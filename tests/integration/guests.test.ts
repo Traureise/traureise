@@ -11,7 +11,9 @@ import { guestRequests, guests, households, rsvpPolls, rsvpSettings } from "@/in
 import { createGuestMailTemplates } from "@/infrastructure/mail/guest-templates";
 import { PostgresRateLimiter } from "@/infrastructure/repositories/auth";
 import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing";
+import { DrizzleCardRepository } from "@/infrastructure/repositories/cards";
 import { DrizzleGuestRepository } from "@/infrastructure/repositories/guests";
+import { createCardTexts } from "@/infrastructure/mail/card-templates";
 import { DrizzleUploadRepository } from "@/infrastructure/repositories/uploads";
 import { DrizzleUserRepository } from "@/infrastructure/repositories/users";
 import { DrizzleWebsiteRepository } from "@/infrastructure/repositories/websites";
@@ -46,6 +48,9 @@ function deps(clock = new FakeClock()) {
     billingRepo: new DrizzleBillingRepository(db),
     rateLimiter: new PostgresRateLimiter(db),
     guests: repo,
+    cards: new DrizzleCardRepository(db),
+    cardTexts: createCardTexts(),
+    mailRate: { batchSize: 10, intervalMs: 0 },
     guestLinks: hmacGuestLinks("integration-secret-integration-secret"),
     guestMail: createGuestMailTemplates(),
     mailer,
@@ -61,7 +66,7 @@ function deps(clock = new FakeClock()) {
 }
 
 const newHousehold = (name = "Familie Weber", people = ["Clara", "Max"]) =>
-  repo.createHousehold(websiteId, { name, invitedEventIds: null, people: people.map((p) => ({ id: null, name: p, isChild: p === "Ida" })) }, (id) => `hash-${id}`);
+  repo.createHousehold(websiteId, { name, invitedEventIds: null, email: null, personalLine: "", people: people.map((p) => ({ id: null, name: p, isChild: p === "Ida" })) }, (id) => `hash-${id}`);
 
 describe("DrizzleGuestRepository", () => {
   it("stores settings and polls per website", async () => {
@@ -88,7 +93,7 @@ describe("DrizzleGuestRepository", () => {
     expect(await repo.findHousehold(crypto.randomUUID(), household.id)).toBeNull();
 
     const [clara] = household.people;
-    await repo.updateHousehold(websiteId, household.id, { name: "Weber", invitedEventIds: [party], people: [{ id: null, name: "Ida", isChild: true }, { id: clara!.id, name: "Clara W.", isChild: false }] });
+    await repo.updateHousehold(websiteId, household.id, { name: "Weber", invitedEventIds: [party], email: null, personalLine: "", people: [{ id: null, name: "Ida", isChild: true }, { id: clara!.id, name: "Clara W.", isChild: false }] });
     const updated = (await repo.findHousehold(websiteId, household.id))!;
     expect(updated).toMatchObject({ name: "Weber", invitedEventIds: [party] });
     expect(updated.people.map((p) => [p.name, p.isChild, p.id === clara!.id])).toEqual([
@@ -173,7 +178,7 @@ describe("retention", () => {
     const household = await newHousehold();
     await repo.saveResponse(household.id, { people: [], pollAnswers: {}, message: "Hallo", requests: ["Lena"] }, new Date());
     const otherSite = (await websites.create({ ownerId, slug: `spaet-${Date.now()}`, title: "Später", weddingDate: "2030-01-01", themeId: "salbei", timezone: "Europe/Berlin" }, sections)).id;
-    await repo.createHousehold(otherSite, { name: "Bleibt", invitedEventIds: null, people: [{ id: null, name: "Tom", isChild: false }] }, (id) => `hash-${id}`);
+    await repo.createHousehold(otherSite, { name: "Bleibt", invitedEventIds: null, email: null, personalLine: "", people: [{ id: null, name: "Tom", isChild: false }] }, (id) => `hash-${id}`);
     const ids = [household.id];
 
     clock.current = new Date("2028-06-13T00:00:01Z");

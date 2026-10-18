@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { GetEventIcs, GetPublicWebsite } from "@/application/public";
+import { GetEventIcs, GetPublicWebsite, GetWeddingIcs } from "@/application/public";
 import { AddItem, UpdateSection } from "@/application/sections";
 import { CreateWebsite, GetWebsiteForOwner } from "@/application/websites";
 import { renderableSections } from "@/application/views";
@@ -61,5 +61,16 @@ describe("GetEventIcs", () => {
 
     await new UpdateSection(f.deps).execute(anna, websiteId, "schedule", { visible: false });
     expect(await new GetEventIcs(f.deps).execute("anna-und-ben", item.id)).toBeNull();
+  });
+});
+
+describe("GetWeddingIcs", () => {
+  it("is the wedding day as an all-day event, or null without a date", async () => {
+    expect(await new GetWeddingIcs(f.deps).execute("anna-und-ben")).toBeNull();
+    const other = await new CreateWebsite(f.deps).execute(anna, { title: "Clara & Dan", weddingDate: "2027-06-12" });
+    const ics = await new GetWeddingIcs(f.deps).execute(other.slug);
+    expect(ics?.filename).toBe(`${other.slug}.ics`);
+    expect(ics?.content).toContain("SUMMARY:Hochzeit von Clara & Dan");
+    expect(ics?.content).toContain("DTSTART;VALUE=DATE:20270612");
   });
 });

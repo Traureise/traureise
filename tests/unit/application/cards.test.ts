@@ -1,0 +1,398 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { DeleteAccount, ExportAccount } from "@/application/account";
+import {
+  CreateCard,
+  DeleteCard,
+  ExportCard,
+  GetCardEditor,
+  GetCardPreview,
+  GetEngagementPage,
+  GetHouseholdPage,
+  GetUnsubscribe,
+  ListCards,
+  MarkCardsOpened,
+  RunMailJobs,
+  SaveCard,
+  SendCardEmails,
+  SendReminders,
+  SetCardExcluded,
+  ShareCard,
+  Unsubscribe,
+} from "@/application/cards";
+import { LockedError, NotFoundError, ValidationError } from "@/application/errors";
+import { GetGuestPage, RunGuestJobs, SaveHousehold, SaveRsvpSettings, SubmitGuestResponse } from "@/application/guests";
+import { AddItem } from "@/application/sections";
+import { CreateWebsite, DeleteWebsite } from "@/application/websites";
+import type { PaidTier } from "@/domain/billing";
+import type { CardKind } from "@/domain/cards";
+import { FakeArchive, FakeCardRenderer, createFakes } from "../../fakes";
+
+let f: ReturnType<typeof createFakes>;
+let anna: { id: string; email: string };
+let websiteId: string;
+let ceremony: string;
+
+beforeEach(async () => {
+  f = createFakes();
+  f.deps.billing.enabled = false;
+  anna = await f.users.create("anna@example.org");
+  websiteId = (await new CreateWebsite(f.deps).execute(anna.id, { title: "Anna & Ben", weddingDate: "2027-06-12" })).id;
+  ceremony = (await new AddItem(f.deps).execute(anna.id, websiteId, "schedule", { eventType: "ceremony", name: "Trauung", startDate: "2027-06-12", startTime: "14:30", venueName: "Gut Kaden" })).id;
+});
+
+const create = (kind: CardKind, userId = anna.id) => new CreateCard(f.deps).execute(userId, websiteId, kind);
+const editor = (kind: CardKind) => new GetCardEditor(f.deps).execute(anna.id, websiteId, kind);
+const household = (name: string, email: string | null = null, personalLine = "") =>
+  new SaveHousehold(f.deps).execute(anna.id, websiteId, null, { name, email, personalLine, people: [{ name: `${name} 1` }, { name: `${name} 2` }] });
+const token = (householdId: string) => f.guestLinks.tokenFor(householdId);
+const page = (householdId: string) => new GetHouseholdPage(f.deps).execute(token(householdId));
+const share = (kind: CardKind, householdId: string, via: "whatsapp" | "link" = "link") => new ShareCard(f.deps).execute(anna.id, websiteId, kind, householdId, via);
+const sendEmails = (kind: CardKind, target: { householdId: string } | "all") => new SendCardEmails(f.deps).execute(anna.id, websiteId, kind, target);
+const runMail = () => new RunMailJobs(f.deps).execute({ websiteId });
+const grant = async (tier: PaidTier) => {
+  f.deps.billing.enabled = true;
+  await f.billingRepo.applyEvent(`evt-${Math.random()}`, { kind: "grant", websiteId, tier, purchaseRef: `ord-${Math.random()}`, provider: "testpay", validUntil: new Date("2028-06-13T00:00:00Z") });
+};
+const lockAll = () => {
+  f.deps.billing.enabled = true;
+};
+
+describe("creating and editing cards", () => {
+  it("creates one card per kind with the website's design and translated defaults", async () => {
+    const card = await create("saveTheDate");
+    expect(card).toMatchObject({ kind: "saveTheDate", themeId: "salbei", layoutId: "bogen", envelope: true, content: { names: "Anna & Ben", text: "Einladung folgt" } });
+    const again = await create("saveTheDate");
+    expect(again.id).toBe(card.id);
+    const invitation = await create("invitation");
+    expect(invitation).toMatchObject({ reminderDays: [14, 3], content: { heading: "Wir heiraten", eventId: ceremony } });
+  });
+
+  it("offers themes with layouts for the kind, and saves a different theme, palette and texts", async () => {
+    await create("thankYou");
+    const view = await editor("thankYou");
+    expect(view.themes.map((t) => t.id)).toEqual(["salbei", "terrakotta"]);
+    expect(view.themes[0]!.layouts.map((l) => l.id)).toEqual(["bogen", "schlicht"]);
+    await new SaveCard(f.deps).execute(anna.id, websiteId, "thankYou", {
+      themeId: "terrakotta",
+      paletteId: "dunkel",
+      layoutId: "schlicht",
+      envelope: false,
+      content: { heading: "Danke!", names: "Anna & Ben", text: "Für alles." },
+      message: "Liebe {name}",
+    });
+    expect((await editor("thankYou")).card).toMatchObject({ themeId: "terrakotta", paletteId: "dunkel", layoutId: "schlicht", envelope: false, content: { heading: "Danke!" } });
+  });
+
+  it("refuses unknown themes, layouts, events and someone else's photos", async () => {
+    await create("invitation");
+    const save = (patch: object) =>
+      new SaveCard(f.deps).execute(anna.id, websiteId, "invitation", { themeId: "salbei", content: { names: "Anna & Ben" }, ...patch });
+    await expect(save({ themeId: "nope" })).rejects.toMatchObject({ fieldErrors: { themeId: "invalid_option" } });
+    await expect(save({ layoutId: "schlicht" })).rejects.toMatchObject({ fieldErrors: { layoutId: "invalid_option" } });
+    await expect(save({ content: { names: "A", eventId: "unknown" } })).rejects.toMatchObject({ fieldErrors: { "content.eventId": "invalid_option" } });
+    await expect(save({ photoKey: "other.webp" })).rejects.toMatchObject({ fieldErrors: { photoKey: "invalid_image" } });
+  });
+
+  it("belongs to the website's owner; deleting removes the card", async () => {
+    const ben = await f.users.create("ben@example.org");
+    await expect(create("saveTheDate", ben.id)).rejects.toBeInstanceOf(NotFoundError);
+    await create("saveTheDate");
+    await new DeleteCard(f.deps).execute(anna.id, websiteId, "saveTheDate");
+    await expect(editor("saveTheDate")).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("lists cards for the dashboard with status counts", async () => {
+    const weber = await household("Weber");
+    await household("Kern");
+    await create("saveTheDate");
+    await create("engagement");
+    await share("saveTheDate", weber.id);
+    await new MarkCardsOpened(f.deps).execute(token(weber.id), ["saveTheDate"]);
+    const cards = await new ListCards(f.deps).execute(anna.id);
+    expect(cards.map((c) => [c.kind, c.counts])).toEqual([
+      ["saveTheDate", { households: 2, sent: 1, opened: 1 }],
+      ["engagement", null],
+    ]);
+    expect(cards[1]!.publicUrl).toMatch(/\/verlobung$/);
+  });
+});
+
+describe("gating", () => {
+  it("lets everyone design and preview for free", async () => {
+    lockAll();
+    await create("thankYou");
+    expect((await editor("thankYou")).active).toBe(false);
+    const preview = await new GetCardPreview(f.deps).execute(anna.id, websiteId, "thankYou");
+    expect(preview.cards[0]!.model.kind).toBe("thankYou");
+  });
+
+  it("needs Einladungen for Save the Dates and invitations, Komplett for the other cards", async () => {
+    lockAll();
+    const weber = await household("Weber", "weber@example.org");
+    for (const kind of ["saveTheDate", "thankYou", "engagement"] as const) await create(kind);
+    await expect(new ExportCard(f.deps).execute(anna.id, websiteId, "saveTheDate", "png")).rejects.toBeInstanceOf(LockedError);
+    await expect(share("saveTheDate", weber.id)).rejects.toBeInstanceOf(LockedError);
+    await expect(sendEmails("saveTheDate", "all")).rejects.toBeInstanceOf(LockedError);
+    expect(await new GetEngagementPage(f.deps).execute("anna-und-ben")).toMatchObject({ state: "inactive" });
+
+    await grant("invitations");
+    await expect(share("saveTheDate", weber.id)).resolves.toBeDefined();
+    await expect(new ExportCard(f.deps).execute(anna.id, websiteId, "thankYou", "a6")).rejects.toBeInstanceOf(LockedError);
+
+    await grant("complete");
+    expect(await new ExportCard(f.deps).execute(anna.id, websiteId, "thankYou", "a6")).toMatchObject({ contentType: "application/pdf", filename: "dankeskarte-a6.pdf" });
+    expect(await new GetEngagementPage(f.deps).execute("anna-und-ben")).toMatchObject({ state: "active" });
+  });
+
+  it("exports PNG, A6 and A5 with the photo", async () => {
+    await create("saveTheDate");
+    const png = await new ExportCard(f.deps).execute(anna.id, websiteId, "saveTheDate", "png");
+    expect(png).toMatchObject({ contentType: "image/png", filename: "save-the-date.png" });
+    await new ExportCard(f.deps).execute(anna.id, websiteId, "saveTheDate", "a5");
+    expect((f.deps.cardRenderer as FakeCardRenderer).calls.map((c) => c.format)).toEqual(["png-1748", "a5"]);
+  });
+});
+
+describe("the household page", () => {
+  it("keeps the v3 response page while no card has been sent", async () => {
+    const weber = await household("Weber");
+    expect(await page(weber.id)).toMatchObject({ state: "page", cards: [], form: { state: "open" } });
+  });
+
+  it("shows the Save the Date, then the invitation with the form, then the thank-you card first", async () => {
+    const weber = await household("Weber", null, "Danke für den Kuchen!");
+    await create("saveTheDate");
+    await create("invitation");
+    await create("thankYou");
+    expect(await page(weber.id)).toMatchObject({ state: "empty" });
+
+    await share("saveTheDate", weber.id);
+    let view = await page(weber.id);
+    expect(view).toMatchObject({ state: "page", greeting: "Weber", envelope: true, form: null });
+    if (view?.state !== "page") throw new Error("page");
+    expect(view.cards.map((c) => c.kind)).toEqual(["saveTheDate"]);
+    expect(view.cards[0]!.icsUrl).toBe("/anna-und-ben/hochzeit.ics");
+
+    f.clock.advance(86_400_000);
+    await share("invitation", weber.id, "whatsapp");
+    view = await page(weber.id);
+    if (view?.state !== "page") throw new Error("page");
+    expect(view.cards.map((c) => c.kind)).toEqual(["invitation", "saveTheDate"]);
+    expect(view.form?.state).toBe("open");
+
+    f.clock.advance(86_400_000);
+    await share("thankYou", weber.id);
+    view = await page(weber.id);
+    if (view?.state !== "page") throw new Error("page");
+    expect(view.cards.map((c) => c.kind)).toEqual(["thankYou", "invitation", "saveTheDate"]);
+    expect(view.cards[0]!.model.personalLine).toBe("Danke für den Kuchen!");
+  });
+
+  it("does not accept answers while the invitation that carries the form has not been sent", async () => {
+    const weber = await household("Weber");
+    await create("invitation");
+    const answer = { people: Object.fromEntries(weber.people.map((p) => [p.id, { attending: false }])) };
+    await expect(new SubmitGuestResponse(f.deps).execute({ token: token(weber.id), input: answer, ip: "10.0.0.1" })).rejects.toMatchObject({ fieldErrors: { _: "inactive" } });
+    await share("invitation", weber.id);
+    await expect(new SubmitGuestResponse(f.deps).execute({ token: token(weber.id), input: answer, ip: "10.0.0.1" })).resolves.toBeUndefined();
+  });
+
+  it("records opened once, only for cards the page shows, never from the couple's preview", async () => {
+    const weber = await household("Weber");
+    await create("saveTheDate");
+    await create("invitation");
+    await new GetCardPreview(f.deps).execute(anna.id, websiteId, "saveTheDate");
+    await share("saveTheDate", weber.id);
+    expect(await new MarkCardsOpened(f.deps).execute(token(weber.id), ["saveTheDate", "invitation"])).toEqual(["saveTheDate"]);
+    expect(await new MarkCardsOpened(f.deps).execute(token(weber.id), ["saveTheDate"])).toEqual([]);
+    expect(await new MarkCardsOpened(f.deps).execute("unknown", ["saveTheDate"])).toEqual([]);
+    const entry = (await new GetGuestPage(f.deps).execute(anna.id, websiteId)).households[0]!;
+    expect(entry.deliveries.saveTheDate).toMatchObject({ sharedVia: "link" });
+    expect(entry.deliveries.saveTheDate?.openedAt).toBeInstanceOf(Date);
+  });
+
+  it("leaves out households the couple excluded", async () => {
+    const weber = await household("Weber");
+    await create("saveTheDate");
+    await new SetCardExcluded(f.deps).execute(anna.id, websiteId, "saveTheDate", weber.id, true);
+    await expect(share("saveTheDate", weber.id)).rejects.toBeInstanceOf(ValidationError);
+    expect(await page(weber.id)).toMatchObject({ cards: [] });
+  });
+
+  it("is null for unknown links", async () => {
+    expect(await new GetHouseholdPage(f.deps).execute("nope")).toBeNull();
+  });
+});
+
+describe("sending by email", () => {
+  it("queues one email per household with an address and sends it once, as the couple, with the card and an unsubscribe link", async () => {
+    const weber = await household("Weber", "weber@example.org");
+    await household("Kern");
+    await create("saveTheDate");
+    expect(await sendEmails("saveTheDate", "all")).toEqual({ queued: 1 });
+    expect(f.mailer.sent).toEqual([]);
+
+    expect(await runMail()).toMatchObject({ sent: 1, failed: 0 });
+    expect(await runMail()).toMatchObject({ sent: 0 });
+    expect(f.mailer.sent).toHaveLength(1);
+    const [mail] = f.mailer.sent;
+    expect(mail).toMatchObject({ to: "weber@example.org", fromName: "Anna & Ben über Traureise", replyTo: "anna@example.org" });
+    expect(mail!.headers).toEqual({
+      "List-Unsubscribe": `<http://localhost:3000/api/abmelden/stop-${weber.id}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    });
+    expect(mail!.attachments).toMatchObject([{ contentType: "image/png", cid: "karte" }]);
+    expect(JSON.parse(mail!.text)).toMatchObject({ pageUrl: `http://localhost:3000/antwort/link-${weber.id}`, unsubscribeUrl: `http://localhost:3000/abmelden/stop-${weber.id}`, message: "Hallo Weber, merkt euch den Tag!" });
+
+    expect(await sendEmails("saveTheDate", "all")).toEqual({ queued: 0 });
+    expect(await sendEmails("saveTheDate", { householdId: weber.id })).toEqual({ queued: 1 });
+  });
+
+  it("refuses a single household without an address", async () => {
+    const kern = await household("Kern");
+    await create("saveTheDate");
+    await expect(sendEmails("saveTheDate", { householdId: kern.id })).rejects.toMatchObject({ fieldErrors: { email: "no_email" } });
+  });
+
+  it("renders a personal image only for thank-you cards with a personal line", async () => {
+    await household("Weber", "weber@example.org", "Danke für den Kuchen!");
+    await household("Kern", "kern@example.org");
+    await household("Roth", "roth@example.org");
+    await create("thankYou");
+    await sendEmails("thankYou", "all");
+    await runMail();
+    expect((f.deps.cardRenderer as FakeCardRenderer).calls.map((c) => c.personalLine)).toEqual(["Danke für den Kuchen!", null]);
+  });
+
+  it("marks a failed send and never retries it by itself", async () => {
+    await household("Weber", "weber@example.org");
+    await create("saveTheDate");
+    await sendEmails("saveTheDate", "all");
+    f.mailer.send = async () => {
+      throw new Error("smtp down");
+    };
+    expect(await runMail()).toMatchObject({ sent: 0, failed: 1 });
+    expect(await runMail()).toMatchObject({ sent: 0, failed: 0 });
+    const entry = (await new GetGuestPage(f.deps).execute(anna.id, websiteId)).households[0]!;
+    expect(entry.deliveries.saveTheDate).toMatchObject({ emailError: "send_failed", emailedAt: null });
+  });
+
+  it("turns claims of a crashed run into failures instead of sending again", async () => {
+    const weber = await household("Weber", "weber@example.org");
+    const card = await create("saveTheDate");
+    await sendEmails("saveTheDate", "all");
+    expect(await f.cards.claimMail("card", card.id, weber.id, f.clock.now())).toBe(true);
+    f.clock.advance(16 * 60_000);
+    expect(await runMail()).toMatchObject({ sent: 0 });
+    expect((await f.cards.listDeliveries(card.id))[0]).toMatchObject({ emailError: "interrupted", emailedAt: null });
+  });
+
+  it("skips households that unsubscribed after the email was queued", async () => {
+    const weber = await household("Weber", "weber@example.org");
+    await create("saveTheDate");
+    await sendEmails("saveTheDate", "all");
+    expect(await new Unsubscribe(f.deps).execute(f.guestLinks.unsubscribeTokenFor(weber.id))).toBe(true);
+    expect(await runMail()).toMatchObject({ sent: 0, failed: 1 });
+    expect(f.mailer.sent).toEqual([]);
+  });
+});
+
+describe("unsubscribing", () => {
+  it("clears the address without login and tells the household whose emails stop", async () => {
+    const weber = await household("Weber", "weber@example.org");
+    const stop = f.guestLinks.unsubscribeTokenFor(weber.id);
+    expect(await new GetUnsubscribe(f.deps).execute(stop)).toEqual({ couple: "Anna & Ben", household: "Weber", done: false });
+    expect(await new Unsubscribe(f.deps).execute(stop)).toBe(true);
+    expect(await new GetUnsubscribe(f.deps).execute(stop)).toEqual({ couple: "Anna & Ben", household: "Weber", done: true });
+    const entry = (await new GetGuestPage(f.deps).execute(anna.id, websiteId)).households[0]!;
+    expect(entry).toMatchObject({ email: null });
+    expect(entry.unsubscribedAt).toBeInstanceOf(Date);
+    expect(await new Unsubscribe(f.deps).execute("forged")).toBe(false);
+    expect(await new GetUnsubscribe(f.deps).execute("forged")).toBeNull();
+  });
+});
+
+describe("reminders", () => {
+  beforeEach(async () => {
+    await new SaveRsvpSettings(f.deps).execute(anna.id, websiteId, { replyBy: "2027-05-01" });
+  });
+
+  it("emails open households with an address on the configured days, once each", async () => {
+    const weber = await household("Weber", "weber@example.org");
+    const kern = await household("Kern", "kern@example.org");
+    const roth = await household("Roth");
+    await create("invitation");
+    f.clock.current = new Date("2027-03-01T10:00:00Z");
+    for (const h of [weber, kern, roth]) await share("invitation", h.id);
+    await new SubmitGuestResponse(f.deps).execute({ token: token(kern.id), input: { people: Object.fromEntries(kern.people.map((p) => [p.id, { attending: false }])) }, ip: "10.0.0.2" });
+
+    f.clock.current = new Date("2027-04-10T10:00:00Z");
+    expect((await runMail()).reminders).toBe(0);
+    f.clock.current = new Date("2027-04-17T10:00:00Z");
+    expect((await runMail()).reminders).toBe(1);
+    expect((await runMail()).reminders).toBe(0);
+    f.clock.current = new Date("2027-04-28T10:00:00Z");
+    expect((await runMail()).reminders).toBe(1);
+    f.clock.current = new Date("2027-05-02T10:00:00Z");
+    expect((await runMail()).reminders).toBe(0);
+    expect(f.mailer.sent.map((m) => m.to)).toEqual(["weber@example.org", "weber@example.org"]);
+    expect(f.mailer.sent[0]!.subject).toBe("Erinnerung: Anna & Ben");
+  });
+
+  it("are part of the regular guest jobs and need the Einladungen tier", async () => {
+    const weber = await household("Weber", "weber@example.org");
+    await create("invitation");
+    f.clock.current = new Date("2027-03-01T10:00:00Z");
+    await share("invitation", weber.id);
+    await grant("rsvp");
+    f.clock.current = new Date("2027-04-28T10:00:00Z");
+    expect((await new RunGuestJobs(f.deps).execute({ websiteId })).reminders).toBe(0);
+  });
+
+  it("has a button: email where there is an address, otherwise a WhatsApp link", async () => {
+    const weber = await household("Weber", "weber@example.org");
+    const roth = await household("Roth");
+    await create("invitation");
+    const result = await new SendReminders(f.deps).execute(anna.id, websiteId, "all");
+    expect(result.queued).toBe(1);
+    expect(result.whatsapp.map((w) => w.householdId)).toEqual([roth.id]);
+    expect(result.whatsapp[0]!.url).toContain(encodeURIComponent(`link-${roth.id}`));
+    await runMail();
+    expect(f.mailer.sent.map((m) => m.to)).toEqual(["weber@example.org"]);
+    const entry = (await new GetGuestPage(f.deps).execute(anna.id, websiteId)).households.find((h) => h.id === weber.id)!;
+    expect(entry.deliveries.invitation?.remindedAt).toBeInstanceOf(Date);
+  });
+
+  it("keeps the WhatsApp reminder in RSVP and email reminders in Einladungen", async () => {
+    await household("Weber", "weber@example.org");
+    await household("Roth");
+    await grant("rsvp");
+    const result = await new SendReminders(f.deps).execute(anna.id, websiteId, "all");
+    expect(result.queued).toBe(0);
+    expect(result.whatsapp).toHaveLength(2);
+  });
+});
+
+describe("account rights and retention", () => {
+  it("exports cards, addresses, personal lines and statuses", async () => {
+    const weber = await household("Weber", "weber@example.org", "Danke!");
+    await create("saveTheDate");
+    await share("saveTheDate", weber.id);
+    const entries = FakeArchive.read((await new ExportAccount(f.deps).execute(anna.id)).bytes);
+    const data = JSON.parse(new TextDecoder().decode(entries.find((e) => e.path === "data.json")!.bytes));
+    const website = data.websites[0];
+    expect(website.cards).toMatchObject([{ kind: "saveTheDate", content: { names: "Anna & Ben" }, deliveries: [{ household: "Weber", sharedVia: "link" }] }]);
+    expect(website.guests.households[0]).toMatchObject({ email: "weber@example.org", personalLine: "Danke!" });
+  });
+
+  it("removes cards and deliveries with the website, the account and the guest data", async () => {
+    const weber = await household("Weber", "weber@example.org");
+    await create("saveTheDate");
+    await share("saveTheDate", weber.id);
+    await f.guests.deleteGuestData(websiteId);
+    expect(await f.cards.listDeliveries(f.cards.cards[0]!.id)).toEqual([]);
+    await new DeleteWebsite(f.deps).execute(anna.id, websiteId);
+    expect(f.cards.cards).toEqual([]);
+    await new DeleteAccount(f.deps).execute(anna.id, "anna@example.org");
+  });
+});

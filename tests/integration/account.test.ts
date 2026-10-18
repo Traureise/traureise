@@ -10,6 +10,7 @@ import { SECTION_KINDS } from "@/domain/sections";
 import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
 import { DrizzleMagicLinkRepository, DrizzleSessionRepository, PostgresRateLimiter } from "@/infrastructure/repositories/auth";
 import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing";
+import { DrizzleCardRepository } from "@/infrastructure/repositories/cards";
 import { DrizzleGuestRepository } from "@/infrastructure/repositories/guests";
 import { DrizzleUploadRepository } from "@/infrastructure/repositories/uploads";
 import { DrizzleUserRepository } from "@/infrastructure/repositories/users";
@@ -34,6 +35,7 @@ async function realDeps() {
     storage: new LocalFileStorage(dir),
     billingRepo: new DrizzleBillingRepository(db),
     guests: new DrizzleGuestRepository(db),
+    cards: new DrizzleCardRepository(db),
     archive: new FflateArchiveWriter(),
     clock: systemClock,
     tokens: cryptoTokens,

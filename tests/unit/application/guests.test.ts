@@ -6,7 +6,6 @@ import {
   DeleteHousehold,
   DeletePoll,
   ExportGuestsCsv,
-  GetGuestForm,
   GetGuestFormPreview,
   GetGuestPage,
   RunGuestJobs,
@@ -15,6 +14,7 @@ import {
   SaveRsvpSettings,
   SubmitGuestResponse,
 } from "@/application/guests";
+import { GetHouseholdPage } from "@/application/cards";
 import { AddItem } from "@/application/sections";
 import { CreateWebsite, DeleteWebsite } from "@/application/websites";
 import type { CsvLabels } from "@/domain/guests";
@@ -42,6 +42,11 @@ const saveHousehold = (input: unknown, householdId: string | null = null, userId
 const page = () => new GetGuestPage(f.deps).execute(anna.id, websiteId);
 const submit = (token: string, input: unknown, ip = "10.0.0.1") => new SubmitGuestResponse(f.deps).execute({ token, input, ip });
 const tokenOf = (householdId: string) => f.guestLinks.tokenFor(householdId);
+/** The response form on a household's page (without cards the page is just the form), or the inactive page. */
+const guestForm = async (token: string) => {
+  const result = await new GetHouseholdPage(f.deps).execute(token);
+  return result?.state === "page" ? result.form : result;
+};
 const grantRsvp = async (over: { validUntil?: Date } = {}) => {
   f.deps.billing.enabled = true;
   await f.billingRepo.applyEvent(`evt-${Math.random()}`, {
@@ -140,32 +145,32 @@ describe("sending is the RSVP tier", () => {
     const view = await page();
     expect(view.sending).toBe(false);
     expect(view.households[0]!.link).toBeNull();
-    expect(await new GetGuestForm(f.deps).execute(tokenOf(household.id))).toMatchObject({ state: "inactive" });
+    expect(await guestForm(tokenOf(household.id))).toMatchObject({ state: "inactive" });
     await expect(submit(tokenOf(household.id), {})).rejects.toMatchObject({ fieldErrors: { _: "inactive" } });
 
     await grantRsvp();
     expect((await page()).sending).toBe(true);
-    expect(await new GetGuestForm(f.deps).execute(tokenOf(household.id))).toMatchObject({ state: "open" });
+    expect(await guestForm(tokenOf(household.id))).toMatchObject({ state: "open" });
   });
 });
 
 describe("the guest form", () => {
   it("is a 404 for unknown tokens and hides everything when inactive", async () => {
-    expect(await new GetGuestForm(f.deps).execute("nope")).toBeNull();
+    expect(await guestForm("nope")).toBeNull();
     await expect(submit("nope", {})).rejects.toBeInstanceOf(NotFoundError);
     f.deps.billing.enabled = true;
     const household = await weber();
-    expect(await new GetGuestForm(f.deps).execute(tokenOf(household.id))).not.toHaveProperty("household");
+    expect(await guestForm(tokenOf(household.id))).not.toHaveProperty("household");
   });
 
   it("shows only the household's events and the meal only when it applies", async () => {
     await new SaveRsvpSettings(f.deps).execute(anna.id, websiteId, { meal: { eventId: party, options: [{ label: "Fisch" }] } });
     const brunchOnly = await saveHousehold({ name: "Brunch", invitedEventIds: [brunch], people: [{ name: "Ute" }] });
     const all = await weber();
-    const brunchForm = await new GetGuestForm(f.deps).execute(tokenOf(brunchOnly.id));
+    const brunchForm = await guestForm(tokenOf(brunchOnly.id));
     expect(brunchForm).toMatchObject({ state: "open", meal: null });
     expect(brunchForm!.state === "open" && brunchForm!.events.map((e) => e.name)).toEqual(["Brunch"]);
-    const allForm = await new GetGuestForm(f.deps).execute(tokenOf(all.id));
+    const allForm = await guestForm(tokenOf(all.id));
     expect(allForm!.state === "open" && allForm!.events.map((e) => e.name)).toEqual(["Feier", "Brunch"]);
     expect(allForm!.state === "open" && allForm!.meal?.options.map((o) => o.label)).toEqual(["Fisch"]);
   });
@@ -190,7 +195,7 @@ describe("the guest form", () => {
     expect(view.overview.requests.map((r) => r.name)).toEqual(["Lena"]);
 
     f.clock.advance(3 * 86_400_000);
-    expect(await new GetGuestForm(f.deps).execute(tokenOf(household.id))).toMatchObject({ state: "closed" });
+    expect(await guestForm(tokenOf(household.id))).toMatchObject({ state: "closed" });
     await expect(submit(tokenOf(household.id), { people: { [clara!.id]: { attending: true, eventIds: [party] }, [max!.id]: { attending: false } } })).rejects.toMatchObject({
       fieldErrors: { _: "closed" },
     });
@@ -246,7 +251,7 @@ describe("requests for additional guests", () => {
     const view = await page();
     expect(view.overview.requests).toEqual([]);
     expect(view.households[0]!.people.map((p) => p.name)).toEqual(["Clara", "Max", "Lena"]);
-    const form = await new GetGuestForm(f.deps).execute(tokenOf(household.id));
+    const form = await guestForm(tokenOf(household.id));
     expect(form!.state === "open" && form!.household.requests.map((r) => [r.name, r.status])).toEqual([
       ["Lena", "added"],
       ["Jonas", "declined"],
@@ -296,7 +301,7 @@ describe("RunGuestJobs", () => {
 
   it("deletes guest data 12 months after the wedding, after warning 30 days before (once)", async () => {
     await weber();
-    expect(await jobs()).toEqual({ deleted: [], warned: [], summaries: [] });
+    expect(await jobs()).toEqual({ deleted: [], warned: [], summaries: [], emails: 0, reminders: 0 });
 
     f.clock.current = new Date("2028-05-15T10:00:00Z");
     expect((await jobs()).warned).toEqual([websiteId]);
@@ -314,7 +319,7 @@ describe("RunGuestJobs", () => {
     const household = await weber();
     const [entitlement] = f.billingRepo.entitlements;
     entitlement!.revokedAt = f.clock.now();
-    expect(await new GetGuestForm(f.deps).execute(tokenOf(household.id))).toMatchObject({ state: "inactive" });
+    expect(await guestForm(tokenOf(household.id))).toMatchObject({ state: "inactive" });
     expect((await jobs()).deleted).toEqual([]);
     expect(f.guests.households).toHaveLength(1);
     f.clock.current = new Date("2028-06-13T00:00:01Z");

@@ -1,4 +1,4 @@
-import type { FeatureContext } from "@/domain/billing";
+import { HOUSEHOLD_CARD_KINDS, type HouseholdCardKind } from "@/domain/cards";
 import {
   dailySummaryDue,
   guestOverview,
@@ -6,66 +6,41 @@ import {
   householdEvents,
   householdStatus,
   isReplyOpen,
-  mealApplies,
   parseHouseholdInput,
   parsePoll,
   parseResponse,
   parseRsvpSettings,
-  rsvpEvents,
   type ChoiceOption,
   type ChoiceOptionInput,
   type CsvLabels,
   type GuestOverview,
   type Household,
   type HouseholdStatus,
-  type MealChoice,
   type Poll,
   type RsvpEvent,
   type RsvpSettings,
 } from "@/domain/guests";
-import { guestDataDeletionDate, guestLinksActive, retentionWarningDue } from "@/domain/retention";
-import type { ResolvedDesign } from "@/domain/theme";
+import { guestDataDeletionDate, retentionWarningDue } from "@/domain/retention";
+import { RunMailJobs } from "./cards";
 import type { Deps } from "./deps";
 import { NotFoundError, RateLimitedError, ValidationError } from "./errors";
+import { deliveriesByKind, formFor, guestsUrl, householdContent, linkUrl, loadByToken, loadGuestContext, type GuestForm } from "./guest-context";
 import { loadOwnedWebsite } from "./owned";
-import type { PollRecord, Website } from "./ports";
-import { itemsOf, loadView } from "./views";
+import type { DeliveryRecord, PollRecord, Website } from "./ports";
+
+export type { GuestForm } from "./guest-context";
 
 const RATE_WINDOW_MS = 15 * 60 * 1000;
 const MAX_PER_LINK = 20;
 const MAX_PER_IP = 60;
 
-/** Everything about a website's guests that the rules need. */
-async function loadGuestContext(deps: Deps, website: Website) {
-  const view = await loadView(deps, website);
-  const [settings, polls, entitlements] = await Promise.all([
-    deps.guests.getSettings(website.id),
-    deps.guests.listPolls(website.id),
-    deps.billingRepo.listByWebsite(website.id),
-  ]);
-  const schedule: RsvpEvent[] = itemsOf(view, "schedule").map((i) => ({ id: i.id, name: i.data.name, startDate: i.data.startDate, startTime: i.data.startTime }));
-  const features: FeatureContext = { billingEnabled: deps.billing.enabled, entitlements };
-  const now = deps.clock.now();
-  const events = rsvpEvents(settings, schedule);
-  return {
-    view,
-    settings,
-    polls,
-    schedule,
-    events,
-    // The meal's event must be on offer; otherwise nobody could choose a meal.
-    meal: settings.meal && (!settings.meal.eventId || events.some((e) => e.id === settings.meal!.eventId)) ? settings.meal : null,
-    now,
-    sending: guestLinksActive(features, website.weddingDate, now),
-    deleteAt: guestDataDeletionDate({ weddingDate: website.weddingDate, entitlements }),
-  };
-}
-type GuestContext = Awaited<ReturnType<typeof loadGuestContext>>;
-
-const guestsUrl = (deps: Deps, websiteId: string) => `${deps.appUrl}/websites/${websiteId}/gaeste`;
-const linkUrl = (deps: Deps, householdId: string) => `${deps.appUrl}/antwort/${deps.guestLinks.tokenFor(householdId)}`;
-
-export type GuestListEntry = Household & { status: HouseholdStatus; events: RsvpEvent[]; link: string | null };
+export type GuestListEntry = Household & {
+  status: HouseholdStatus;
+  events: RsvpEvent[];
+  link: string | null;
+  /** What happened with each card for this household (v4). */
+  deliveries: Record<HouseholdCardKind, DeliveryRecord | null>;
+};
 
 export type GuestPage = {
   website: Website;
@@ -82,6 +57,11 @@ export type GuestPage = {
   billingEnabled: boolean;
   deleteAt: Date | null;
   deletionSoon: boolean;
+  /** The website's household cards and whether each is unlocked (links, sending). */
+  cards: { kind: HouseholdCardKind; active: boolean; message: string }[];
+  /** Email sending and email reminders (Einladungen tier, or no billing). */
+  emailSending: boolean;
+  emailReminders: boolean;
 };
 
 export class GetGuestPage {
@@ -91,6 +71,7 @@ export class GetGuestPage {
     const website = await loadOwnedWebsite(this.deps, userId, websiteId);
     const ctx = await loadGuestContext(this.deps, website);
     const households = await this.deps.guests.listHouseholds(websiteId);
+    const deliveries = (await Promise.all(ctx.cards.map((c) => this.deps.cards.listDeliveries(c.id)))).flat();
     return {
       website,
       settings: ctx.settings,
@@ -102,12 +83,19 @@ export class GetGuestPage {
         status: householdStatus(h),
         events: householdEvents(h, ctx.events),
         link: ctx.sending ? linkUrl(this.deps, h.id) : null,
+        deliveries: deliveriesByKind(ctx, deliveries, h.id),
       })),
       overview: guestOverview({ households, events: ctx.events, meal: ctx.meal, polls: ctx.polls }),
       sending: ctx.sending,
       billingEnabled: this.deps.billing.enabled,
       deleteAt: ctx.deleteAt,
       deletionSoon: households.length > 0 && retentionWarningDue(ctx.deleteAt, ctx.now),
+      cards: HOUSEHOLD_CARD_KINDS.flatMap((kind) => {
+        const card = ctx.cards.find((c) => c.kind === kind);
+        return card ? [{ kind, active: ctx.cardActive(kind), message: card.message ?? this.deps.cardTexts.defaults[kind].message }] : [];
+      }),
+      emailSending: ctx.can("emailSending"),
+      emailReminders: ctx.can("emailReminders"),
     };
   }
 }
@@ -217,56 +205,6 @@ export class ExportGuestsCsv {
 
 // ---- the guests' side ----
 
-type FormWebsite = Pick<Website, "title" | "weddingDate" | "timezone">;
-export type GuestForm = {
-  state: "open" | "closed" | "preview";
-  website: FormWebsite;
-  design: ResolvedDesign;
-  household: Household;
-  /** The household's events, in date order. */
-  events: RsvpEvent[];
-  /** Set when the household is asked for a meal. */
-  meal: MealChoice | null;
-  polls: Poll[];
-  replyBy: string | null;
-};
-export type GuestFormResult = GuestForm | { state: "inactive"; website: FormWebsite; design: ResolvedDesign };
-
-function formFor(ctx: GuestContext, household: Household, state: GuestForm["state"]): GuestForm {
-  const events = householdEvents(household, ctx.events);
-  const { title, weddingDate, timezone } = ctx.view.website;
-  return {
-    state,
-    website: { title, weddingDate, timezone },
-    design: ctx.view.design,
-    household,
-    events,
-    meal: mealApplies(ctx.meal, events.map((e) => e.id)) ? ctx.meal : null,
-    polls: ctx.polls.map(({ id, question, multiple, allowOther, per, options }) => ({ id, question, multiple, allowOther, per, options })),
-    replyBy: ctx.settings.replyBy,
-  };
-}
-
-async function loadByToken(deps: Deps, token: string) {
-  const found = token ? await deps.guests.findByTokenHash(deps.guestLinks.hash(token)) : null;
-  const website = found && (await deps.websites.findById(found.websiteId));
-  if (!found || !website) return null;
-  return { website, household: found.household, ctx: await loadGuestContext(deps, website) };
-}
-
-export class GetGuestForm {
-  constructor(private deps: Deps) {}
-
-  /** Null for unknown links. An inactive link reveals nothing about the household. */
-  async execute(token: string): Promise<GuestFormResult | null> {
-    const found = await loadByToken(this.deps, token);
-    if (!found) return null;
-    const { ctx, household, website } = found;
-    if (!ctx.sending) return { state: "inactive", website: { title: website.title, weddingDate: website.weddingDate, timezone: website.timezone }, design: ctx.view.design };
-    return formFor(ctx, household, isReplyOpen(ctx.settings.replyBy, website.timezone, ctx.now) ? "open" : "closed");
-  }
-}
-
 export class GetGuestFormPreview {
   constructor(private deps: Deps) {}
 
@@ -283,6 +221,9 @@ export class GetGuestFormPreview {
       pollAnswers: {},
       respondedAt: null,
       createdAt: ctx.now,
+      email: null,
+      personalLine: "",
+      unsubscribedAt: null,
       requests: [],
       people: sample.people.map((name, i) => ({ id: `preview-${i}`, name, isChild: false, attending: null, eventIds: [], mealOptionId: null, allergies: "", pollAnswers: {}, fromRequest: false })),
     };
@@ -304,7 +245,7 @@ export class SubmitGuestResponse {
     const found = await loadByToken(this.deps, input.token);
     if (!found) throw new NotFoundError();
     const { ctx, household, website } = found;
-    if (!ctx.sending) throw new ValidationError({ _: "inactive" });
+    if (!ctx.sending || !(await householdContent(this.deps, ctx, household)).form) throw new ValidationError({ _: "inactive" });
     if (!isReplyOpen(ctx.settings.replyBy, website.timezone, ctx.now)) throw new ValidationError({ _: "closed" });
 
     const parsed = parseResponse(input.input, { household, events: ctx.events, meal: ctx.meal, polls: ctx.polls });
@@ -335,7 +276,7 @@ export class SubmitGuestResponse {
 
 // ---- background jobs ----
 
-export type GuestJobsResult = { deleted: string[]; warned: string[]; summaries: string[] };
+export type GuestJobsResult = { deleted: string[]; warned: string[]; summaries: string[]; emails: number; reminders: number };
 
 /**
  * Retention and daily summaries. Idempotent and safe on several instances at once: deleting twice
@@ -345,7 +286,7 @@ export class RunGuestJobs {
   constructor(private deps: Deps) {}
 
   async execute(options: { websiteId?: string } = {}): Promise<GuestJobsResult> {
-    const result: GuestJobsResult = { deleted: [], warned: [], summaries: [] };
+    const result: GuestJobsResult = { deleted: [], warned: [], summaries: [], emails: 0, reminders: 0 };
     const inScope = (ids: string[]) => (options.websiteId ? ids.filter((id) => id === options.websiteId) : ids);
 
     for (const websiteId of inScope(await this.deps.guests.listWebsiteIdsWithGuests())) {
@@ -362,6 +303,10 @@ export class RunGuestJobs {
       });
       if (sent) result.summaries.push(websiteId);
     }
+    // Emails the couple queued that are still waiting (the instance restarted, say), and automatic reminders.
+    const mail = await new RunMailJobs(this.deps).execute(options);
+    result.emails = mail.sent;
+    result.reminders = mail.reminders;
     return result;
   }
 

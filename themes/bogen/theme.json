@@ -21,5 +21,12 @@
     }
   ],
   "fonts": { "defaultPairing": "markant" },
-  "assets": { "preview": "preview.svg", "heroFrame": "frame.svg", "divider": "divider.svg" }
+  "assets": { "preview": "preview.svg", "heroFrame": "frame.svg", "divider": "divider.svg" },
+  "cards": {
+    "layouts": [
+      { "id": "fenster", "name": { "de": "Fenster", "en": "Window" }, "photo": "masked", "photoMask": "frame.svg", "ornament": "divider.svg", "headingCase": "upper" },
+      { "id": "farbe", "name": { "de": "Farbfläche", "en": "Colour block" }, "photo": "circle", "surface": "primary", "ornament": "divider.svg" },
+      { "id": "klar", "name": { "de": "Klar", "en": "Clean" }, "photo": "rect", "align": "left", "headingCase": "upper", "border": true }
+    ]
+  }
 }

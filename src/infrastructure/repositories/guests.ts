@@ -98,6 +98,9 @@ export class DrizzleGuestRepository implements GuestRepository {
       pollAnswers: r.pollAnswers,
       respondedAt: r.respondedAt,
       createdAt: r.createdAt,
+      email: r.email,
+      personalLine: r.personalLine,
+      unsubscribedAt: r.unsubscribedAt,
       people: people.filter((p) => p.householdId === r.id).map(toGuest),
       requests: requests.filter((q) => q.householdId === r.id).map(toRequest),
     }));
@@ -122,7 +125,9 @@ export class DrizzleGuestRepository implements GuestRepository {
   async createHousehold(websiteId: string, data: HouseholdData, tokenHashFor: (householdId: string) => string): Promise<Household> {
     const id = crypto.randomUUID();
     await this.db.transaction(async (tx) => {
-      await tx.insert(households).values({ id, websiteId, name: data.name, invitedEventIds: data.invitedEventIds, tokenHash: tokenHashFor(id) });
+      await tx
+        .insert(households)
+        .values({ id, websiteId, name: data.name, invitedEventIds: data.invitedEventIds, email: data.email, personalLine: data.personalLine, tokenHash: tokenHashFor(id) });
       await tx.insert(guests).values(data.people.map((p, position) => ({ householdId: id, position, name: p.name, isChild: p.isChild })));
     });
     return (await this.findHousehold(websiteId, id))!;
@@ -132,7 +137,14 @@ export class DrizzleGuestRepository implements GuestRepository {
     await this.db.transaction(async (tx) => {
       const updated = await tx
         .update(households)
-        .set({ name: data.name, invitedEventIds: data.invitedEventIds })
+        // A new address (entered by the couple) ends an earlier unsubscribe.
+        .set({
+          name: data.name,
+          invitedEventIds: data.invitedEventIds,
+          email: data.email,
+          personalLine: data.personalLine,
+          unsubscribedAt: sql`case when ${households.email} is not distinct from ${data.email} then ${households.unsubscribedAt} else null end`,
+        })
         .where(and(eq(households.id, householdId), eq(households.websiteId, websiteId)))
         .returning({ id: households.id });
       if (updated.length === 0) return;
@@ -192,6 +204,16 @@ export class DrizzleGuestRepository implements GuestRepository {
       }
       return true;
     });
+  }
+
+  async unsubscribe(householdId: string, at: Date): Promise<boolean> {
+    if (!UUID.test(householdId)) return false;
+    const rows = await this.db
+      .update(households)
+      .set({ email: null, unsubscribedAt: sql`coalesce(${households.unsubscribedAt}, ${at.toISOString()}::timestamptz)` })
+      .where(eq(households.id, householdId))
+      .returning({ id: households.id });
+    return rows.length > 0;
   }
 
   async deleteGuestData(websiteId: string): Promise<number> {

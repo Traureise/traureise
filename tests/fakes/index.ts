@@ -1,5 +1,14 @@
 import { createHash, randomUUID } from "node:crypto";
 import type {
+  Card,
+  CardMailTemplates,
+  CardRenderer,
+  CardRepository,
+  CardTexts,
+  DeliveryRecord,
+  MailChannel,
+  NewCard,
+  QueuedMail,
   ArchiveEntry,
   ArchiveWriter,
   BillingChange,
@@ -40,6 +49,7 @@ import type { Deps } from "@/application/deps";
 import type { CollectionKind } from "@/domain/sections";
 import { DEFAULT_RSVP_SETTINGS, type Household, type HouseholdResponse, type RsvpSettings } from "@/domain/guests";
 import { parseThemeManifest, type ThemeManifest } from "@/domain/theme";
+import type { CardInput, CardKind, Delivery, SharedVia } from "@/domain/cards";
 
 export class FakeClock implements Clock {
   constructor(public current = new Date("2026-10-18T10:00:00Z")) {}
@@ -386,6 +396,9 @@ export class InMemoryGuests implements GuestRepository {
       pollAnswers: {},
       respondedAt: null,
       createdAt: new Date(),
+      email: data.email,
+      personalLine: data.personalLine,
+      unsubscribedAt: null,
       people: data.people.map((p) => this.person({ ...p, id: null })),
       requests: [],
     };
@@ -396,6 +409,9 @@ export class InMemoryGuests implements GuestRepository {
     const h = this.households.find((x) => x.id === householdId && x.websiteId === websiteId)!;
     h.name = data.name;
     h.invitedEventIds = data.invitedEventIds;
+    if (data.email !== h.email) h.unsubscribedAt = null;
+    h.email = data.email;
+    h.personalLine = data.personalLine;
     h.people = data.people.map((p) => {
       const existing = h.people.find((x) => x.id === p.id);
       return existing ? { ...existing, name: p.name, isChild: p.isChild } : this.person({ ...p, id: null });
@@ -422,6 +438,13 @@ export class InMemoryGuests implements GuestRepository {
     request.status = status;
     request.decidedAt = at;
     if (status === "added") h.people.push({ ...this.person({ id: null, name: request.name, isChild: false }), fromRequest: true });
+    return true;
+  }
+  async unsubscribe(householdId: string, at: Date) {
+    const h = this.households.find((x) => x.id === householdId);
+    if (!h) return false;
+    h.email = null;
+    h.unsubscribedAt ??= at;
     return true;
   }
   async deleteGuestData(websiteId: string) {
@@ -461,7 +484,199 @@ export class InMemoryGuests implements GuestRepository {
 export const fakeGuestLinks: GuestLinks = {
   tokenFor: (householdId) => `link-${householdId}`,
   hash: (token) => createHash("sha256").update(token).digest("hex"),
+  unsubscribeTokenFor: (householdId) => `stop-${householdId}`,
+  verifyUnsubscribe: (token) => (token.startsWith("stop-") ? token.slice(5) : null),
 };
+
+export const fakeCardMail: CardMailTemplates = {
+  card: (m) => ({ subject: `${m.kind}: ${m.couple}`, text: JSON.stringify(m), html: `<img src="cid:${m.imageCid}">` }),
+  reminder: (m) => ({ subject: `Erinnerung: ${m.couple}`, text: JSON.stringify(m), html: "" }),
+};
+
+export const fakeCardTexts: CardTexts = {
+  labels: {
+    locale: "de",
+    eyebrow: { saveTheDate: "Save the Date", invitation: "Einladung", thankYou: "Danke", engagement: "Verlobung" },
+    replyBy: "Bitte antwortet bis {date}",
+    time: "{time} Uhr",
+  },
+  defaults: {
+    saveTheDate: { heading: "", text: "Einladung folgt", message: "Hallo {name}, merkt euch den Tag!" },
+    invitation: { heading: "Wir heiraten", text: "Feiert mit uns", message: "Hallo {name}, hier ist eure Einladung." },
+    thankYou: { heading: "Danke", text: "Es war wunderschön.", message: "Hallo {name}, danke!" },
+    engagement: { heading: "Wir haben uns verlobt", text: "", message: "" },
+  },
+  reminderMessage: "Hallo {name}, denkt an eure Antwort.",
+  sampleHousehold: "Familie Beispiel",
+  calendarTitle: "Hochzeit von {couple}",
+};
+
+/** Records what it was asked to draw; the bytes say which card and format. */
+export class FakeCardRenderer implements CardRenderer {
+  calls: { kind: CardKind; personalLine: string | null; format: string; photo: boolean }[] = [];
+  async png(model: Parameters<CardRenderer["png"]>[0], photo: Uint8Array | null, width: number) {
+    this.calls.push({ kind: model.kind, personalLine: model.personalLine, format: `png-${width}`, photo: !!photo });
+    return new TextEncoder().encode(`png:${model.kind}:${model.names}`);
+  }
+  async pdf(model: Parameters<CardRenderer["pdf"]>[0], photo: Uint8Array | null, format: string) {
+    this.calls.push({ kind: model.kind, personalLine: model.personalLine, format, photo: !!photo });
+    return new TextEncoder().encode(`pdf:${format}:${model.kind}`);
+  }
+}
+
+const emptyDelivery = (): Delivery => ({
+  excluded: false,
+  sharedAt: null,
+  sharedVia: null,
+  emailQueuedAt: null,
+  emailedAt: null,
+  emailError: null,
+  openedAt: null,
+  reminderOffset: null,
+  reminderQueuedAt: null,
+  remindedAt: null,
+  reminderError: null,
+});
+
+type FakeDelivery = DeliveryRecord & { emailClaimedAt: Date | null; reminderClaimedAt: Date | null };
+
+export class InMemoryCards implements CardRepository {
+  cards: Card[] = [];
+  deliveries: FakeDelivery[] = [];
+  private n = 0;
+  constructor(private guests: InMemoryGuests) {}
+
+  /** Deliveries go with their household (ON DELETE CASCADE). */
+  private live() {
+    this.deliveries = this.deliveries.filter((d) => this.guests.households.some((h) => h.id === d.householdId) && this.cards.some((c) => c.id === d.cardId));
+    return this.deliveries;
+  }
+  private row(cardId: string, householdId: string): FakeDelivery {
+    let d = this.live().find((x) => x.cardId === cardId && x.householdId === householdId);
+    if (!d) {
+      d = { ...emptyDelivery(), cardId, householdId, emailClaimedAt: null, reminderClaimedAt: null };
+      this.deliveries.push(d);
+    }
+    return d;
+  }
+  private plain = (d: FakeDelivery): DeliveryRecord => omit(omit(copy(d), "emailClaimedAt"), "reminderClaimedAt");
+
+  async create(card: NewCard) {
+    if (this.cards.some((c) => c.websiteId === card.websiteId && c.kind === card.kind)) return null;
+    const created = { ...copy(card), id: `card-${++this.n}`, createdAt: new Date(), updatedAt: new Date() };
+    this.cards.push(created);
+    return copy(created);
+  }
+  async find(websiteId: string, kind: CardKind) {
+    const card = this.cards.find((c) => c.websiteId === websiteId && c.kind === kind);
+    return card ? copy(card) : null;
+  }
+  async listByWebsite(websiteId: string) {
+    return copy(this.cards.filter((c) => c.websiteId === websiteId));
+  }
+  async update(websiteId: string, kind: CardKind, input: CardInput) {
+    const card = this.cards.find((c) => c.websiteId === websiteId && c.kind === kind);
+    if (card) Object.assign(card, copy(input), { updatedAt: new Date() });
+  }
+  async delete(websiteId: string, kind: CardKind) {
+    this.cards = this.cards.filter((c) => !(c.websiteId === websiteId && c.kind === kind));
+  }
+  async listDeliveries(cardId: string) {
+    return this.live().filter((d) => d.cardId === cardId).map(this.plain);
+  }
+  async listDeliveriesOfHousehold(householdId: string) {
+    return this.live().filter((d) => d.householdId === householdId).map(this.plain);
+  }
+  async setExcluded(cardId: string, householdId: string, excluded: boolean) {
+    this.row(cardId, householdId).excluded = excluded;
+  }
+  async markShared(cardId: string, householdId: string, via: SharedVia, at: Date) {
+    const d = this.row(cardId, householdId);
+    if (d.sharedAt) return;
+    d.sharedAt = at;
+    d.sharedVia = via;
+  }
+  async markOpened(cardId: string, householdId: string, at: Date) {
+    const d = this.row(cardId, householdId);
+    if (d.openedAt) return false;
+    d.openedAt = at;
+    return true;
+  }
+  private fields(channel: MailChannel) {
+    return channel === "card"
+      ? ({ queued: "emailQueuedAt", claimed: "emailClaimedAt", sent: "emailedAt", error: "emailError" } as const)
+      : ({ queued: "reminderQueuedAt", claimed: "reminderClaimedAt", sent: "remindedAt", error: "reminderError" } as const);
+  }
+  async queueMail(channel: MailChannel, cardId: string, householdIds: string[], at: Date) {
+    const f = this.fields(channel);
+    let queued = 0;
+    for (const id of householdIds) {
+      const d = this.row(cardId, id);
+      if (d[f.claimed]) continue;
+      d[f.queued] = at;
+      d[f.error] = null;
+      queued++;
+    }
+    return queued;
+  }
+  async listQueuedMail(limit: number, websiteId?: string): Promise<QueuedMail[]> {
+    const result: QueuedMail[] = [];
+    for (const d of this.live()) {
+      const card = this.cards.find((c) => c.id === d.cardId)!;
+      if (websiteId && card.websiteId !== websiteId) continue;
+      if (d.emailQueuedAt && !d.emailClaimedAt) result.push({ cardId: d.cardId, householdId: d.householdId, websiteId: card.websiteId, channel: "card" });
+      if (d.reminderQueuedAt && !d.reminderClaimedAt) result.push({ cardId: d.cardId, householdId: d.householdId, websiteId: card.websiteId, channel: "reminder" });
+    }
+    return result.slice(0, limit);
+  }
+  async claimMail(channel: MailChannel, cardId: string, householdId: string, at: Date) {
+    const f = this.fields(channel);
+    const d = this.live().find((x) => x.cardId === cardId && x.householdId === householdId);
+    if (!d || !d[f.queued] || d[f.claimed]) return false;
+    d[f.claimed] = at;
+    return true;
+  }
+  async finishMail(channel: MailChannel, cardId: string, householdId: string, outcome: { sentAt: Date } | { error: string }) {
+    const f = this.fields(channel);
+    const d = this.live().find((x) => x.cardId === cardId && x.householdId === householdId);
+    if (!d) return;
+    d[f.queued] = null;
+    d[f.claimed] = null;
+    if ("sentAt" in outcome) {
+      d[f.sent] = outcome.sentAt;
+      d[f.error] = null;
+    } else d[f.error] = outcome.error;
+  }
+  async failStaleClaims(before: Date) {
+    let n = 0;
+    for (const d of this.live()) {
+      for (const channel of ["card", "reminder"] as const) {
+        const f = this.fields(channel);
+        const claimed = d[f.claimed];
+        if (claimed && claimed < before) {
+          d[f.queued] = null;
+          d[f.claimed] = null;
+          d[f.error] = "interrupted";
+          n++;
+        }
+      }
+    }
+    return n;
+  }
+  async claimAutomaticReminder(cardId: string, householdId: string, offset: number, at: Date) {
+    const d = this.row(cardId, householdId);
+    if (d.reminderOffset !== null && d.reminderOffset <= offset) return false;
+    d.reminderOffset = offset;
+    d.remindedAt = at;
+    return true;
+  }
+  async listInvitationsWithReminders() {
+    return this.cards.filter((c) => c.kind === "invitation" && c.reminderDays.length > 0).map((c) => ({ websiteId: c.websiteId, cardId: c.id }));
+  }
+  dropWebsite(websiteId: string) {
+    this.cards = this.cards.filter((c) => c.websiteId !== websiteId);
+  }
+}
 
 export const fakeGuestMail: GuestMailTemplates = {
   answer: (m) => ({ subject: `Antwort: ${m.household}`, text: JSON.stringify(m), html: "" }),
@@ -479,7 +694,7 @@ const palette = (id: string) => ({
   colors: { background: "#ffffff", surface: "#ffffff", text: "#000000", muted: "#555555", primary: "#336699", accent: "#cc9933" },
 });
 
-export function themeFixture(id: string, paletteIds = ["hell", "dunkel"]): ThemeManifest {
+export function themeFixture(id: string, paletteIds = ["hell", "dunkel"], withCards = true): ThemeManifest {
   const parsed = parseThemeManifest(
     {
       id,
@@ -488,6 +703,14 @@ export function themeFixture(id: string, paletteIds = ["hell", "dunkel"]): Theme
       palettes: paletteIds.map(palette),
       fonts: { defaultPairing: "klassisch" },
       assets: { preview: "preview.svg" },
+      cards: withCards
+        ? {
+            layouts: [
+              { id: "bogen", name: { de: "Bogen" }, photo: "masked", photoMask: "frame.svg", ornament: "divider.svg" },
+              { id: "schlicht", name: { de: "Schlicht" }, kinds: ["thankYou", "engagement"], photo: "none" },
+            ],
+          }
+        : undefined,
     },
     id,
   );
@@ -506,13 +729,17 @@ export class FakeThemes implements ThemeCatalog {
   defaultThemeId() {
     return this.themes[0]!.id;
   }
+  readSvg(themeId: string, file: string) {
+    return this.get(themeId) ? `<svg xmlns="http://www.w3.org/2000/svg"><!-- ${themeId}/${file} --></svg>` : null;
+  }
 }
 
 export function createFakes() {
   const websites = new InMemoryWebsites();
   const billingRepo = new InMemoryBilling(websites);
   const guests = new InMemoryGuests();
-  websites.cascades.push((id) => guests.dropWebsite(id));
+  const cards = new InMemoryCards(guests);
+  websites.cascades.push((id) => guests.dropWebsite(id), (id) => cards.dropWebsite(id));
   const fakes = {
     users: new InMemoryUsers(),
     magicLinks: new InMemoryMagicLinks(),
@@ -531,10 +758,11 @@ export function createFakes() {
       enabled: true,
       offers: [
         { tier: "rsvp" as const, priceCents: 4900, productId: "prod_rsvp" },
-        { tier: "invitations" as const, priceCents: 13900, productId: "prod_inv" },
+        // No product: shows how a tier the operator does not sell yet behaves.
+        { tier: "invitations" as const, priceCents: 13900, productId: null as string | null },
         { tier: "complete" as const, priceCents: 14900, productId: "prod_all" },
       ],
-      unlockedTiers: ["rsvp" as const, "complete" as const],
+      unlockedTiers: [] as ("rsvp" | "invitations" | "complete")[],
     },
     billingRepo,
     payments: new FakePayments() as FakePayments | null,
@@ -542,6 +770,11 @@ export function createFakes() {
     guests,
     guestLinks: fakeGuestLinks,
     guestMail: fakeGuestMail,
+    cards,
+    cardRenderer: new FakeCardRenderer(),
+    cardMail: fakeCardMail,
+    cardTexts: fakeCardTexts,
+    mailRate: { batchSize: 50, intervalMs: 0 },
     appUrl: "http://localhost:3000",
   };
   fakes.users.cascades.push((userId) => {

@@ -35,6 +35,37 @@
       "body": "Das RSVP-Paket für „{title}“ endet bald. Am {date} löschen wir die Gästeliste mit allen Antworten automatisch, so wie es in unserer Datenschutzerklärung steht.",
       "hint": "Wenn ihr die Antworten behalten wollt, ladet vorher auf der Gäste-Seite die CSV-Datei herunter.",
       "button": "Zur Gästeliste"
+    },
+    "card": {
+      "subject": {
+        "saveTheDate": "Save the Date von {couple}",
+        "invitation": "Einladung zur Hochzeit von {couple}",
+        "thankYou": "Ein Dankeschön von {couple}",
+        "engagement": "{couple} haben sich verlobt"
+      },
+      "imageAlt": {
+        "saveTheDate": "Save the Date von {couple}",
+        "invitation": "Einladung von {couple}",
+        "thankYou": "Dankeskarte von {couple}",
+        "engagement": "Verlobungsanzeige von {couple}"
+      },
+      "button": {
+        "saveTheDate": "Karte ansehen",
+        "invitation": "Zur Einladung und Antwort",
+        "thankYou": "Karte ansehen",
+        "engagement": "Karte ansehen"
+      },
+      "linkHint": "Der Link gehört zu {household}. Ihr könnt ihn im Haushalt weitergeben."
+    },
+    "reminder": {
+      "subject": "Erinnerung: Antwort für die Hochzeit von {couple}",
+      "replyBy": "Bitte antwortet bis zum {date}.",
+      "button": "Jetzt antworten"
+    },
+    "guestFooter": {
+      "sender": "Diese E-Mail hat Traureise im Auftrag von {couple} verschickt, weil sie euch auf ihre Gästeliste gesetzt haben. Wenn ihr antwortet, geht eure Antwort direkt an {couple}.",
+      "unsubscribe": "Keine E-Mails mehr zu dieser Hochzeit: {url}",
+      "unsubscribeLink": "Keine E-Mails mehr zu dieser Hochzeit"
     }
   },
   "landing": {
@@ -100,7 +131,10 @@
     "invalid_person": "Diese Person gehört nicht zu diesem Haushalt.",
     "invalid_input": "Diese Antwort konnten wir nicht lesen. Bitte lade die Seite neu.",
     "inactive": "Dieser Link ist noch nicht aktiv.",
-    "closed": "Die Antwortfrist ist vorbei."
+    "closed": "Die Antwortfrist ist vorbei.",
+    "no_email": "Dieser Haushalt hat keine E-Mail-Adresse.",
+    "excluded": "Dieser Haushalt ist bei dieser Karte ausgelassen.",
+    "locked": "Dafür braucht diese Website ein Paket."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -660,5 +694,69 @@
     "inactiveTitle": "Dieser Link ist noch nicht aktiv",
     "inactiveBody": "Hier könnt ihr bald antworten. Schaut einfach später noch einmal vorbei.",
     "allergiesHint": "Freiwillig. Nur das Brautpaar sieht diese Angabe, damit es die Küche informieren kann. Sie wird mit der Gästeliste nach der Hochzeit gelöscht."
+  },
+  "cards": {
+    "labels": {
+      "eyebrow": {
+        "saveTheDate": "Save the Date",
+        "invitation": "Einladung",
+        "thankYou": "Danke",
+        "engagement": "Wir sind verlobt"
+      },
+      "replyBy": "Bitte antwortet bis zum {date}",
+      "time": "{time} Uhr"
+    },
+    "defaults": {
+      "saveTheDate": {
+        "heading": "",
+        "text": "Einladung folgt",
+        "message": "Hallo {name}, merkt euch schon mal den Tag! Hier ist unser Save the Date. Liebe Grüße"
+      },
+      "invitation": {
+        "heading": "Wir heiraten",
+        "text": "Wir freuen uns sehr, wenn ihr diesen Tag mit uns feiert.",
+        "message": "Hallo {name}, hier ist eure Einladung zu unserer Hochzeit. Über den Link könnt ihr uns auch gleich antworten. Liebe Grüße"
+      },
+      "thankYou": {
+        "heading": "Von Herzen danke",
+        "text": "Danke, dass ihr unseren Tag so besonders gemacht habt.",
+        "message": "Hallo {name}, wir sagen danke! Liebe Grüße"
+      },
+      "engagement": {
+        "heading": "Wir haben uns verlobt",
+        "text": "Wir sind überglücklich und wollten es euch als Erste erzählen.",
+        "message": ""
+      }
+    },
+    "reminderMessage": "Hallo {name}, kleine Erinnerung: Sagt uns bitte über diesen Link, ob ihr zu unserer Hochzeit kommt. Liebe Grüße",
+    "sampleHousehold": "Familie Beispiel",
+    "calendarTitle": "Hochzeit von {couple}"
+  },
+  "letter": {
+    "to": "Für {name}",
+    "toEveryone": "Für euch",
+    "everyone": "euch",
+    "open": "Brief für {name} öffnen",
+    "hint": "Zum Öffnen tippen",
+    "label": {
+      "saveTheDate": "Save the Date von {names}",
+      "invitation": "Einladung von {names}",
+      "thankYou": "Dankeskarte von {names}",
+      "engagement": "Verlobungsanzeige von {names}"
+    },
+    "toForm": "Zur Antwort",
+    "calendar": "Zum Kalender hinzufügen",
+    "website": "Zur Website",
+    "emptyTitle": "Hier kommt bald Post",
+    "emptyBody": "Schaut einfach später noch einmal über diesen Link vorbei.",
+    "engagementTitle": "{title} · Verlobung",
+    "inactiveTitle": "Diese Karte ist noch nicht freigeschaltet",
+    "inactiveBody": "Schaut einfach später noch einmal vorbei."
+  },
+  "unsubscribe": {
+    "title": "Keine E-Mails mehr",
+    "body": "Möchtet ihr keine E-Mails mehr zur Hochzeit von {couple} bekommen? Dann löschen wir die E-Mail-Adresse von {household} aus ihrer Gästeliste. Euer Link funktioniert weiter.",
+    "confirm": "Keine E-Mails mehr senden",
+    "done": "Erledigt: {household} bekommt keine E-Mails mehr zur Hochzeit von {couple}. Die Adresse ist gelöscht."
   }
 }

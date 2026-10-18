@@ -2,6 +2,7 @@ import type { CollectionKind, ItemData, SectionKind } from "@/domain/sections";
 import type { Entitlement, PaidTier, Tier, TierOffer } from "@/domain/billing";
 import type { ThemeManifest } from "@/domain/theme";
 import type { Household, HouseholdInput, HouseholdResponse, Poll, PollInput, RequestStatus, RsvpSettings } from "@/domain/guests";
+import type { CardContent, CardInput, CardKind, CardLabels, CardModel, Delivery, SharedVia } from "@/domain/cards";
 
 export type User = { id: string; email: string; firstName: string | null; createdAt: Date };
 
@@ -116,7 +117,19 @@ export interface ImageProcessor {
   process(bytes: Uint8Array): Promise<ProcessedImage>;
 }
 
-export type MailMessage = { to: string; subject: string; text: string; html: string };
+export type MailAttachment = { filename: string; content: Uint8Array; contentType: string; /** Set for images shown inline (`cid:` in the HTML). */ cid?: string };
+
+export type MailMessage = {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  /** Display name for MAIL_FROM's address, e.g. "Anna & Ben über Traureise". The address never changes. */
+  fromName?: string;
+  replyTo?: string;
+  headers?: Record<string, string>;
+  attachments?: MailAttachment[];
+};
 
 export interface Mailer {
   send(message: MailMessage): Promise<void>;
@@ -131,6 +144,8 @@ export interface ThemeCatalog {
   list(): ThemeManifest[];
   get(id: string): ThemeManifest | undefined;
   defaultThemeId(): string;
+  /** A declared SVG asset's markup (card masks and ornaments), or null. */
+  readSvg(themeId: string, file: string): string | null;
 }
 
 export interface Clock {
@@ -213,6 +228,8 @@ export interface GuestRepository {
   /** Adding puts the requested person into the household. Returns false for unknown or decided requests. */
   decideRequest(websiteId: string, requestId: string, status: Exclude<RequestStatus, "pending">, at: Date): Promise<boolean>;
 
+  /** Clears the household's email address (one-click unsubscribe); false for unknown households. */
+  unsubscribe(householdId: string, at: Date): Promise<boolean>;
   /** Retention: removes households, people, answers and requests of a website; returns how many households. */
   deleteGuestData(websiteId: string): Promise<number>;
   listWebsiteIdsWithGuests(): Promise<string[]>;
@@ -228,6 +245,10 @@ export interface GuestRepository {
 export interface GuestLinks {
   tokenFor(householdId: string): string;
   hash(token: string): string;
+  /** Unsubscribe links: the household id with a signature, so they work without login and without a stored token. */
+  unsubscribeTokenFor(householdId: string): string;
+  /** The household id of a valid unsubscribe token, or null. */
+  verifyUnsubscribe(token: string): string | null;
 }
 
 export type AnswerMail = { websiteTitle: string; household: string; coming: string[]; notComing: string[]; message: string; requests: string[]; guestsUrl: string };
@@ -239,4 +260,98 @@ export interface GuestMailTemplates {
   answer(mail: AnswerMail): Omit<MailMessage, "to">;
   dailySummary(mail: SummaryMail): Omit<MailMessage, "to">;
   retentionWarning(mail: RetentionMail): Omit<MailMessage, "to">;
+}
+
+// ---- cards (v4) ----
+
+export type Card = {
+  id: string;
+  websiteId: string;
+  kind: CardKind;
+  themeId: string;
+  paletteId: string | null;
+  fontPairingId: string | null;
+  layoutId: string | null;
+  envelope: boolean;
+  photoKey: string | null;
+  content: CardContent;
+  /** WhatsApp text and email introduction; null uses the default. */
+  message: string | null;
+  /** Invitation: automatic email reminders, in days before the reply-by date. */
+  reminderDays: number[];
+  reminderMessage: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+export type NewCard = Omit<Card, "id" | "createdAt" | "updatedAt">;
+
+export type DeliveryRecord = Delivery & { cardId: string; householdId: string };
+export type MailChannel = "card" | "reminder";
+export type QueuedMail = { cardId: string; householdId: string; websiteId: string; channel: MailChannel };
+
+/** Cards and their deliveries. Cards hang off the website, deliveries off the card and the household (cascades). */
+export interface CardRepository {
+  /** Null when the website already has a card of this kind. */
+  create(card: NewCard): Promise<Card | null>;
+  find(websiteId: string, kind: CardKind): Promise<Card | null>;
+  listByWebsite(websiteId: string): Promise<Card[]>;
+  update(websiteId: string, kind: CardKind, input: CardInput): Promise<void>;
+  delete(websiteId: string, kind: CardKind): Promise<void>;
+
+  listDeliveries(cardId: string): Promise<DeliveryRecord[]>;
+  listDeliveriesOfHousehold(householdId: string): Promise<DeliveryRecord[]>;
+  setExcluded(cardId: string, householdId: string, excluded: boolean): Promise<void>;
+  /** Records the first share; later shares keep the first time and channel. */
+  markShared(cardId: string, householdId: string, via: SharedVia, at: Date): Promise<void>;
+  /** Only the first visit counts; returns whether this one did. */
+  markOpened(cardId: string, householdId: string, at: Date): Promise<boolean>;
+
+  /** Queues an email per household, unless one is being sent right now; returns how many were queued. */
+  queueMail(channel: MailChannel, cardId: string, householdIds: string[], at: Date): Promise<number>;
+  listQueuedMail(limit: number, websiteId?: string): Promise<QueuedMail[]>;
+  /** Compare-and-set: true for exactly one caller, so an email is never sent twice. */
+  claimMail(channel: MailChannel, cardId: string, householdId: string, at: Date): Promise<boolean>;
+  finishMail(channel: MailChannel, cardId: string, householdId: string, outcome: { sentAt: Date } | { error: string }): Promise<void>;
+  /** Claims older than `before` that never finished (a crash mid-send) become failures, never retries. */
+  failStaleClaims(before: Date): Promise<number>;
+  /** Compare-and-set on the last automatic reminder's offset. */
+  claimAutomaticReminder(cardId: string, householdId: string, offset: number, at: Date): Promise<boolean>;
+  /** Invitations with automatic reminders configured. */
+  listInvitationsWithReminders(): Promise<{ websiteId: string; cardId: string }[]>;
+}
+
+export type PaperFormat = "a6" | "a5";
+
+/** Draws a card as an image or a printable PDF, on the instance. `photo` is the stored photo, if any. */
+export interface CardRenderer {
+  png(model: CardModel, photo: Uint8Array | null, width: number): Promise<Uint8Array>;
+  pdf(model: CardModel, photo: Uint8Array | null, format: PaperFormat): Promise<Uint8Array>;
+}
+
+/** Translated texts for cards (labels on the card, defaults for new cards). */
+export type CardTexts = {
+  labels: CardLabels;
+  defaults: Record<CardKind, { heading: string; text: string; message: string }>;
+  reminderMessage: string;
+  sampleHousehold: string;
+  /** "{couple}" is replaced. */
+  calendarTitle: string;
+};
+
+export type CardMail = {
+  kind: CardKind;
+  couple: string;
+  household: string;
+  message: string;
+  pageUrl: string;
+  unsubscribeUrl: string;
+  /** Content id of the attached card image. */
+  imageCid: string;
+};
+export type ReminderMail = Omit<CardMail, "kind" | "imageCid"> & { replyBy: Date | null };
+
+/** Emails to guests on the couple's behalf. */
+export interface CardMailTemplates {
+  card(mail: CardMail): Omit<MailMessage, "to">;
+  reminder(mail: ReminderMail): Omit<MailMessage, "to">;
 }

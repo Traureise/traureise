@@ -16,3 +16,6 @@ export class RateLimitedError extends AppError {}
 export class InvalidTokenError extends AppError {}
 
 export class InvalidSignatureError extends AppError {}
+
+/** The feature needs a paid tier the website does not have (the UI links to /preise). */
+export class LockedError extends AppError {}

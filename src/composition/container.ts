@@ -16,13 +16,12 @@ import type { BillingSettings, FileStorage, PaymentProvider } from "@/applicatio
 import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
 import { CreemPaymentProvider } from "@/infrastructure/payments/creem";
 import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing";
-import { GetEventIcs, GetPublicWebsite } from "@/application/public";
+import { GetEventIcs, GetPublicWebsite, GetWeddingIcs } from "@/application/public";
 import {
   DecideGuestRequest,
   DeleteHousehold,
   DeletePoll,
   ExportGuestsCsv,
-  GetGuestForm,
   GetGuestFormPreview,
   GetGuestPage,
   RunGuestJobs,
@@ -32,6 +31,28 @@ import {
   SubmitGuestResponse,
 } from "@/application/guests";
 import { createGuestMailTemplates } from "@/infrastructure/mail/guest-templates";
+import {
+  CreateCard,
+  DeleteCard,
+  ExportCard,
+  GetCardEditor,
+  GetCardPreview,
+  GetEngagementPage,
+  GetHouseholdPage,
+  GetUnsubscribe,
+  ListCards,
+  MarkCardsOpened,
+  RunMailJobs,
+  SaveCard,
+  SendCardEmails,
+  SendReminders,
+  SetCardExcluded,
+  ShareCard,
+  Unsubscribe,
+} from "@/application/cards";
+import { SatoriCardRenderer } from "@/infrastructure/cards/renderer";
+import { createCardMailTemplates, createCardTexts } from "@/infrastructure/mail/card-templates";
+import { DrizzleCardRepository } from "@/infrastructure/repositories/cards";
 import { DrizzleGuestRepository } from "@/infrastructure/repositories/guests";
 import { AddItem, DeleteItem, MoveItem, UpdateItem, UpdateSection } from "@/application/sections";
 import { GetUpload, UploadImage } from "@/application/uploads";
@@ -129,6 +150,11 @@ function build() {
     guests: new DrizzleGuestRepository(db),
     guestLinks: hmacGuestLinks(appSecret(config)),
     guestMail: createGuestMailTemplates(),
+    cards: new DrizzleCardRepository(db),
+    cardRenderer: new SatoriCardRenderer(path.resolve(config.CARD_FONTS_DIR)),
+    cardMail: createCardMailTemplates(),
+    cardTexts: createCardTexts(),
+    mailRate: { batchSize: config.MAIL_BATCH_SIZE, intervalMs: config.MAIL_SEND_INTERVAL_MS },
     appUrl: config.APP_URL.replace(/\/$/, ""),
   };
 
@@ -173,6 +199,7 @@ function build() {
     getUpload: new GetUpload(deps),
     getPublicWebsite: new GetPublicWebsite(deps),
     getEventIcs: new GetEventIcs(deps),
+    getWeddingIcs: new GetWeddingIcs(deps),
     exportAccount: new ExportAccount(deps),
     deleteAccount: new DeleteAccount(deps),
     getPricing: new GetPricing(deps),
@@ -188,10 +215,27 @@ function build() {
     deletePoll: new DeletePoll(deps),
     decideGuestRequest: new DecideGuestRequest(deps),
     exportGuestsCsv: new ExportGuestsCsv(deps),
-    getGuestForm: new GetGuestForm(deps),
     getGuestFormPreview: new GetGuestFormPreview(deps),
     submitGuestResponse: new SubmitGuestResponse(deps),
     runGuestJobs: new RunGuestJobs(deps),
+    createCard: new CreateCard(deps),
+    getCardEditor: new GetCardEditor(deps),
+    saveCard: new SaveCard(deps),
+    deleteCard: new DeleteCard(deps),
+    listCards: new ListCards(deps),
+    exportCard: new ExportCard(deps),
+    getHouseholdPage: new GetHouseholdPage(deps),
+    getCardPreview: new GetCardPreview(deps),
+    markCardsOpened: new MarkCardsOpened(deps),
+    getEngagementPage: new GetEngagementPage(deps),
+    shareCard: new ShareCard(deps),
+    setCardExcluded: new SetCardExcluded(deps),
+    sendCardEmails: new SendCardEmails(deps),
+    sendReminders: new SendReminders(deps),
+    /** A fresh instance per run: it caches contexts and images for that run only. */
+    runMailJobs: (options: { websiteId?: string } = {}) => new RunMailJobs(deps).execute(options),
+    getUnsubscribe: new GetUnsubscribe(deps),
+    unsubscribe: new Unsubscribe(deps),
   };
 }
 

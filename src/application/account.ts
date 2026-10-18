@@ -10,7 +10,7 @@ export class ExportAccount {
   constructor(private deps: Deps) {}
 
   async execute(userId: string): Promise<{ filename: string; bytes: Uint8Array }> {
-    const { users, websites, uploads, storage, billingRepo, guests, archive, clock } = this.deps;
+    const { users, websites, uploads, storage, billingRepo, guests, cards, archive, clock } = this.deps;
     const user = await users.findById(userId);
     if (!user) throw new NotFoundError();
     const now = clock.now();
@@ -26,6 +26,7 @@ export class ExportAccount {
 
     const exported = [];
     for (const website of await websites.listByOwner(userId)) {
+      const households = await guests.listHouseholds(website.id);
       const { id, slug, title, weddingDate, location, welcomeMessage, hashtag, showCountdown, timezone, themeId, paletteId, fontPairingId } = website;
       exported.push({
         id,
@@ -56,8 +57,40 @@ export class ExportAccount {
         guests: {
           settings: await guests.getSettings(website.id),
           polls: await guests.listPolls(website.id),
-          households: await guests.listHouseholds(website.id),
+          households,
         },
+        cards: await Promise.all(
+          (await cards.listByWebsite(website.id)).map(async (card) => ({
+            kind: card.kind,
+            themeId: card.themeId,
+            paletteId: card.paletteId,
+            fontPairingId: card.fontPairingId,
+            layoutId: card.layoutId,
+            envelope: card.envelope,
+            content: card.content,
+            message: card.message,
+            reminderDays: card.reminderDays,
+            reminderMessage: card.reminderMessage,
+            createdAt: card.createdAt,
+            updatedAt: card.updatedAt,
+            photo: card.photoKey ? imagePath(card.photoKey) : null,
+            // Sent and opened status per household (v4); the households themselves are under guests.
+            deliveries: (await cards.listDeliveries(card.id)).map((d) => ({
+              household: households.find((h) => h.id === d.householdId)?.name ?? null,
+              householdId: d.householdId,
+              excluded: d.excluded,
+              sharedAt: d.sharedAt,
+              sharedVia: d.sharedVia,
+              emailedAt: d.emailedAt,
+              emailQueuedAt: d.emailQueuedAt,
+              emailError: d.emailError,
+              openedAt: d.openedAt,
+              remindedAt: d.remindedAt,
+              reminderOffset: d.reminderOffset,
+              reminderError: d.reminderError,
+            })),
+          })),
+        ),
       });
     }
 

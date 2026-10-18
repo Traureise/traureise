@@ -9,6 +9,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -204,6 +205,10 @@ export const households = pgTable(
     message: text("message").notNull().default(""),
     pollAnswers: jsonb("poll_answers").$type<PollAnswersJson>().notNull().default({}),
     respondedAt: timestamp("responded_at", { withTimezone: true }),
+    // v4: optional address for cards and reminders by email, a line for the thank-you card, and the unsubscribe.
+    email: text("email"),
+    personalLine: text("personal_line").notNull().default(""),
+    unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [index("households_website_idx").on(t.websiteId, t.createdAt)],
@@ -242,4 +247,74 @@ export const guestRequests = pgTable(
     decidedAt: timestamp("decided_at", { withTimezone: true }),
   },
   (t) => [index("guest_requests_household_idx").on(t.householdId)],
+);
+
+// Cards (v4): one per website and kind. The design stays with the website; deliveries are guest data and go
+// with the household (retention deletes households) or the card.
+export const cards = pgTable(
+  "cards",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    themeId: text("theme_id").notNull(),
+    paletteId: text("palette_id"),
+    fontPairingId: text("font_pairing_id"),
+    layoutId: text("layout_id"),
+    envelope: boolean("envelope").notNull().default(true),
+    photoKey: text("photo_key"),
+    content: jsonb("content").$type<CardContentJson>().notNull(),
+    message: text("message"),
+    reminderDays: jsonb("reminder_days").$type<number[]>().notNull().default([]),
+    reminderMessage: text("reminder_message"),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => sql`now()`),
+  },
+  (t) => [uniqueIndex("cards_website_kind_idx").on(t.websiteId, t.kind)],
+);
+
+type CardContentJson = {
+  heading: string;
+  names: string;
+  text: string;
+  place: string;
+  eventId: string | null;
+  time: string;
+  venue: string;
+  showReplyBy: boolean;
+  showWebsiteLink: boolean;
+};
+
+// What happened with one card for one household. Emails are claimed (email_claimed_at) before they are sent,
+// so two instances never send the same one; the same for reminders. reminder_offset is the last automatic
+// reminder handled, in days before the reply-by date.
+export const cardDeliveries = pgTable(
+  "card_deliveries",
+  {
+    cardId: uuid("card_id")
+      .notNull()
+      .references(() => cards.id, { onDelete: "cascade" }),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id, { onDelete: "cascade" }),
+    excluded: boolean("excluded").notNull().default(false),
+    sharedAt: timestamp("shared_at", { withTimezone: true }),
+    sharedVia: text("shared_via"),
+    emailQueuedAt: timestamp("email_queued_at", { withTimezone: true }),
+    emailClaimedAt: timestamp("email_claimed_at", { withTimezone: true }),
+    emailedAt: timestamp("emailed_at", { withTimezone: true }),
+    emailError: text("email_error"),
+    openedAt: timestamp("opened_at", { withTimezone: true }),
+    reminderOffset: integer("reminder_offset"),
+    reminderQueuedAt: timestamp("reminder_queued_at", { withTimezone: true }),
+    reminderClaimedAt: timestamp("reminder_claimed_at", { withTimezone: true }),
+    remindedAt: timestamp("reminded_at", { withTimezone: true }),
+    reminderError: text("reminder_error"),
+  },
+  (t) => [primaryKey({ columns: [t.cardId, t.householdId] }), index("card_deliveries_household_idx").on(t.householdId)],
 );

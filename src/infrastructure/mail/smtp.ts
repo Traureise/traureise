@@ -15,7 +15,17 @@ export class SmtpMailer implements Mailer {
     });
   }
 
-  async send(message: MailMessage): Promise<void> {
-    await this.transport.sendMail({ from: this.config.from, ...message });
+  async send({ fromName, attachments, ...message }: MailMessage): Promise<void> {
+    await this.transport.sendMail({
+      ...message,
+      // Only the display name changes ("Anna & Ben über Traureise"); nodemailer quotes it, so user input never becomes a header.
+      from: fromName ? { name: fromName, address: senderAddress(this.config.from) } : this.config.from,
+      attachments: attachments?.map(({ filename, content, contentType, cid }) => ({ filename, content: Buffer.from(content), contentType, cid })),
+    });
   }
+}
+
+/** The address part of MAIL_FROM ("Traureise <no-reply@example.org>" or a bare address). */
+export function senderAddress(from: string): string {
+  return /<([^<>]+)>\s*$/.exec(from)?.[1]?.trim() ?? from.trim();
 }

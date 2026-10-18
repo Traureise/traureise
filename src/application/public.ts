@@ -1,4 +1,4 @@
-import { buildIcs } from "@/domain/calendar";
+import { buildAllDayIcs, buildIcs } from "@/domain/calendar";
 import { slugify } from "@/domain/slug";
 import type { Deps } from "./deps";
 import { itemsOf, loadView, type WebsiteView } from "./views";
@@ -35,5 +35,26 @@ export class GetEventIcs {
       this.deps.clock.now(),
     );
     return { filename: `${slugify(e.name)}.ics`, content };
+  }
+}
+
+export class GetWeddingIcs {
+  constructor(private deps: Deps) {}
+
+  /** The wedding day as an all-day event, for the Save the Date's "Zum Kalender hinzufügen". */
+  async execute(slug: string): Promise<{ filename: string; content: string } | null> {
+    const website = await this.deps.websites.findBySlug(slug);
+    if (!website?.weddingDate) return null;
+    const content = buildAllDayIcs(
+      {
+        uid: `${website.id}-wedding@traureise`,
+        title: this.deps.cardTexts.calendarTitle.replace("{couple}", website.title),
+        location: website.location ?? undefined,
+        date: website.weddingDate,
+        url: `${this.deps.appUrl}/${website.slug}`,
+      },
+      this.deps.clock.now(),
+    );
+    return { filename: `${website.slug}.ics`, content };
   }
 }
