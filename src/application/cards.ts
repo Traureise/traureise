@@ -506,7 +506,8 @@ export class RunMailJobs {
 
   constructor(private deps: Deps) {}
 
-  async execute(options: { websiteId?: string } = {}): Promise<MailJobsResult> {
+  /** `automatic: false` sends only what is queued (the run started right after the couple clicked). */
+  async execute(options: { websiteId?: string; automatic?: boolean } = {}): Promise<MailJobsResult> {
     this.contexts.clear();
     this.images.clear();
     const result: MailJobsResult = { sent: 0, failed: 0, reminders: 0 };
@@ -531,6 +532,7 @@ export class RunMailJobs {
       if (claimed === 0) break;
     }
 
+    if (options.automatic === false) return result;
     for (const { websiteId, cardId } of await this.deps.cards.listInvitationsWithReminders()) {
       if (options.websiteId && websiteId !== options.websiteId) continue;
       const outcome = await this.automaticReminders(websiteId, cardId).catch((error) => {

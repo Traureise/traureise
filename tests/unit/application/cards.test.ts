@@ -343,6 +343,16 @@ describe("reminders", () => {
     expect(f.mailer.sent[0]!.subject).toBe("Erinnerung: Anna & Ben");
   });
 
+  it("are not sent by the run that only sends what the couple just queued", async () => {
+    const weber = await household("Weber", "weber@example.org");
+    await create("invitation");
+    f.clock.current = new Date("2027-03-01T10:00:00Z");
+    await share("invitation", weber.id);
+    f.clock.current = new Date("2027-04-28T10:00:00Z");
+    expect((await new RunMailJobs(f.deps).execute({ websiteId, automatic: false })).reminders).toBe(0);
+    expect((await runMail()).reminders).toBe(1);
+  });
+
   it("are part of the regular guest jobs and need the Einladungen tier", async () => {
     const weber = await household("Weber", "weber@example.org");
     await create("invitation");

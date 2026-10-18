@@ -24,7 +24,8 @@ async function cards<T>(websiteId: string, fn: (userId: string) => Promise<T>): 
 function sendInBackground(websiteId: string) {
   after(async () => {
     try {
-      await container().runMailJobs({ websiteId });
+      // Only what was just queued; automatic reminders belong to the regular job.
+      await container().runMailJobs({ websiteId, automatic: false });
     } catch (error) {
       console.error("[traureise] sending emails failed", error);
     }

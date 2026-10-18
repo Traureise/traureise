@@ -233,7 +233,7 @@ function build() {
     sendCardEmails: new SendCardEmails(deps),
     sendReminders: new SendReminders(deps),
     /** A fresh instance per run: it caches contexts and images for that run only. */
-    runMailJobs: (options: { websiteId?: string } = {}) => new RunMailJobs(deps).execute(options),
+    runMailJobs: (options: { websiteId?: string; automatic?: boolean } = {}) => new RunMailJobs(deps).execute(options),
     getUnsubscribe: new GetUnsubscribe(deps),
     unsubscribe: new Unsubscribe(deps),
   };

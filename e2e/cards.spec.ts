@@ -164,6 +164,8 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
       await page.getByRole("alertdialog").getByRole("button", { name: "Jetzt senden" }).click();
       const [invitation] = await waitForMessages(request, mail.weber, `Einladung zur Hochzeit von ${COUPLE}`);
       expect(invitation!.Text).toContain(weberLink);
+      // Emails go out one per second; wait for both before the clock moves later on.
+      await waitForMessages(request, mail.kern, `Einladung zur Hochzeit von ${COUPLE}`);
 
       await guest.goto(weberLink);
       await openEnvelope(guest);
