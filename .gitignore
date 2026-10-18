@@ -1,0 +1,12 @@
+.secrets/
+.playwright-mcp/
+docs/superpowers/
+node_modules/
+.next/
+.env*
+!.env.example
+test-results/
+playwright-report/
+coverage/
+*.tsbuildinfo
+data/
