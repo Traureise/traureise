@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Traureise theme manifest",
+  "description": "Editor hint only. The authoritative schema is themeManifestSchema in src/domain/theme.ts.",
+  "type": "object",
+  "required": ["id", "name", "category", "palettes", "fonts", "assets"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "name": { "$ref": "#/$defs/localized" },
+    "category": { "$ref": "#/$defs/localized" },
+    "palettes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "colors"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "name": { "$ref": "#/$defs/localized" },
+          "colors": {
+            "type": "object",
+            "required": ["background", "surface", "text", "muted", "primary", "accent"],
+            "additionalProperties": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
+          }
+        }
+      }
+    },
+    "fonts": {
+      "type": "object",
+      "required": ["defaultPairing"],
+      "properties": {
+        "defaultPairing": { "enum": ["klassisch", "romantisch", "modern", "elegant", "verspielt", "markant", "buchsatz", "schlicht"] }
+      }
+    },
+    "assets": {
+      "type": "object",
+      "required": ["preview"],
+      "properties": {
+        "preview": { "$ref": "#/$defs/file" },
+        "heroFrame": { "$ref": "#/$defs/file" },
+        "divider": { "$ref": "#/$defs/file" },
+        "background": { "$ref": "#/$defs/file" }
+      }
+    }
+  },
+  "$defs": {
+    "localized": { "type": "object", "required": ["de"], "additionalProperties": { "type": "string", "minLength": 1 } },
+    "file": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*\\.(svg|png|jpg|webp)$" }
+  }
+}

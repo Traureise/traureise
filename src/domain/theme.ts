@@ -7,6 +7,7 @@ const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, "invalid_color");
 const assetFile = z.string().regex(/^[a-z0-9][a-z0-9-]*\.(svg|png|jpg|webp)$/, "invalid_asset");
 
 export const themeManifestSchema = z.object({
+  $schema: z.string().optional(),
   id: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/),
   name: localized,
   category: localized,

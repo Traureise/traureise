@@ -1,0 +1,25 @@
+{
+  "$schema": "../theme.schema.json",
+  "id": "bogen",
+  "name": { "de": "Bogen", "en": "Arch" },
+  "category": { "de": "Modern", "en": "Modern" },
+  "palettes": [
+    {
+      "id": "pflaume",
+      "name": { "de": "Pflaume", "en": "Plum" },
+      "colors": { "background": "#f6f2f4", "surface": "#ffffff", "text": "#2a1f28", "muted": "#6b5d68", "primary": "#6d3260", "accent": "#c9a227" }
+    },
+    {
+      "id": "ozean",
+      "name": { "de": "Ozean", "en": "Ocean" },
+      "colors": { "background": "#eef4f5", "surface": "#ffffff", "text": "#16262b", "muted": "#566a70", "primary": "#1f5f6f", "accent": "#e07a5f" }
+    },
+    {
+      "id": "tinte",
+      "name": { "de": "Tinte", "en": "Ink" },
+      "colors": { "background": "#191b24", "surface": "#222533", "text": "#f1eee8", "muted": "#a9a8b5", "primary": "#e8c27a", "accent": "#b9a3e3" }
+    }
+  ],
+  "fonts": { "defaultPairing": "markant" },
+  "assets": { "preview": "preview.svg", "heroFrame": "frame.svg", "divider": "divider.svg" }
+}
