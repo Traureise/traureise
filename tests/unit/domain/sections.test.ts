@@ -80,6 +80,17 @@ describe("parseItem", () => {
     if (!result.ok) expect(result.fieldErrors).toHaveProperty("endTime");
   });
 
+  it("reports a bad end time together with other field errors", () => {
+    const result = parseItem("schedule", { ...event, endDate: "2027-06-12", endTime: "13:00", website: "kein link", name: "" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.fieldErrors).toMatchObject({ endTime: "end_before_start", website: "invalid_url", name: "required" });
+  });
+
+  it("requires an end time when an end date is given", () => {
+    const result = parseItem("schedule", { ...event, endDate: "2027-06-13" });
+    expect(!result.ok && result.fieldErrors).toMatchObject({ endTime: "required" });
+  });
+
   it("accepts an end after midnight", () => {
     expect(parseItem("schedule", { ...event, endDate: "2027-06-13", endTime: "02:00" }).ok).toBe(true);
   });

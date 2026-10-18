@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { imageKey, isoDate, optional, requiredText, text, time24, webUrl } from "./fields";
-import { parseWith, type Parsed } from "./result";
+import { parseWith, type FieldErrors, type Parsed } from "./result";
 
 /** Fixed section order after Home (reordering is out of scope for v1). */
 export const SECTION_KINDS = [
@@ -98,13 +98,28 @@ const scheduleItem = z
     description: text(2000),
     website: optional(webUrl).default(null),
   })
-  .transform((e) => ({ ...e, endDate: e.endTime && !e.endDate ? e.startDate : e.endDate }))
-  .superRefine((e, ctx) => {
-    if (e.endDate && !e.endTime) ctx.addIssue({ code: "custom", path: ["endTime"], message: "required" });
-    if (e.endDate && e.endTime && `${e.endDate}T${e.endTime}` <= `${e.startDate}T${e.startTime}`) {
-      ctx.addIssue({ code: "custom", path: ["endTime"], message: "end_before_start" });
-    }
-  });
+  .transform((e) => ({ ...e, endDate: e.endTime && !e.endDate ? e.startDate : e.endDate }));
+
+/**
+ * Start/end consistency, checked on the raw input so it is reported together with any other
+ * field errors (zod skips refinements once a field has failed).
+ */
+function scheduleTimeErrors(input: unknown): FieldErrors {
+  const raw = (input ?? {}) as Record<string, unknown>;
+  const valid = (schema: z.ZodType, key: string) => {
+    const value = typeof raw[key] === "string" ? (raw[key] as string).trim() : "";
+    return value && schema.safeParse(value).success ? value : null;
+  };
+  const startDate = valid(isoDate, "startDate");
+  const startTime = valid(time24, "startTime");
+  const endTime = valid(time24, "endTime");
+  const endDate = valid(isoDate, "endDate") ?? (endTime ? startDate : null);
+  if (endDate && !endTime) return { endTime: "required" };
+  if (startDate && startTime && endDate && endTime && `${endDate}T${endTime}` <= `${startDate}T${startTime}`) {
+    return { endTime: "end_before_start" };
+  }
+  return {};
+}
 
 const travelItem = z.object({
   name: requiredText(120),
@@ -163,7 +178,10 @@ export type GalleryItem = ItemData<"gallery">;
 export type FaqItem = ItemData<"faqs">;
 
 export function parseItem<K extends CollectionKind>(kind: K, input: unknown): Parsed<ItemData<K>> {
-  return parseWith(ITEM_SCHEMAS[kind], input) as Parsed<ItemData<K>>;
+  const result = parseWith(ITEM_SCHEMAS[kind], input) as Parsed<ItemData<K>>;
+  const extra = kind === "schedule" ? scheduleTimeErrors(input) : {};
+  if (Object.keys(extra).length === 0) return result;
+  return { ok: false, fieldErrors: { ...extra, ...(result.ok ? {} : result.fieldErrors) } };
 }
 
 /** Image keys referenced by an item, for cleanup when items or websites are deleted. */
