@@ -37,7 +37,7 @@ Database migrations run automatically every time the app container starts.
 
 ## Configuration
 
-All settings are environment variables, read from `.env` by `compose.yml`.
+All settings are environment variables, read from `.env` by `docker-compose.yml`.
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -61,7 +61,7 @@ The bundled Mailpit only catches emails, which is good for trying things out and
 
 1. Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD` and `MAIL_FROM` for your
    provider. For GDPR, prefer an EU provider and sign a data processing agreement (AVV) with it.
-2. Remove the `mailpit` service, and the `depends_on` entry that points to it, from `compose.yml`,
+2. Remove the `mailpit` service, and the `depends_on` entry that points to it, from `docker-compose.yml`,
    or keep it if you want a catch-all inbox.
 3. Configure SPF, DKIM and DMARC for the sender domain, so login links don't end up in spam.
 
@@ -131,6 +131,11 @@ DATABASE_URL=postgres://traureise:<password>@localhost:5432/traureise SMTP_HOST=
 | `npm run db:generate` | Generates a migration after changing `src/infrastructure/db/schema.ts` |
 
 Every E2E test fails if the browser makes a request to any host other than the app itself.
+
+GitHub Actions runs all of this on every pull request (`.github/workflows/ci.yml`). The E2E job starts the
+stack with `docker compose up` from `.env.example`, just like a fresh install.
+`.github/workflows/docker.yml` builds the image for every pull request and publishes it to
+`ghcr.io/traureise/traureise` from `main` and from `v*` tags.
 
 ### Architecture
 

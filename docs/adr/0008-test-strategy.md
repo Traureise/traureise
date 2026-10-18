@@ -33,6 +33,11 @@ Chosen option: "Three levels", because each level catches what the others cannot
 Rules: no skipped tests and no retries (`retries: 0`, `forbidOnly`). Tests use unique emails and
 per-test client addresses, so they don't share state or rate-limit buckets.
 
+### Confirmation
+
+GitHub Actions runs lint, typecheck, unit, integration (with PostgreSQL and Mailpit service containers) and
+E2E (against `docker compose up` from `.env.example`) on every pull request.
+
 ### Consequences
 
 * Good, because the Compose setup that self-hosters use is exactly what the E2E suite tests.
