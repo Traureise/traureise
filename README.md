@@ -25,6 +25,11 @@ backups, themes, architecture and design decisions. The sources are in [`docs/`]
   WhatsApp), a themed answer form (attendance, events, meal, allergies, polls, requests to bring someone,
   a message), an overview with a pie chart and counts, email notifications, CSV export, and automatic
   deletion of guest data 12 months after the wedding ([how](https://docs.traureise.de/guests/)).
+- Save the Dates, invitations, thank-you cards and an engagement announcement: card layouts from the
+  themes, a live-preview editor, an envelope that opens on the household's page, sending by link,
+  WhatsApp or email (with one-click unsubscribe), automatic and manual reminders, "opened" per household
+  without tracking, and export as PDF (A6, A5) and PNG, rendered on the instance
+  ([how](https://docs.traureise.de/cards/)).
 - Account rights: download all your data as a ZIP (data.json plus images) and delete your account
   with everything in it, under `/konto`.
 - Optional billing for operators who run Traureise as a service: one-time prices per wedding on
@@ -80,9 +85,14 @@ services:
 
 **Guest links.** Set `APP_SECRET` to a long random value (`openssl rand -base64 48`) before couples send
 links, and keep it: each household's personal link is derived from it, so changing it stops every link
-already sent. Retention and daily summaries run inside the app every `GUEST_JOBS_INTERVAL_MINUTES`
+already sent. Retention, daily summaries and automatic reminders run inside the app every `GUEST_JOBS_INTERVAL_MINUTES`
 (default 15). Your privacy policy should cover what is stored about guests (see the
 [guests guide](https://docs.traureise.de/guests/)).
+
+**Emails to guests.** Cards and reminders go out through your SMTP server as `"<couple> über Traureise"`
+with the address of `MAIL_FROM` and the couple's address as `Reply-To`, at most `MAIL_BATCH_SIZE` per job
+pass with `MAIL_SEND_INTERVAL_MS` between two (defaults 50 and 1000 ms). Use a provider that allows this and
+set up SPF, DKIM and DMARC (see [Email](https://docs.traureise.de/email/#emails-to-guests)).
 
 **Billing** (for operators who run Traureise as a paid service; off by default):
 
@@ -92,11 +102,13 @@ already sent. Retention and daily summaries run inside the app every `GUEST_JOBS
 | `CREEM_API_URL`, `CREEM_API_KEY`, `CREEM_WEBHOOK_SECRET` | Creem API (`https://test-api.creem.io` for test mode) and webhook secret. Point the Creem webhook at `<APP_URL>/api/billing/webhook`. |
 | `CREEM_PRODUCT_RSVP`, `CREEM_PRODUCT_INVITATIONS`, `CREEM_PRODUCT_COMPLETE` | Creem product ids per tier. A tier without a product cannot be bought. |
 | `PRICE_RSVP_EUR`, `PRICE_INVITATIONS_EUR`, `PRICE_COMPLETE_EUR` | Prices on `/preise` in euros, VAT included (defaults 49, 139, 149). |
-| `BILLING_TEST_UNLOCK_TIERS` | **Testing only.** Sells tiers whose features are not built yet. Never set it in production. |
+| `BILLING_TEST_UNLOCK_TIERS` | **Testing only.** Sells tiers whose features are not built yet (since v4 all are). Never set it in production. |
 | `TEST_HOOKS` | **Testing only.** Lets anyone move the clock and run the guest jobs. Never set it in production. |
 
-Setting up guests is free; the RSVP tier activates the personal links, sharing and notifications. A tier
-whose features do not exist yet is shown as "bald verfügbar" and cannot be bought. Without billing,
+Setting up guests and designing cards is free. RSVP activates the personal links, sharing and
+notifications; Einladungen adds Save the Dates, invitations, email sending and reminders; Komplett the
+thank-you card and the engagement announcement. A tier without a product id is shown as "bald verfügbar"
+and cannot be bought. Without billing,
 `/preise`, plans and purchases do not appear anywhere.
 
 ## Development

@@ -22,6 +22,7 @@ nav:
       - Backups and restore: backups.md
       - Legal pages, account rights and billing: legal-and-billing.md
       - Guests and RSVP: guests.md
+      - Save the Dates, invitations and cards: cards.md
   - Customising:
       - Themes: themes.md
       - Languages: languages.md
@@ -48,6 +49,10 @@ nav:
           - Configure free, send paid: adr/0016-configure-free-send-paid.md
           - Automatic deletion of guest data: adr/0017-automatic-deletion-of-guest-data.md
           - Background jobs inside the app: adr/0018-background-jobs-inside-the-app.md
+          - One household page for all cards: adr/0019-one-household-page-for-all-cards.md
+          - Card rendering and export: adr/0020-card-rendering-and-export.md
+          - Sending email on the couple's behalf: adr/0021-sending-email-on-the-couples-behalf.md
+          - Opened status without tracking: adr/0022-opened-status-without-tracking.md
 
 theme:
   name: material

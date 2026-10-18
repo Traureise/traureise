@@ -68,4 +68,13 @@ the household id with `APP_SECRET` ([ADR 0015](adr/0015-households-with-hashed-p
 Retention and daily summaries run as `RunGuestJobs` on a timer started in `src/instrumentation.ts`
 ([ADR 0018](adr/0018-background-jobs-inside-the-app.md)).
 
+Cards (`cards`, one per website and kind) cascade from `websites.id`; `card_deliveries` (sent, opened,
+email claims, reminders per card and household) cascade from the card and from the household, so
+retention removes them with the guest list. One React component, `CardView`
+(`src/components/cards/card-view.tsx`), draws a card from a `CardModel` (`src/domain/cards.ts`) on the
+household page, in the editor's live preview, on the dashboard, and through satori for the email image
+and the PDF/PNG exports (`src/infrastructure/cards/renderer.tsx`, [ADR 0020](adr/0020-card-rendering-and-export.md)).
+Card emails are queued in `card_deliveries` and sent by `RunMailJobs`, kicked after the request and run
+with the guest jobs ([ADR 0021](adr/0021-sending-email-on-the-couples-behalf.md)).
+
 The reasoning behind these choices is recorded in the [design decisions](adr/0001-nextjs-with-layered-architecture.md).

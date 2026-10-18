@@ -1,7 +1,8 @@
 # Email (SMTP)
 
-Traureise only sends one kind of email: the login link. It sends it over plain SMTP, so any mail
-provider works.
+Traureise sends three kinds of email over plain SMTP, so any mail provider works: the login link,
+notifications to couples about their guests' answers, and cards and reminders to guests on the couple's
+behalf.
 
 ## The bundled Mailpit
 
@@ -29,6 +30,29 @@ SMTP_USER=no-reply@example.de
 SMTP_PASSWORD=…
 MAIL_FROM=Traureise <no-reply@example.de>
 ```
+
+## Emails to guests
+
+Cards and reminders go to guests who have an email address in the guest list
+([Save the Dates, invitations and cards](cards.md)):
+
+- **Sender:** the address of `MAIL_FROM` with the couple's names as display name, for example
+  `"Anna & Ben über Traureise" <no-reply@example.de>`. `Reply-To` is the couple's account address, so
+  answers go to them, not to you.
+- **Content:** the couple's text, the card as an attached image (no remote images, so nothing tracks
+  opening), one button to the household's page, and a footer saying who sent it and why.
+- **Unsubscribe:** every email has a link and a `List-Unsubscribe` header with one-click
+  `List-Unsubscribe-Post` (RFC 8058). One click, without login, clears the household's address, so it gets no
+  more emails for this wedding. Only a POST unsubscribes; link scanners that follow the link see a page
+  with a button.
+- **Background sending:** emails are queued and sent by the background job, at most `MAIL_BATCH_SIZE` per
+  pass with `MAIL_SEND_INTERVAL_MS` between two. Every email is claimed in the database first, so it never
+  goes out twice, also with several app instances; one interrupted mid-send is marked failed, never retried
+  on its own ([ADR 0021](adr/0021-sending-email-on-the-couples-behalf.md)).
+
+Sending wedding mail is mass email to people who did not sign up with you: use a provider that allows it,
+set up SPF, DKIM and DMARC for the `MAIL_FROM` domain, and keep the default rate unless your provider allows
+more.
 
 ## Limits
 

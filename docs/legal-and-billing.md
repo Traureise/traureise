@@ -34,7 +34,12 @@ wedding websites get no cookies and nothing is stored about them; what is stored
 answer through their personal link (names, attendance, events, meal, allergies, which can be health data,
 poll answers, requests, messages), that the couple decides about it, that RSVP emails to the couple carry it
 through the SMTP provider, and that it is deleted automatically 12 months after the wedding
-([Guests and RSVP](guests.md)); how long backups keep deleted data; and
+([Guests and RSVP](guests.md)); for cards: guests' optional email addresses and personal lines, that
+Traureise emails cards and reminders on the couple's behalf through the SMTP provider, that it records
+whether and how a card was sent and when the household first opened it on its own page (no tracking
+pixels), that every email has a one-click unsubscribe which deletes the address, and that all of this is
+deleted with the guest list ([Save the Dates, invitations and cards](cards.md)); how long backups keep
+deleted data; and
 which rights people have, including the self-service export and deletion under `/konto`.
 
 ## Account rights
@@ -60,8 +65,9 @@ prices, plans or locks appear anywhere.
 
 A purchase attaches to one wedding website and lasts until 12 months after the wedding date (or after the
 purchase if no date is set). Refunds and chargebacks revoke it. The RSVP tier unlocks sending guest links
-([Guests and RSVP](guests.md)); tiers whose features are not built yet are shown as "bald verfügbar" and
-cannot be bought. Creem is the merchant of record and issues the
+([Guests and RSVP](guests.md)); Einladungen unlocks Save the Dates, invitations, email sending and
+reminders, and Komplett the thank-you card and the engagement announcement ([cards](cards.md)). A tier
+without a product id is shown as "bald verfügbar" and cannot be bought. Creem is the merchant of record and issues the
 invoices ([ADR 0013](adr/0013-creem-as-merchant-of-record.md),
 [ADR 0014](adr/0014-entitlements-per-website.md)).
 

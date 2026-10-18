@@ -8,13 +8,16 @@ All settings are environment variables. `docker-compose.yml` reads them from `.e
 | `APP_URL` | `http://localhost:3000` | Public URL of the instance, used in login and share links. If it starts with `https://`, the session cookie is marked `Secure`. |
 | `APP_PORT` | `3000` | Host port the app is published on. |
 | `APP_SECRET` | – | Signs the guests' personal RSVP links. Set a long random value (`openssl rand -base64 48`) before you send links, and keep it: changing it stops every link already sent. Missing or still `change-me`, the app logs a warning. |
-| `GUEST_JOBS_INTERVAL_MINUTES` | `15` | How often the app deletes guest data whose package has ended and sends daily summaries. `0` turns the jobs off. See [Guests and RSVP](guests.md). |
+| `GUEST_JOBS_INTERVAL_MINUTES` | `15` | How often the app deletes guest data whose package has ended, sends daily summaries and automatic reminders, and sends card emails left over from a restart. `0` turns the jobs off. See [Guests and RSVP](guests.md). |
+| `MAIL_BATCH_SIZE` | `50` | Card and reminder emails per pass of the background job. See [Email](email.md#emails-to-guests). |
+| `MAIL_SEND_INTERVAL_MS` | `1000` | Pause between two card or reminder emails (a rate limit for your SMTP server). |
+| `CARD_FONTS_DIR` | `./node_modules/@fontsource` | Font files for card exports. The Docker image ships them; change only for a custom build. |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | `traureise` / – / `traureise` | Credentials for the bundled PostgreSQL. The app's `DATABASE_URL` is built from these. |
 | `POSTGRES_PORT` | `5432` | Host port for PostgreSQL, bound to `127.0.0.1` only (used by the integration tests). |
 | `SMTP_HOST` / `SMTP_PORT` | `mailpit` / `1025` | SMTP server for login emails. See [Email](email.md). |
 | `SMTP_SECURE` | `false` | `true` for implicit TLS (usually port 465). With `false`, STARTTLS is used when the server offers it. |
 | `SMTP_USER` / `SMTP_PASSWORD` | empty | SMTP credentials. Leave empty for servers without authentication. |
-| `MAIL_FROM` | `Traureise <no-reply@traureise.localhost>` | Sender of login emails. |
+| `MAIL_FROM` | `Traureise <no-reply@traureise.localhost>` | Sender of all emails. Emails to guests use its address with the couple's names as display name. |
 | `STORAGE_DRIVER` | `local` | `local` (Docker volume) or `s3`. See [File storage](storage.md). |
 | `STORAGE_LOCAL_DIR` | `/data/uploads` | Upload directory inside the container, backed by the `uploads` volume. |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | empty, `true` | S3 settings when `STORAGE_DRIVER=s3`. |
@@ -27,7 +30,7 @@ All settings are environment variables. `docker-compose.yml` reads them from `.e
 | `CREEM_API_URL`, `CREEM_API_KEY`, `CREEM_WEBHOOK_SECRET` | `https://api.creem.io`, empty | Creem API and webhook secret. |
 | `CREEM_PRODUCT_RSVP`, `CREEM_PRODUCT_INVITATIONS`, `CREEM_PRODUCT_COMPLETE` | empty | Creem product id per tier. |
 | `PRICE_RSVP_EUR`, `PRICE_INVITATIONS_EUR`, `PRICE_COMPLETE_EUR` | `49`, `139`, `149` | Prices shown on `/preise`, whole euros, VAT included. |
-| `BILLING_TEST_UNLOCK_TIERS` | empty | Testing only: sells tiers whose features are not built yet. |
+| `BILLING_TEST_UNLOCK_TIERS` | empty | Testing only: sells tiers whose features are not built yet (all tiers are released since v4). |
 | `TEST_HOOKS` | `false` | Testing only: `/api/test/clock` moves the app's clock and `/api/test/jobs` runs the guest jobs. Anyone could use them to delete guest data, so never set it on a real instance. |
 
 Empty values count as "not set", so unused lines from `.env.example` can stay in place.
