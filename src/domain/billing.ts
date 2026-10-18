@@ -4,15 +4,18 @@ export type Tier = (typeof TIERS)[number];
 export type PaidTier = Exclude<Tier, "website">;
 export const PAID_TIERS = ["rsvp", "invitations", "complete"] as const satisfies readonly PaidTier[];
 
-/** Which tier unlocks a feature. */
+/**
+ * Which tier unlocks a feature. Setting up guests is free; `rsvp` is sending: active personal links,
+ * sharing them and notifications.
+ */
 export const FEATURE_TIERS = {
   website: "website",
   qrCode: "website",
   themes: "website",
-  guestList: "rsvp",
+  guestList: "website",
+  polls: "website",
+  mealChoices: "website",
   rsvp: "rsvp",
-  polls: "rsvp",
-  mealChoices: "rsvp",
   invitations: "invitations",
   saveTheDates: "invitations",
   cards: "complete",
@@ -20,7 +23,7 @@ export const FEATURE_TIERS = {
 export type Feature = keyof typeof FEATURE_TIERS;
 
 /** Tiers whose features all exist. A tier is only sold once it is released. */
-const RELEASED_TIERS: readonly Tier[] = ["website"];
+const RELEASED_TIERS: readonly Tier[] = ["website", "rsvp"];
 
 export type Entitlement = { tier: PaidTier; purchaseRef: string; validUntil: Date; revokedAt: Date | null };
 
@@ -52,8 +55,12 @@ export function canUse(feature: Feature, context: FeatureContext, now: Date): bo
  */
 export function entitlementValidUntil(weddingDate: string | null, purchasedAt: Date): Date {
   const purchaseDay = purchasedAt.toISOString().slice(0, 10);
-  const base = weddingDate && weddingDate > purchaseDay ? weddingDate : purchaseDay;
-  const [y, m, d] = base.split("-").map(Number) as [number, number, number];
+  return endOfDayTwelveMonthsAfter(weddingDate && weddingDate > purchaseDay ? weddingDate : purchaseDay);
+}
+
+/** The end (UTC) of the day 12 months after a calendar date; 29 February falls back to the 28th. */
+export function endOfDayTwelveMonthsAfter(isoDate: string): Date {
+  const [y, m, d] = isoDate.split("-").map(Number) as [number, number, number];
   const lastDayOfMonth = new Date(Date.UTC(y + 1, m, 0)).getUTCDate();
   return new Date(Date.UTC(y + 1, m - 1, Math.min(d, lastDayOfMonth) + 1));
 }
