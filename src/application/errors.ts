@@ -14,3 +14,5 @@ export class NotFoundError extends AppError {}
 export class RateLimitedError extends AppError {}
 
 export class InvalidTokenError extends AppError {}
+
+export class InvalidSignatureError extends AppError {}

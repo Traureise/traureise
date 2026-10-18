@@ -39,7 +39,7 @@ describe("validateSlug", () => {
   });
 
   it("reserves every top-level app route", () => {
-    for (const route of ["dashboard", "websites", "login", "logout", "auth", "uploads", "theme-assets", "willkommen"]) {
+    for (const route of ["dashboard", "websites", "login", "logout", "auth", "uploads", "theme-assets", "willkommen", "impressum", "datenschutz", "preise", "konto"]) {
       expect(RESERVED_SLUGS).toContain(route);
     }
   });

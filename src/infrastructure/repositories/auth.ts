@@ -31,6 +31,10 @@ export class DrizzleMagicLinkRepository implements MagicLinkRepository {
       .returning({ id: magicLinkTokens.id });
     return updated.length === 1;
   }
+
+  async deleteByEmail(email: string): Promise<void> {
+    await this.db.delete(magicLinkTokens).where(eq(magicLinkTokens.email, email));
+  }
 }
 
 export class DrizzleSessionRepository implements SessionRepository {
@@ -66,5 +70,9 @@ export class PostgresRateLimiter implements RateLimiter {
         .where(and(eq(rateLimitHits.key, key), gte(rateLimitHits.createdAt, since)));
       return (row?.count ?? 0) <= limit;
     });
+  }
+
+  async forget(key: string): Promise<void> {
+    await this.db.delete(rateLimitHits).where(eq(rateLimitHits.key, key));
   }
 }

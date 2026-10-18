@@ -7,7 +7,7 @@ import { testEnv } from "./env";
 export function setupTestDatabase() {
   const { db, close } = createDatabase(testEnv().databaseUrl, 3);
   beforeEach(async () => {
-    await db.execute(sql`truncate users, magic_link_tokens, sessions, rate_limit_hits, websites, website_sections, section_items, uploads cascade`);
+    await db.execute(sql`truncate users, magic_link_tokens, sessions, rate_limit_hits, websites, website_sections, section_items, uploads, entitlements, billing_events cascade`);
   });
   afterAll(close);
   return db;

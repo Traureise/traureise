@@ -127,3 +127,28 @@ export const uploads = pgTable("uploads", {
   size: integer("size").notNull(),
   createdAt: createdAt(),
 });
+
+// One row per purchase. purchase_ref is the provider's order id and stays unique after a refund,
+// so a replayed payment event can never grant the same purchase twice.
+export const entitlements = pgTable(
+  "entitlements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    tier: text("tier").notNull(),
+    provider: text("provider").notNull(),
+    purchaseRef: text("purchase_ref").notNull().unique(),
+    validUntil: timestamp("valid_until", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("entitlements_website_idx").on(t.websiteId)],
+);
+
+/** Ids of payment-provider events already handled (webhook idempotency). No personal data. */
+export const billingEvents = pgTable("billing_events", {
+  id: text("id").primaryKey(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+});

@@ -1,5 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import type {
+  ArchiveEntry,
+  ArchiveWriter,
+  BillingChange,
+  BillingRepository,
+  CheckoutRequest,
+  EntitlementRecord,
+  PaymentEvent,
+  PaymentProvider,
   Clock,
   FileStorage,
   ImageProcessor,
@@ -48,6 +56,8 @@ export class FakeTokens implements TokenGenerator {
 
 export class InMemoryUsers implements UserRepository {
   users: User[] = [];
+  /** Stands in for ON DELETE CASCADE across the other in-memory repositories. */
+  cascades: ((userId: string) => void)[] = [];
   async findById(id: string) {
     return this.users.find((u) => u.id === id) ?? null;
   }
@@ -62,6 +72,10 @@ export class InMemoryUsers implements UserRepository {
   async updateFirstName(id: string, firstName: string) {
     const user = this.users.find((u) => u.id === id);
     if (user) user.firstName = firstName;
+  }
+  async delete(id: string) {
+    this.users = this.users.filter((u) => u.id !== id);
+    for (const cascade of this.cascades) cascade(id);
   }
 }
 
@@ -78,6 +92,9 @@ export class InMemoryMagicLinks implements MagicLinkRepository {
     if (!link || link.usedAt) return false;
     link.usedAt = at;
     return true;
+  }
+  async deleteByEmail(email: string) {
+    this.links = this.links.filter((l) => l.email !== email);
   }
 }
 
@@ -100,6 +117,9 @@ export class InMemoryRateLimiter implements RateLimiter {
     this.hits.push({ key, at: now });
     const recent = this.hits.filter((h) => h.key === key && now.getTime() - h.at.getTime() < windowMs);
     return recent.length <= limit;
+  }
+  async forget(key: string) {
+    this.hits = this.hits.filter((h) => h.key !== key);
   }
 }
 
@@ -186,9 +206,14 @@ export class InMemoryWebsites implements WebsiteRepository {
 }
 
 export class InMemoryUploads implements UploadRepository {
-  uploads: { key: string; ownerId: string; websiteId: string; contentType: string; size: number }[] = [];
-  async create(input: InMemoryUploads["uploads"][number]) {
-    this.uploads.push(input);
+  uploads: { key: string; ownerId: string; websiteId: string; contentType: string; size: number; createdAt: Date }[] = [];
+  async create(input: Omit<InMemoryUploads["uploads"][number], "createdAt">) {
+    this.uploads.push({ ...input, createdAt: new Date() });
+  }
+  async listByOwner(ownerId: string) {
+    return this.uploads
+      .filter((u) => u.ownerId === ownerId)
+      .map((u) => ({ key: u.key, websiteId: u.websiteId, contentType: u.contentType, size: u.size, createdAt: u.createdAt }));
   }
   async belongsToWebsite(key: string, websiteId: string) {
     return this.uploads.some((u) => u.key === key && u.websiteId === websiteId);
@@ -225,6 +250,55 @@ export class FakeMailer implements Mailer {
   sent: MailMessage[] = [];
   async send(message: MailMessage) {
     this.sent.push(message);
+  }
+}
+
+export class InMemoryBilling implements BillingRepository {
+  entitlements: EntitlementRecord[] = [];
+  events = new Set<string>();
+  constructor(private websites: InMemoryWebsites) {}
+  async applyEvent(eventId: string, change: BillingChange) {
+    if (this.events.has(eventId)) return "duplicate" as const;
+    this.events.add(eventId);
+    if (change.kind === "grant" && !this.entitlements.some((e) => e.purchaseRef === change.purchaseRef)) {
+      const { websiteId, tier, purchaseRef, provider, validUntil } = change;
+      this.entitlements.push({ id: randomUUID(), revokedAt: null, createdAt: new Date(), websiteId, tier, purchaseRef, provider, validUntil });
+    }
+    if (change.kind === "revoke") {
+      for (const e of this.entitlements) if (e.purchaseRef === change.purchaseRef && !e.revokedAt) e.revokedAt = change.at;
+    }
+    return "applied" as const;
+  }
+  async listByWebsite(websiteId: string) {
+    return copy(this.entitlements.filter((e) => e.websiteId === websiteId));
+  }
+  async listByOwner(ownerId: string) {
+    const ids = new Set(this.websites.websites.filter((w) => w.ownerId === ownerId).map((w) => w.id));
+    return copy(this.entitlements.filter((e) => ids.has(e.websiteId)));
+  }
+}
+
+export class FakePayments implements PaymentProvider {
+  readonly name = "Testpay";
+  readonly legalEntity = "Testpay Ltd., Testland";
+  checkouts: CheckoutRequest[] = [];
+  /** Webhooks are "signed" with this value; the body is the PaymentEvent as JSON. */
+  static SIGNATURE = "valid";
+  async createCheckout(request: CheckoutRequest) {
+    this.checkouts.push(request);
+    return { url: `https://pay.example.org/checkout/${request.requestId}` };
+  }
+  parseWebhook(rawBody: string, signature: string | null): PaymentEvent | null {
+    return signature === FakePayments.SIGNATURE ? (JSON.parse(rawBody) as PaymentEvent) : null;
+  }
+}
+
+export class FakeArchive implements ArchiveWriter {
+  async zip(entries: ArchiveEntry[]) {
+    return new TextEncoder().encode(JSON.stringify(entries.map((e) => ({ path: e.path, bytes: [...e.bytes] }))));
+  }
+  static read(bytes: Uint8Array): ArchiveEntry[] {
+    return (JSON.parse(new TextDecoder().decode(bytes)) as { path: string; bytes: number[] }[]).map((e) => ({ path: e.path, bytes: new Uint8Array(e.bytes) }));
   }
 }
 
@@ -268,12 +342,14 @@ export class FakeThemes implements ThemeCatalog {
 }
 
 export function createFakes() {
+  const websites = new InMemoryWebsites();
+  const billingRepo = new InMemoryBilling(websites);
   const fakes = {
     users: new InMemoryUsers(),
     magicLinks: new InMemoryMagicLinks(),
     sessions: new InMemorySessions(),
     rateLimiter: new InMemoryRateLimiter(),
-    websites: new InMemoryWebsites(),
+    websites,
     uploads: new InMemoryUploads(),
     storage: new InMemoryStorage(),
     images: new FakeImageProcessor(),
@@ -282,8 +358,27 @@ export function createFakes() {
     themes: new FakeThemes(),
     clock: new FakeClock(),
     tokens: new FakeTokens(),
+    billing: {
+      enabled: true,
+      offers: [
+        { tier: "rsvp" as const, priceCents: 4900, productId: "prod_rsvp" },
+        { tier: "invitations" as const, priceCents: 13900, productId: "prod_inv" },
+        { tier: "complete" as const, priceCents: 14900, productId: "prod_all" },
+      ],
+      unlockedTiers: ["rsvp" as const, "complete" as const],
+    },
+    billingRepo,
+    payments: new FakePayments() as FakePayments | null,
+    archive: new FakeArchive(),
     appUrl: "http://localhost:3000",
   };
+  fakes.users.cascades.push((userId) => {
+    const owned = new Set(websites.websites.filter((w) => w.ownerId === userId).map((w) => w.id));
+    for (const id of owned) void websites.delete(id);
+    fakes.sessions.sessions = fakes.sessions.sessions.filter((s) => s.userId !== userId);
+    fakes.uploads.uploads = fakes.uploads.uploads.filter((u) => u.ownerId !== userId);
+    billingRepo.entitlements = billingRepo.entitlements.filter((e) => !owned.has(e.websiteId));
+  });
   const deps: Deps = fakes;
   return { ...fakes, deps };
 }

@@ -2,9 +2,24 @@ import "server-only";
 import path from "node:path";
 import { S3Client } from "@aws-sdk/client-s3";
 import { sql } from "drizzle-orm";
-import { GetCurrentUser, Logout, RequestMagicLink, UpdateProfile, VerifyMagicLink } from "@/application/auth";
+import { DeleteAccount, ExportAccount } from "@/application/account";
+import {
+  GetCurrentUser,
+  Logout,
+  MAGIC_LINK_TTL_MS,
+  RATE_WINDOW_MS,
+  RequestMagicLink,
+  SESSION_TTL_MS,
+  UpdateProfile,
+  VerifyMagicLink,
+} from "@/application/auth";
+import { GetPricing, HandlePaymentWebhook, ListPurchases, ListWebsitePlans, StartCheckout } from "@/application/billing";
 import type { Deps } from "@/application/deps";
-import type { FileStorage } from "@/application/ports";
+import type { BillingSettings, FileStorage, PaymentProvider } from "@/application/ports";
+import { buildPrivacyPolicy } from "@/domain/privacy";
+import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
+import { CreemPaymentProvider } from "@/infrastructure/payments/creem";
+import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing";
 import { GetEventIcs, GetPublicWebsite } from "@/application/public";
 import { AddItem, DeleteItem, MoveItem, UpdateItem, UpdateSection } from "@/application/sections";
 import { GetUpload, UploadImage } from "@/application/uploads";
@@ -31,7 +46,7 @@ import { LocalFileStorage } from "@/infrastructure/storage/local";
 import { S3FileStorage } from "@/infrastructure/storage/s3";
 import { cryptoTokens, systemClock } from "@/infrastructure/system";
 import { FsThemeCatalog } from "@/infrastructure/themes/fs-catalog";
-import { loadConfig, type AppConfig } from "./config";
+import { billingProblems, loadConfig, operatorFromConfig, type AppConfig } from "./config";
 
 function createStorage(config: AppConfig): FileStorage {
   if (config.STORAGE_DRIVER === "s3") {
@@ -50,11 +65,30 @@ function createStorage(config: AppConfig): FileStorage {
   return new LocalFileStorage(path.resolve(config.STORAGE_LOCAL_DIR));
 }
 
+function createPayments(config: AppConfig): PaymentProvider | null {
+  if (!config.BILLING_ENABLED || billingProblems(config).length > 0) return null;
+  return new CreemPaymentProvider({ apiUrl: config.CREEM_API_URL, apiKey: config.CREEM_API_KEY!, webhookSecret: config.CREEM_WEBHOOK_SECRET! });
+}
+
+function billingSettings(config: AppConfig, payments: PaymentProvider | null): BillingSettings {
+  return {
+    enabled: payments !== null,
+    offers: [
+      { tier: "rsvp", priceCents: config.PRICE_RSVP_EUR * 100, productId: config.CREEM_PRODUCT_RSVP ?? null },
+      { tier: "invitations", priceCents: config.PRICE_INVITATIONS_EUR * 100, productId: config.CREEM_PRODUCT_INVITATIONS ?? null },
+      { tier: "complete", priceCents: config.PRICE_COMPLETE_EUR * 100, productId: config.CREEM_PRODUCT_COMPLETE ?? null },
+    ],
+    unlockedTiers: config.BILLING_TEST_UNLOCK_TIERS,
+  };
+}
+
 /** Composition root: the only place that knows which adapter implements which port. */
 function build() {
   const config = loadConfig();
   const { db } = createDatabase(config.DATABASE_URL);
   const themes = new FsThemeCatalog(path.resolve(config.THEMES_DIR));
+  const payments = createPayments(config);
+  const operator = operatorFromConfig(config).details;
   const deps: Deps = {
     users: new DrizzleUserRepository(db),
     magicLinks: new DrizzleMagicLinkRepository(db),
@@ -76,6 +110,10 @@ function build() {
     themes,
     clock: systemClock,
     tokens: cryptoTokens,
+    billing: billingSettings(config, payments),
+    billingRepo: new DrizzleBillingRepository(db),
+    payments,
+    archive: new FflateArchiveWriter(),
     appUrl: config.APP_URL.replace(/\/$/, ""),
   };
 
@@ -83,6 +121,21 @@ function build() {
     config,
     themes,
     appUrl: deps.appUrl,
+    billingEnabled: deps.billing.enabled,
+    /** Null until OPERATOR_NAME, OPERATOR_ADDRESS and OPERATOR_EMAIL are set. */
+    operator,
+    privacyPolicy: buildPrivacyPolicy({
+      controller: operator,
+      hostingProvider: config.PRIVACY_HOSTING_PROVIDER ?? null,
+      smtpProvider: config.PRIVACY_SMTP_PROVIDER ?? null,
+      storage: config.STORAGE_DRIVER === "s3" ? { driver: "s3", provider: config.PRIVACY_STORAGE_PROVIDER ?? null } : { driver: "local" },
+      paymentProvider: payments ? { name: payments.name, details: payments.legalEntity } : null,
+      retention: {
+        magicLinkMinutes: MAGIC_LINK_TTL_MS / 60_000,
+        sessionDays: SESSION_TTL_MS / 86_400_000,
+        rateLimitMinutes: RATE_WINDOW_MS / 60_000,
+      },
+    }),
     async healthCheck(): Promise<boolean> {
       try {
         await db.execute(sql`select 1`);
@@ -114,6 +167,13 @@ function build() {
     getUpload: new GetUpload(deps),
     getPublicWebsite: new GetPublicWebsite(deps),
     getEventIcs: new GetEventIcs(deps),
+    exportAccount: new ExportAccount(deps),
+    deleteAccount: new DeleteAccount(deps),
+    getPricing: new GetPricing(deps),
+    listWebsitePlans: new ListWebsitePlans(deps),
+    listPurchases: new ListPurchases(deps),
+    startCheckout: new StartCheckout(deps),
+    handlePaymentWebhook: new HandlePaymentWebhook(deps),
   };
 }
 
