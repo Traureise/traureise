@@ -26,14 +26,14 @@ export default async function HouseholdPage({ params }: Props) {
   const { token } = await params;
   const view = await load(token);
   if (!view) notFound();
-  const t = await getTranslations(view.state === "empty" ? "letter" : "rsvp");
+  const t = await getTranslations("rsvp");
   if (view.state !== "page") {
     return (
       <GuestSite design={view.design}>
-        <section className="mx-auto max-w-xl space-y-4 px-6 py-24 text-center" data-testid={view.state === "empty" ? "household-page-empty" : "guest-link-inactive"}>
+        <section className="mx-auto max-w-xl space-y-4 px-6 py-24 text-center" data-testid="guest-link-inactive">
           <p className="site-eyebrow">{view.website.title}</p>
-          <h1 className="text-4xl">{t(view.state === "empty" ? "emptyTitle" : "inactiveTitle")}</h1>
-          <p className="site-muted">{t(view.state === "empty" ? "emptyBody" : "inactiveBody")}</p>
+          <h1 className="text-4xl">{t("inactiveTitle")}</h1>
+          <p className="site-muted">{t("inactiveBody")}</p>
         </section>
       </GuestSite>
     );

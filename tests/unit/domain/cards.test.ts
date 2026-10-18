@@ -116,8 +116,12 @@ describe("householdPageContent", () => {
     expect(householdPageContent({ cards: [card("saveTheDate", delivery({ excluded: true, sharedAt: at("2026-01-01") }))], rsvpActive: false })).toEqual({ kinds: [], form: false });
   });
 
-  it("shows the form when there is no invitation card at all", () => {
-    expect(householdPageContent({ cards: [card("saveTheDate", delivery({ sharedAt: at("2026-01-01") }))], rsvpActive: true })).toEqual({ kinds: ["saveTheDate"], form: true });
+  it("keeps the v3 page while nothing was sent, even when an invitation card exists", () => {
+    expect(householdPageContent({ cards: [card("saveTheDate", null), card("invitation", null)], rsvpActive: true })).toEqual({ kinds: [], form: true });
+  });
+
+  it("shows a Save the Date on its own also without an invitation card", () => {
+    expect(householdPageContent({ cards: [card("saveTheDate", delivery({ sharedAt: at("2026-01-01") }))], rsvpActive: true })).toEqual({ kinds: ["saveTheDate"], form: false });
   });
 });
 

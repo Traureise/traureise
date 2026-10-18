@@ -237,7 +237,7 @@ export default async function GuestsPage({ params, searchParams }: Props) {
   const whatsappMessage = page.settings.whatsappMessage ?? t("list.whatsappDefault", { title: page.website.title });
   const locked = page.billingEnabled && !page.sending;
   const openHouseholds = page.households.filter((h) => h.status === "open");
-  const remindable = page.sending || page.emailReminders;
+  const remindable = page.replyOpen && (page.sending || page.emailReminders);
   const counts = card ? cardCounts(page.households.map((h) => h.deliveries[card.kind])) : null;
   const recipients = card ? emailRecipients(page.households.map((h) => ({ ...h, delivery: h.deliveries[card.kind] }))).length : 0;
 

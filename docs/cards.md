@@ -34,8 +34,8 @@ the invitation with the response form, with the Save the Date below; after the w
 on top. Links already sent keep working. A website with only the RSVP package keeps the plain response
 page.
 
-While an invitation card exists but has not been sent to a household, its page shows no response form
-(the invitation brings it). Without an invitation card, the form is there as in v3.
+Until you send a household a card, its page is the response page from v3. A page that shows only a Save
+the Date has no response form; the invitation brings it.
 
 The engagement announcement is not personal: it has one link for everyone, `/<website>/verlobung`.
 
@@ -60,7 +60,7 @@ The text for WhatsApp and email is per card (`{name}` becomes the household's na
 - **Automatic:** on the invitation, set days before the reply-by date (default 14 and 3). On those days
   every household that got the invitation, has an email address and has not answered gets a reminder
   email. Each reminder goes out once; if several are due at once, only the latest is sent; none goes out
-  for an invitation sent after that day. Reminders stop when the household answers or the reply-by date has
+  for an invitation sent after that day. Reminders, automatic or by button, stop when the household answers or the reply-by date has
   passed.
 - **Erinnerung senden** per open household or **Erinnerung an alle offenen**: an email where there is an
   address, otherwise a WhatsApp link with the reminder text.

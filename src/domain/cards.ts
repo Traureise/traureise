@@ -275,8 +275,9 @@ export function emailRecipients<H extends { email: string | null; delivery: Deli
 }
 
 /**
- * Which cards a household's page shows, newest first, and whether the response form is on it. The form
- * comes with the invitation; without an (active) invitation card, the page is the v3 response page.
+ * Which cards a household's page shows, newest first, and whether the response form is on it. Before any
+ * card was sent the page is the v3 response page (so links already sent keep working); once cards are shown,
+ * the form comes with the invitation (a Save the Date is the card on its own).
  */
 export function householdPageContent(input: {
   cards: readonly { kind: HouseholdCardKind; active: boolean; delivery: Delivery | null }[];
@@ -287,8 +288,7 @@ export function householdPageContent(input: {
     .filter((c) => c.active && c.delivery && !c.delivery.excluded && sentAt(c.delivery))
     .sort((a, b) => sentAt(b.delivery)!.getTime() - sentAt(a.delivery)!.getTime() || order.indexOf(a.kind) - order.indexOf(b.kind))
     .map((c) => c.kind);
-  const invitationOffered = input.cards.some((c) => c.kind === "invitation" && c.active);
-  return { kinds: shown, form: input.rsvpActive && (!invitationOffered || shown.includes("invitation")) };
+  return { kinds: shown, form: input.rsvpActive && (shown.length === 0 || shown.includes("invitation")) };
 }
 
 // ---- reminders ----

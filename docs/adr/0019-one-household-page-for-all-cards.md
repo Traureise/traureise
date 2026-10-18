@@ -24,9 +24,10 @@ Chosen option: "One link per household that shows everything sent to it".
 
 * The v3 link is the household's page. It shows the cards sent to that household (by email, WhatsApp or a
   copied link), newest first; older ones stay below. The domain rule `householdPageContent` decides it.
-* The response form comes with the invitation. Once an invitation card exists, a household sees the form
-  only after its invitation was sent (and answers are refused before that); without an invitation card the
-  page is the v3 response page. A website with only the RSVP package therefore keeps the v3 page.
+* Until a card was sent to a household, its page is the v3 response page, so links already sent keep
+  working (also when the couple only tried out an invitation card). Once cards are shown, the response form
+  comes with the invitation: a page with only a Save the Date shows the card on its own, and answers are
+  refused until the invitation is sent. A website with only the RSVP package keeps the v3 page.
 * A card goes to every household by default; the couple can leave households out per card.
 * The engagement announcement is not personal and has one link for everyone, `/<slug>/verlobung`.
 * The page opens like a letter: an envelope with the household's name; tapping it opens it. The couple can

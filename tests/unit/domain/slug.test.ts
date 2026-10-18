@@ -35,6 +35,7 @@ describe("validateSlug", () => {
     ["api", "reserved"],
     ["login", "reserved"],
     ["antwort", "reserved"],
+    ["abmelden", "reserved"],
   ])("rejects %s with %s", (slug, error) => {
     expect(validateSlug(slug)).toBe(error);
   });

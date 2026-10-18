@@ -64,6 +64,8 @@ export type GuestPage = {
   emailReminders: boolean;
   /** WhatsApp text of reminders ("{name}" is the household). */
   reminderMessage: string;
+  /** Answers are still possible, so reminders make sense. */
+  replyOpen: boolean;
 };
 
 export class GetGuestPage {
@@ -99,6 +101,7 @@ export class GetGuestPage {
       emailSending: ctx.can("emailSending"),
       emailReminders: ctx.can("emailReminders"),
       reminderMessage: ctx.cards.find((c) => c.kind === "invitation")?.reminderMessage ?? this.deps.cardTexts.reminderMessage,
+      replyOpen: isReplyOpen(ctx.settings.replyBy, website.timezone, ctx.now),
     };
   }
 }

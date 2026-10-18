@@ -134,7 +134,8 @@
     "closed": "Die Antwortfrist ist vorbei.",
     "no_email": "Dieser Haushalt hat keine E-Mail-Adresse.",
     "excluded": "Dieser Haushalt ist bei dieser Karte ausgelassen.",
-    "locked": "Dafür braucht diese Website ein Paket."
+    "locked": "Dafür braucht diese Website ein Paket.",
+    "answered": "Dieser Haushalt hat schon geantwortet."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -831,8 +832,6 @@
     "toForm": "Zur Antwort",
     "calendar": "Zum Kalender hinzufügen",
     "website": "Zur Website",
-    "emptyTitle": "Hier kommt bald Post",
-    "emptyBody": "Schaut einfach später noch einmal über diesen Link vorbei.",
     "engagementTitle": "{title} · Verlobung",
     "inactiveTitle": "Diese Karte ist noch nicht freigeschaltet",
     "inactiveBody": "Schaut einfach später noch einmal vorbei."

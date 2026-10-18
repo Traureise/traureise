@@ -164,7 +164,8 @@ describe("the household page", () => {
     await create("saveTheDate");
     await create("invitation");
     await create("thankYou");
-    expect(await page(weber.id)).toMatchObject({ state: "empty" });
+    // Nothing sent yet: the v3 response page, so links already sent keep working.
+    expect(await page(weber.id)).toMatchObject({ state: "page", cards: [], form: { state: "open" } });
 
     await share("saveTheDate", weber.id);
     let view = await page(weber.id);
@@ -188,10 +189,13 @@ describe("the household page", () => {
     expect(view.cards[0]!.model.personalLine).toBe("Danke für den Kuchen!");
   });
 
-  it("does not accept answers while the invitation that carries the form has not been sent", async () => {
+  it("accepts answers on the v3 page and with the invitation, not while only a Save the Date is shown", async () => {
     const weber = await household("Weber");
+    await create("saveTheDate");
     await create("invitation");
     const answer = { people: Object.fromEntries(weber.people.map((p) => [p.id, { attending: false }])) };
+    await expect(new SubmitGuestResponse(f.deps).execute({ token: token(weber.id), input: answer, ip: "10.0.0.1" })).resolves.toBeUndefined();
+    await share("saveTheDate", weber.id);
     await expect(new SubmitGuestResponse(f.deps).execute({ token: token(weber.id), input: answer, ip: "10.0.0.1" })).rejects.toMatchObject({ fieldErrors: { _: "inactive" } });
     await share("invitation", weber.id);
     await expect(new SubmitGuestResponse(f.deps).execute({ token: token(weber.id), input: answer, ip: "10.0.0.1" })).resolves.toBeUndefined();
@@ -361,6 +365,22 @@ describe("reminders", () => {
     expect(f.mailer.sent.map((m) => m.to)).toEqual(["weber@example.org"]);
     const entry = (await new GetGuestPage(f.deps).execute(anna.id, websiteId)).households.find((h) => h.id === weber.id)!;
     expect(entry.deliveries.invitation?.remindedAt).toBeInstanceOf(Date);
+  });
+
+  it("stop when the household answers or the reply-by date has passed", async () => {
+    const weber = await household("Weber", "weber@example.org");
+    await create("invitation");
+    expect((await new SendReminders(f.deps).execute(anna.id, websiteId, "all")).queued).toBe(1);
+    // Answered after the reminder was queued: it is dropped, not sent.
+    await new SubmitGuestResponse(f.deps).execute({ token: token(weber.id), input: { people: Object.fromEntries(weber.people.map((p) => [p.id, { attending: false }])) }, ip: "10.0.0.3" });
+    expect(await runMail()).toMatchObject({ sent: 0, failed: 1 });
+    expect(f.mailer.sent).toEqual([]);
+    await expect(new SendReminders(f.deps).execute(anna.id, websiteId, { householdId: weber.id })).rejects.toMatchObject({ fieldErrors: { _: "answered" } });
+
+    await household("Kern", "kern@example.org");
+    f.clock.current = new Date("2027-05-02T10:00:00Z");
+    await expect(new SendReminders(f.deps).execute(anna.id, websiteId, "all")).rejects.toMatchObject({ fieldErrors: { _: "closed" } });
+    expect((await new GetGuestPage(f.deps).execute(anna.id, websiteId)).replyOpen).toBe(false);
   });
 
   it("keeps the WhatsApp reminder in RSVP and email reminders in Einladungen", async () => {

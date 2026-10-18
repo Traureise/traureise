@@ -281,7 +281,7 @@ export type HouseholdPageView =
       cards: PageCard[];
       form: GuestForm | null;
     }
-  | { state: "empty" | "inactive"; website: PageWebsite; design: ResolvedDesign };
+  | { state: "inactive"; website: PageWebsite; design: ResolvedDesign };
 
 const pageWebsite = ({ title, slug, weddingDate, timezone }: Website): PageWebsite => ({ title, slug, weddingDate, timezone });
 
@@ -310,7 +310,8 @@ export class GetHouseholdPage {
     const { ctx, household, website } = found;
     const content = await householdContent(this.deps, ctx, household);
     const base = { website: pageWebsite(website), design: ctx.view.design };
-    if (content.kinds.length === 0 && !content.form) return { ...base, state: ctx.sending ? "empty" : "inactive" };
+    // Nothing to show only without active links (no package, or the guest data is gone).
+    if (content.kinds.length === 0 && !content.form) return { ...base, state: "inactive" };
     const cards = content.kinds.map((kind) => pageCard(this.deps, ctx, ctx.cards.find((c) => c.kind === kind)!, household));
     return {
       ...base,
@@ -472,11 +473,14 @@ export class SendReminders {
     const ctx = await loadGuestContext(this.deps, website);
     const byEmail = ctx.can("emailReminders");
     if (!ctx.sending && !byEmail) throw new LockedError();
+    // Reminders are about answering: they stop at the reply-by date and for households that answered.
+    if (!isReplyOpen(ctx.settings.replyBy, website.timezone, ctx.now)) throw new ValidationError({ _: "closed" });
     const invitation = ctx.cards.find((c) => c.kind === "invitation");
     const deliveries = invitation ? await this.deps.cards.listDeliveries(invitation.id) : [];
     const all = await this.deps.guests.listHouseholds(websiteId);
     const chosen = target === "all" ? all.filter((h) => householdStatus(h) === "open") : all.filter((h) => h.id === target.householdId);
     if (target !== "all" && chosen.length === 0) throw new NotFoundError();
+    if (target !== "all" && householdStatus(chosen[0]!) !== "open") throw new ValidationError({ _: "answered" });
     const households = chosen.filter((h) => !deliveries.find((d) => d.householdId === h.id)?.excluded);
     const emailIds = byEmail && invitation ? households.filter((h) => h.email).map((h) => h.id) : [];
     const queued = emailIds.length ? await this.deps.cards.queueMail("reminder", invitation!.id, emailIds, ctx.now) : 0;
@@ -560,6 +564,8 @@ export class RunMailJobs {
     if (!ctx || !card || !household) return "gone";
     if (!household.email) return "no_email";
     if (queued.channel === "card" ? !ctx.cardActive(card.kind) || !ctx.can("emailSending") : !ctx.can("emailReminders")) return "locked";
+    if (queued.channel === "reminder" && household.respondedAt) return "answered";
+    if (queued.channel === "reminder" && !isReplyOpen(ctx.settings.replyBy, ctx.view.website.timezone, ctx.now)) return "closed";
     try {
       if (queued.channel === "reminder") await this.sendReminder(ctx, card, household);
       else await this.sendCard(ctx, card, household);
