@@ -1,0 +1,14 @@
+.git
+.secrets
+.playwright-mcp
+docs/superpowers
+node_modules
+.next
+dist
+test-results
+playwright-report
+coverage
+.env
+.env.*
+!.env.example
+data
