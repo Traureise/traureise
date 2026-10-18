@@ -1,0 +1,77 @@
+/* Wedding site styles. Colours and fonts come from the theme via --site-* custom properties. */
+.site {
+  background: var(--site-bg) var(--site-background-image) repeat;
+  color: var(--site-text);
+  font-family: var(--site-body);
+  line-height: 1.65;
+}
+.site h1,
+.site h2,
+.site h3 {
+  font-family: var(--site-heading);
+  font-weight: 500;
+  line-height: 1.15;
+}
+.site-nav {
+  background: color-mix(in srgb, var(--site-bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid color-mix(in srgb, var(--site-text) 10%, transparent);
+}
+.site-nav a {
+  color: var(--site-muted);
+}
+.site-nav a:hover,
+.site-nav a:focus-visible {
+  color: var(--site-primary);
+}
+.site-cover {
+  mask: var(--site-frame) center / 100% 100% no-repeat;
+}
+.site-cover[data-frame="none"] {
+  mask: none;
+  border-radius: 1.5rem;
+}
+.site-divider {
+  height: 28px;
+  width: 200px;
+  margin-inline: auto;
+  background: var(--site-accent);
+  mask: var(--site-divider) center / contain no-repeat;
+}
+.site-divider[data-frame="none"] {
+  height: 1px;
+  width: 120px;
+  mask: none;
+}
+.site-muted {
+  color: var(--site-muted);
+}
+.site-surface {
+  background: var(--site-surface);
+  border: 1px solid color-mix(in srgb, var(--site-text) 10%, transparent);
+}
+.site-link {
+  color: var(--site-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.site-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--site-primary);
+  color: var(--site-primary);
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.875rem;
+}
+.site-button:hover,
+.site-button:focus-visible {
+  background: var(--site-primary);
+  color: var(--site-surface);
+}
+.site-eyebrow {
+  color: var(--site-accent);
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+}
