@@ -10,3 +10,5 @@ playwright-report/
 coverage/
 *.tsbuildinfo
 data/
+dist/
+next-env.d.ts

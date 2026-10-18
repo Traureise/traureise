@@ -1,0 +1,25 @@
+{
+  "$schema": "../theme.schema.json",
+  "id": "salbei",
+  "name": { "de": "Salbei", "en": "Sage" },
+  "category": { "de": "Botanisch", "en": "Botanical" },
+  "palettes": [
+    {
+      "id": "salbei",
+      "name": { "de": "Salbei", "en": "Sage" },
+      "colors": { "background": "#f5f6f0", "surface": "#ffffff", "text": "#26302a", "muted": "#5f6d63", "primary": "#56735f", "accent": "#b8935a" }
+    },
+    {
+      "id": "nebel",
+      "name": { "de": "Nebel", "en": "Mist" },
+      "colors": { "background": "#f1f3f5", "surface": "#ffffff", "text": "#232a33", "muted": "#5e6875", "primary": "#4d6a86", "accent": "#a88a6a" }
+    },
+    {
+      "id": "waldnacht",
+      "name": { "de": "Waldnacht", "en": "Forest night" },
+      "colors": { "background": "#1d2621", "surface": "#25302a", "text": "#eef1ea", "muted": "#a8b5ab", "primary": "#a9c7b0", "accent": "#d9b97f" }
+    }
+  ],
+  "fonts": { "defaultPairing": "klassisch" },
+  "assets": { "preview": "preview.svg", "heroFrame": "frame.svg", "divider": "divider.svg" }
+}
