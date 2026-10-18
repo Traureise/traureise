@@ -17,6 +17,9 @@ const nextConfig: NextConfig = {
     return [{ source: "/antwort/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }, { key: "X-Robots-Tag", value: "noindex, nofollow" }] }];
   },
   experimental: {
+    // One build worker: `next build` then fits in 2 GB of RAM (checked with docker run --memory=2g), which a
+    // small VPS or the CI runner has; with a worker per CPU it is killed for lack of memory.
+    cpus: 1,
     // Uploads are capped at 10 MB (src/domain/images.ts); leave room for multipart overhead.
     serverActions: { bodySizeLimit: "12mb" },
     proxyClientMaxBodySize: "12mb",
