@@ -1,0 +1,13 @@
+{#-
+  Same as Material's partials/source.html, minus data-md-component="source": without it, Material
+  does not fetch star and fork counts from api.github.com in the reader's browser.
+-#}
+<a href="{{ config.repo_url }}" title="{{ lang.t('source') }}" class="md-source">
+  <div class="md-source__icon md-icon">
+    {% set icon = config.theme.icon.repo or "fontawesome/brands/git-alt" %}
+    {% include ".icons/" ~ icon ~ ".svg" %}
+  </div>
+  <div class="md-source__repository">
+    {{ config.repo_name }}
+  </div>
+</a>

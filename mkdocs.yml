@@ -1,0 +1,108 @@
+site_name: Traureise
+site_description: Self-hostable, open-source wedding website builder. German-first, privacy by design.
+site_url: https://docs.traureise.de/
+repo_url: https://github.com/Traureise/traureise
+repo_name: Traureise/traureise
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 Marcel Bruckner. Licensed under <a href="https://www.gnu.org/licenses/agpl-3.0.html">AGPL-3.0-or-later</a>
+
+# Planning notes are local-only and never published.
+exclude_docs: |
+  superpowers/
+  overrides/
+
+nav:
+  - Home: index.md
+  - Self-hosting:
+      - Quick start: getting-started.md
+      - Configuration: configuration.md
+      - Email (SMTP): email.md
+      - File storage: storage.md
+      - Reverse proxy and HTTPS: reverse-proxy.md
+      - Backups and restore: backups.md
+  - Customising:
+      - Themes: themes.md
+      - Languages: languages.md
+  - Internals:
+      - Architecture: architecture.md
+      - Privacy by design: privacy.md
+      - Development and tests: development.md
+      - Design decisions:
+          - Next.js with a layered architecture: adr/0001-nextjs-with-layered-architecture.md
+          - PostgreSQL with Drizzle: adr/0002-postgresql-with-drizzle.md
+          - Magic-link login and sessions: adr/0003-magic-link-auth-and-database-sessions.md
+          - Themes as data packages: adr/0004-themes-as-data-packages.md
+          - No runtime third-party requests: adr/0005-gdpr-no-runtime-third-party-requests.md
+          - i18n with next-intl: adr/0006-i18n-with-next-intl.md
+          - File storage abstraction: adr/0007-file-storage-abstraction.md
+          - Test strategy: adr/0008-test-strategy.md
+          - Documentation site: adr/0009-documentation-site-with-material-for-mkdocs.md
+
+theme:
+  name: material
+  # Overrides: see docs/overrides/partials/source.html (no GitHub API calls).
+  custom_dir: docs/overrides
+  language: en
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  font:
+    text: Inter
+    code: JetBrains Mono
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.instant
+    - navigation.footer
+    - navigation.top
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+    - content.action.edit
+
+plugins:
+  - search
+  # Downloads fonts and scripts at build time, so readers' browsers only talk to this site.
+  - privacy
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.min.js
+  - javascripts/mermaid.js
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
