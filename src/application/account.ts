@@ -10,7 +10,7 @@ export class ExportAccount {
   constructor(private deps: Deps) {}
 
   async execute(userId: string): Promise<{ filename: string; bytes: Uint8Array }> {
-    const { users, websites, uploads, storage, billingRepo, archive, clock } = this.deps;
+    const { users, websites, uploads, storage, billingRepo, guests, archive, clock } = this.deps;
     const user = await users.findById(userId);
     if (!user) throw new NotFoundError();
     const now = clock.now();
@@ -53,6 +53,11 @@ export class ExportAccount {
           revokedAt,
           createdAt,
         })),
+        guests: {
+          settings: await guests.getSettings(website.id),
+          polls: await guests.listPolls(website.id),
+          households: await guests.listHouseholds(website.id),
+        },
       });
     }
 

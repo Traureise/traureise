@@ -24,6 +24,7 @@ export const RESERVED_SLUGS = [
   "konto",
   "agb",
   "hilfe",
+  "antwort",
   "_next",
 ] as const;
 

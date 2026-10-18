@@ -15,6 +15,13 @@
       "when": 1792335308781,
       "tag": "0001_billing",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792345612882,
+      "tag": "0002_guests",
+      "breakpoints": true
     }
   ]
 }

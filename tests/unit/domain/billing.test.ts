@@ -36,9 +36,15 @@ describe("canUse", () => {
     expect(canUse("qrCode", { billingEnabled: true, entitlements: [] }, now)).toBe(true);
   });
 
+  it("lets every couple set up guests for free; sending needs the RSVP tier", () => {
+    const free = { billingEnabled: true, entitlements: [] };
+    for (const feature of ["guestList", "polls", "mealChoices"] as const) expect(canUse(feature, free, now)).toBe(true);
+    expect(canUse("rsvp", free, now)).toBe(false);
+  });
+
   it("needs an active entitlement of at least the feature's tier", () => {
     const ctx = { billingEnabled: true, entitlements: [entitlement({ tier: "rsvp" })] };
-    expect(canUse("guestList", ctx, now)).toBe(true);
+    expect(canUse("rsvp", ctx, now)).toBe(true);
     expect(canUse("mealChoices", ctx, now)).toBe(true);
     expect(canUse("invitations", ctx, now)).toBe(false);
     expect(canUse("cards", { billingEnabled: true, entitlements: [entitlement({ tier: "complete" })] }, now)).toBe(true);
@@ -81,24 +87,25 @@ describe("entitlementValidUntil", () => {
 describe("tier availability", () => {
   it("releases only tiers whose features exist", () => {
     expect(isTierReleased("website")).toBe(true);
-    expect(isTierReleased("rsvp")).toBe(false);
-    expect(isTierReleased("rsvp", ["rsvp"])).toBe(true);
+    expect(isTierReleased("rsvp")).toBe(true);
+    expect(isTierReleased("invitations")).toBe(false);
+    expect(isTierReleased("invitations", ["invitations"])).toBe(true);
   });
 
   it("sells released tiers above the current one", () => {
-    expect(sellableTiers(offers, [], [])).toEqual([]);
+    expect(sellableTiers(offers, [], [])).toEqual(["rsvp"]);
     expect(sellableTiers(offers, ["rsvp", "complete"], [])).toEqual(["rsvp", "complete"]);
     expect(sellableTiers(offers, ["rsvp", "complete"], [entitlement({ tier: "rsvp" })], now)).toEqual(["complete"]);
   });
 
   it("does not sell tiers without a product id", () => {
-    expect(sellableTiers([{ tier: "rsvp", priceCents: 4900, productId: null }], ["rsvp"], [])).toEqual([]);
+    expect(sellableTiers([{ tier: "rsvp", priceCents: 4900, productId: null }], [], [])).toEqual([]);
   });
 });
 
 describe("pricingTable", () => {
   it("lists the free website and every paid tier with its status", () => {
-    expect(pricingTable(offers, ["rsvp"])).toEqual([
+    expect(pricingTable(offers, [])).toEqual([
       { tier: "website", priceCents: 0, status: "included" },
       { tier: "rsvp", priceCents: 4900, status: "available" },
       { tier: "invitations", priceCents: 13900, status: "comingSoon" },

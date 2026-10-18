@@ -1,6 +1,7 @@
 import type { CollectionKind, ItemData, SectionKind } from "@/domain/sections";
 import type { Entitlement, PaidTier, Tier, TierOffer } from "@/domain/billing";
 import type { ThemeManifest } from "@/domain/theme";
+import type { Household, HouseholdInput, HouseholdResponse, Poll, PollInput, RequestStatus, RsvpSettings } from "@/domain/guests";
 
 export type User = { id: string; email: string; firstName: string | null; createdAt: Date };
 
@@ -182,4 +183,60 @@ export type ArchiveEntry = { path: string; bytes: Uint8Array };
 
 export interface ArchiveWriter {
   zip(entries: ArchiveEntry[]): Promise<Uint8Array>;
+}
+
+export type PollRecord = Poll & { position: number };
+export type NewPoll = Omit<PollInput, "options"> & { options: Poll["options"] };
+export type HouseholdData = Omit<HouseholdInput, "people"> & { people: { id: string | null; name: string; isChild: boolean }[] };
+
+/** Guest lists. Everything hangs off the website (ON DELETE CASCADE). */
+export interface GuestRepository {
+  getSettings(websiteId: string): Promise<RsvpSettings>;
+  saveSettings(websiteId: string, settings: RsvpSettings): Promise<void>;
+  listPolls(websiteId: string): Promise<PollRecord[]>;
+  createPoll(websiteId: string, poll: NewPoll): Promise<PollRecord>;
+  /** Returns false if the poll does not belong to the website. */
+  updatePoll(websiteId: string, pollId: string, poll: NewPoll): Promise<boolean>;
+  deletePoll(websiteId: string, pollId: string): Promise<void>;
+
+  /** Households with their people and requests, oldest first. */
+  listHouseholds(websiteId: string): Promise<Household[]>;
+  findHousehold(websiteId: string, householdId: string): Promise<Household | null>;
+  findByTokenHash(tokenHash: string): Promise<{ websiteId: string; household: Household } | null>;
+  /** `tokenHashFor` turns the new household's id into the hash of its personal link. */
+  createHousehold(websiteId: string, data: HouseholdData, tokenHashFor: (householdId: string) => string): Promise<Household>;
+  /** People with an id are updated, people without one added, people left out removed. */
+  updateHousehold(websiteId: string, householdId: string, data: HouseholdData): Promise<void>;
+  deleteHousehold(websiteId: string, householdId: string): Promise<void>;
+  /** Stores a household's answer and its new requests in one transaction. */
+  saveResponse(householdId: string, response: HouseholdResponse, at: Date): Promise<void>;
+  /** Adding puts the requested person into the household. Returns false for unknown or decided requests. */
+  decideRequest(websiteId: string, requestId: string, status: Exclude<RequestStatus, "pending">, at: Date): Promise<boolean>;
+
+  /** Retention: removes households, people, answers and requests of a website; returns how many households. */
+  deleteGuestData(websiteId: string): Promise<number>;
+  listWebsiteIdsWithGuests(): Promise<string[]>;
+  listWebsiteIdsWithDailySummary(): Promise<string[]>;
+  lastSummaryAt(websiteId: string): Promise<Date | null>;
+  /** Compare-and-set, so only one instance sends a summary. */
+  claimDailySummary(websiteId: string, previous: Date | null, at: Date): Promise<boolean>;
+  /** True once per deletion date, so only one instance warns, and only once. */
+  claimRetentionWarning(websiteId: string, deleteAt: Date): Promise<boolean>;
+}
+
+/** Personal links: a token derived from the household id with a server secret. Only its hash is stored. */
+export interface GuestLinks {
+  tokenFor(householdId: string): string;
+  hash(token: string): string;
+}
+
+export type AnswerMail = { websiteTitle: string; household: string; coming: string[]; notComing: string[]; message: string; requests: string[]; guestsUrl: string };
+export type SummaryMail = { websiteTitle: string; households: { name: string; coming: number; notComing: number }[]; totals: { coming: number; notComing: number; open: number }; guestsUrl: string };
+export type RetentionMail = { websiteTitle: string; deleteOn: Date; guestsUrl: string };
+
+/** Emails to the couple about their guests. */
+export interface GuestMailTemplates {
+  answer(mail: AnswerMail): Omit<MailMessage, "to">;
+  dailySummary(mail: SummaryMail): Omit<MailMessage, "to">;
+  retentionWarning(mail: RetentionMail): Omit<MailMessage, "to">;
 }

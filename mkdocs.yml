@@ -21,6 +21,7 @@ nav:
       - Reverse proxy and HTTPS: reverse-proxy.md
       - Backups and restore: backups.md
       - Legal pages, account rights and billing: legal-and-billing.md
+      - Guests and RSVP: guests.md
   - Customising:
       - Themes: themes.md
       - Languages: languages.md
@@ -43,6 +44,10 @@ nav:
           - Account export and deletion: adr/0012-account-export-and-deletion.md
           - Creem as merchant of record: adr/0013-creem-as-merchant-of-record.md
           - Entitlements per website: adr/0014-entitlements-per-website.md
+          - Households with hashed personal links: adr/0015-households-with-hashed-personal-links.md
+          - Configure free, send paid: adr/0016-configure-free-send-paid.md
+          - Automatic deletion of guest data: adr/0017-automatic-deletion-of-guest-data.md
+          - Background jobs inside the app: adr/0018-background-jobs-inside-the-app.md
 
 theme:
   name: material

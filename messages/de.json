@@ -11,6 +11,30 @@
       "button": "Jetzt anmelden",
       "expiry": "Der Link ist {minutes} Minuten gültig und funktioniert nur einmal.",
       "ignore": "Du hast keinen Link angefordert? Dann kannst du diese E-Mail ignorieren."
+    },
+    "answer": {
+      "subject": "{household} hat geantwortet",
+      "intro": "{household} hat für „{title}“ geantwortet.",
+      "coming": "Kommen: {names}",
+      "notComing": "Kommen nicht: {names}",
+      "message": "Nachricht: {message}",
+      "requests": "Möchten gern mitbringen: {names}",
+      "button": "Zur Gästeliste",
+      "footer": "Du bekommst diese E-Mail, weil in den RSVP-Einstellungen „E-Mail bei jeder Antwort“ gewählt ist."
+    },
+    "summary": {
+      "subject": "Neue Antworten für „{title}“",
+      "intro": "Seit der letzten Zusammenfassung {count, plural, one {hat # Haushalt} other {haben # Haushalte}} geantwortet:",
+      "line": "{name}: {coming} kommen, {notComing} kommen nicht",
+      "totals": "Insgesamt: {coming} kommen, {notComing} kommen nicht, {open} offen.",
+      "button": "Zur Gästeliste",
+      "footer": "Du bekommst diese E-Mail, weil in den RSVP-Einstellungen „Tägliche Zusammenfassung“ gewählt ist."
+    },
+    "retention": {
+      "subject": "Eure Gästeliste wird am {date} gelöscht",
+      "body": "Das RSVP-Paket für „{title}“ endet bald. Am {date} löschen wir die Gästeliste mit allen Antworten automatisch, so wie es in unserer Datenschutzerklärung steht.",
+      "hint": "Wenn ihr die Antworten behalten wollt, ladet vorher auf der Gäste-Seite die CSV-Datei herunter.",
+      "button": "Zur Gästeliste"
     }
   },
   "landing": {
@@ -69,7 +93,14 @@
     "notFoundBody": "Diese Seite gibt es nicht oder sie gehört zu einem anderen Konto.",
     "backHome": "Zur Startseite",
     "email_mismatch": "Bitte gib genau die E-Mail-Adresse deines Kontos ein.",
-    "not_available": "Dieses Paket kannst du für diese Website gerade nicht kaufen."
+    "not_available": "Dieses Paket kannst du für diese Website gerade nicht kaufen.",
+    "too_few_options": "Eine Umfrage braucht mindestens zwei Antworten.",
+    "no_people": "Ein Haushalt braucht mindestens eine Person.",
+    "too_many": "Das sind zu viele Einträge.",
+    "invalid_person": "Diese Person gehört nicht zu diesem Haushalt.",
+    "invalid_input": "Diese Antwort konnten wir nicht lesen. Bitte lade die Seite neu.",
+    "inactive": "Dieser Link ist noch nicht aktiv.",
+    "closed": "Die Antwortfrist ist vorbei."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -107,7 +138,8 @@
       "delete": "Löschen",
       "coverAlt": "Titelbild von {title}",
       "plan": "Paket: {tier}",
-      "upgrade": "Paket wählen"
+      "upgrade": "Paket wählen",
+      "guests": "Gäste"
     },
     "deleteDialog": {
       "title": "Website löschen?",
@@ -153,7 +185,9 @@
       "home": "Startseite",
       "sections": "Abschnitte",
       "visible": "Sichtbar",
-      "hidden": "Ausgeblendet"
+      "hidden": "Ausgeblendet",
+      "guests": "Gäste",
+      "guestsHint": "Gästeliste und Antworten"
     },
     "saved": "Gespeichert",
     "save": "Speichern",
@@ -361,16 +395,18 @@
         "features": [
           "Hochzeitswebsite mit allen Bereichen",
           "QR-Code und Link zum Teilen",
-          "Themes, Farben und Schriften"
+          "Themes, Farben und Schriften",
+          "Gästeliste, Umfragen und Menüwahl vorbereiten"
         ]
       },
       "rsvp": {
         "name": "RSVP",
         "features": [
           "Alles aus „Website“",
-          "Gästeliste",
-          "Zu- und Absagen auf der Website",
-          "Umfragen und Menüwahl"
+          "Persönlicher Antwort-Link für jeden Haushalt",
+          "Teilen per Link oder WhatsApp",
+          "Zu- und Absagen, Menüwahl, Allergien und Umfragen",
+          "Benachrichtigungen per E-Mail"
         ]
       },
       "invitations": {
@@ -417,5 +453,212 @@
       "button": "Konto endgültig löschen",
       "deleting": "Wird gelöscht …"
     }
+  },
+  "guests": {
+    "title": "Gäste",
+    "backToDashboard": "Zurück zum Dashboard",
+    "editWebsite": "Website bearbeiten",
+    "tabs": {
+      "label": "Gäste",
+      "overview": "Übersicht",
+      "settings": "Einstellungen",
+      "preview": "Vorschau"
+    },
+    "locked": "Ihr könnt alles kostenlos vorbereiten. Persönliche Links, das Teilen per WhatsApp und Benachrichtigungen gibt es mit dem RSVP-Paket.",
+    "lockedLink": "RSVP-Paket ansehen",
+    "deletionNotice": "Am {date} löschen wir die Gästeliste mit allen Antworten automatisch. Wenn ihr sie behalten wollt, ladet sie vorher herunter:",
+    "overview": {
+      "title": "Übersicht",
+      "people": "Gäste",
+      "chartLabel": "{coming} kommen, {notComing} kommen nicht, {open} offen",
+      "coming": "Kommen",
+      "notComing": "Kommen nicht",
+      "open": "Offen",
+      "households": "{answered} von {total} Haushalten haben geantwortet",
+      "events": "Pro Event",
+      "noEvents": "Noch keine Events. Legt sie im Tagesablauf eurer Website an.",
+      "meals": "Menü",
+      "noMeal": "Keine Menüwahl eingerichtet.",
+      "allergies": "Allergien und Unverträglichkeiten",
+      "noAllergies": "Bisher keine.",
+      "allergyLine": "{name} ({household}): {allergies}",
+      "otherAnswers": "Andere Antworten: {answers}",
+      "requests": "Anfragen für weitere Gäste",
+      "noRequests": "Keine offenen Anfragen.",
+      "request": "{name} – angefragt von {household}",
+      "addRequest": "Zur Gästeliste",
+      "declineRequest": "Ablehnen"
+    },
+    "status": {
+      "open": "Offen",
+      "answered": "Geantwortet",
+      "declined": "Abgesagt"
+    },
+    "requestStatus": {
+      "pending": "angefragt",
+      "added": "zur Gästeliste hinzugefügt",
+      "declined": "abgelehnt"
+    },
+    "list": {
+      "title": "Gästeliste",
+      "csv": "CSV herunterladen",
+      "filter": "Nach Status filtern",
+      "all": "Alle",
+      "filterItem": "{label} ({count})",
+      "empty": "Noch keine Haushalte. Legt den ersten an.",
+      "emptyFilter": "Keine Haushalte mit diesem Status.",
+      "people": "{count, plural, one {# Person} other {# Personen}}: {names}",
+      "invitedTo": "Eingeladen zu: {events}",
+      "noEvent": "keinem Event",
+      "copyLink": "Link kopieren",
+      "linkCopied": "Link für {household} kopiert",
+      "copyFailed": "Kopieren hat nicht geklappt.",
+      "whatsapp": "WhatsApp",
+      "whatsappDefault": "Hallo '{name}', wir heiraten! Sagt uns bitte über diesen Link, ob ihr dabei seid. Liebe Grüße, {title}"
+    },
+    "household": {
+      "add": "Haushalt hinzufügen",
+      "addTitle": "Neuer Haushalt",
+      "edit": "Bearbeiten",
+      "editTitle": "Haushalt bearbeiten",
+      "lead": "Ein Haushalt bekommt einen gemeinsamen Link und antwortet für alle seine Personen.",
+      "name": "Name des Haushalts",
+      "namePlaceholder": "z. B. Familie Weber",
+      "people": "Personen",
+      "personName": "Person {n}",
+      "child": "Kind",
+      "removePerson": "Person {n} entfernen",
+      "addPerson": "Person hinzufügen",
+      "invitedTo": "Eingeladen zu",
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "saved": "Gespeichert",
+      "confirmDelete": "„{name}“ mit allen Antworten löschen?",
+      "deleted": "Haushalt gelöscht",
+      "delete": "Löschen"
+    },
+    "details": {
+      "show": "Antworten ansehen",
+      "child": "Kind",
+      "open": "offen",
+      "coming": "kommt",
+      "notComing": "kommt nicht",
+      "events": "Events: {events}",
+      "meal": "Essen: {meal}",
+      "allergies": "Allergien: {allergies}",
+      "poll": "{question} – {answer}",
+      "request": "Begleitung {name}: {status}",
+      "noAnswer": "Noch keine Antwort."
+    },
+    "csv": {
+      "household": "Haushalt",
+      "name": "Name",
+      "child": "Kind",
+      "status": "Status",
+      "meal": "Essen",
+      "allergies": "Allergien",
+      "message": "Nachricht",
+      "yes": "ja",
+      "no": "nein",
+      "coming": "kommt",
+      "notComing": "kommt nicht",
+      "open": "offen"
+    },
+    "settings": {
+      "title": "RSVP-Einstellungen",
+      "replyBy": "Antworten bis",
+      "replyByHint": "Bis zum Ende dieses Tages können Gäste ihre Antwort ändern. Danach sehen sie sie nur noch.",
+      "events": "Events, für die Gäste zusagen können",
+      "noSchedule": "Legt zuerst im Tagesablauf eurer Website Events an.",
+      "meal": "Menüwahl",
+      "mealHint": "Die Gerichte, die ihr mit der Location abgesprochen habt. Ohne Gerichte gibt es keine Menüwahl.",
+      "dish": "Gericht {n}",
+      "addDish": "Gericht hinzufügen",
+      "removeDish": "Gericht {n} entfernen",
+      "mealEvent": "Menüwahl für",
+      "mealEveryEvent": "alle Gäste, die kommen",
+      "notify": "Benachrichtigungen",
+      "notifyModes": {
+        "off": "Keine E-Mails",
+        "each": "E-Mail bei jeder Antwort",
+        "daily": "Tägliche Zusammenfassung (morgens um 8 Uhr)"
+      },
+      "notifyLocked": "E-Mails verschicken wir, sobald das RSVP-Paket aktiv ist.",
+      "whatsapp": "Text für WhatsApp",
+      "whatsappHint": "'{name}' wird durch den Namen des Haushalts ersetzt, der Link kommt automatisch dazu.",
+      "save": "Einstellungen speichern"
+    },
+    "polls": {
+      "title": "Umfragen",
+      "lead": "Fragen an eure Gäste, zum Beispiel Musikwünsche oder ob jemand den Shuttle braucht.",
+      "add": "Umfrage hinzufügen",
+      "newTitle": "Neue Umfrage",
+      "editTitle": "Umfrage bearbeiten",
+      "question": "Frage",
+      "questionPlaceholder": "z. B. Welche Musik bringt euch auf die Tanzfläche?",
+      "options": "Antworten",
+      "option": "Antwort {n}",
+      "addOption": "Antwort hinzufügen",
+      "removeOption": "Antwort {n} entfernen",
+      "multiple": "Mehrfachauswahl",
+      "allowOther": "Freie Antwort „Andere“ erlauben",
+      "per": "Beantwortet",
+      "scopes": {
+        "person": "von jeder Person",
+        "household": "einmal pro Haushalt"
+      },
+      "save": "Umfrage speichern",
+      "cancel": "Abbrechen",
+      "edit": "Bearbeiten",
+      "delete": "Löschen",
+      "deleted": "Umfrage gelöscht",
+      "confirmDelete": "Umfrage „{question}“ löschen?",
+      "summary": "{options} · {per}"
+    },
+    "preview": {
+      "lead": "So sehen eure Gäste das Formular. In der Vorschau wird nichts gespeichert.",
+      "sampleHousehold": "Familie Muster",
+      "samplePerson1": "Alex",
+      "samplePerson2": "Sam"
+    }
+  },
+  "rsvp": {
+    "pageTitle": "Eure Antwort · {title}",
+    "formLabel": "Antwortformular",
+    "greeting": "Hallo {household}!",
+    "replyBy": "Bitte antwortet bis zum {date}.",
+    "previewNote": "Vorschau: So sieht das Formular für eure Gäste aus. Hier wird nichts gespeichert.",
+    "closed": "Die Antwortfrist ist vorbei. Hier seht ihr eure Antwort. Wenn sich etwas ändert, meldet euch bitte direkt bei {title}.",
+    "answered": "Danke für eure Antwort! Ihr könnt sie hier jederzeit ändern.",
+    "answeredUntil": "Danke für eure Antwort! Ihr könnt sie hier bis zum {date} ändern.",
+    "child": "Kind",
+    "attendingLabel": "Kommt {name}?",
+    "yes": "Ich komme",
+    "no": "Ich kann leider nicht",
+    "events": "Ich komme zu",
+    "event": "{name} · {date}, {time} Uhr",
+    "meal": "Essen",
+    "allergies": "Allergien und Unverträglichkeiten",
+    "allergiesPlaceholder": "z. B. Nüsse, Laktose",
+    "other": "Andere",
+    "otherLabel": "Andere Antwort: {question}",
+    "householdQuestions": "Noch ein paar Fragen",
+    "bringSomeone": "Möchtet ihr jemanden mitbringen?",
+    "bringSomeoneHint": "Schreibt den Namen auf. Das Brautpaar entscheidet, und hier seht ihr, wie es ausgegangen ist.",
+    "requestLine": "{name}: {status}",
+    "requestName": "Name der Begleitung {n}",
+    "addRequest": "Weitere Person",
+    "requestStatus": {
+      "pending": "angefragt",
+      "added": "ist dabei",
+      "declined": "leider nicht möglich"
+    },
+    "message": "Nachricht an {title}",
+    "saved": "Danke! Eure Antwort ist gespeichert.",
+    "submit": "Antwort senden",
+    "update": "Antwort ändern",
+    "inactiveTitle": "Dieser Link ist noch nicht aktiv",
+    "inactiveBody": "Hier könnt ihr bald antworten. Schaut einfach später noch einmal vorbei.",
+    "allergiesHint": "Freiwillig. Nur das Brautpaar sieht diese Angabe, damit es die Küche informieren kann. Sie wird mit der Gästeliste nach der Hochzeit gelöscht."
   }
 }

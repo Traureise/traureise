@@ -1,16 +1,10 @@
 "use server";
 
-import { headers } from "next/headers";
+import { clientIp } from "@/lib/client-ip";
 import { redirect } from "next/navigation";
 import { container } from "@/composition/container";
 import { runAction, type ActionResult } from "@/lib/action-result";
 import { clearSessionCookie, requireUser, sessionToken } from "@/lib/session";
-
-/** The address the nearest reverse proxy saw (it appends the last X-Forwarded-For entry). */
-async function clientIp(): Promise<string> {
-  const h = await headers();
-  return h.get("x-forwarded-for")?.split(",").at(-1)?.trim() || h.get("x-real-ip") || "unknown";
-}
 
 export async function requestMagicLinkAction(_prev: unknown, form: FormData): Promise<ActionResult<{ email: string }>> {
   const email = String(form.get("email") ?? "");

@@ -10,7 +10,13 @@ import type {
   PaymentProvider,
   Clock,
   FileStorage,
+  GuestLinks,
+  GuestMailTemplates,
+  GuestRepository,
+  HouseholdData,
   ImageProcessor,
+  NewPoll,
+  PollRecord,
   Item,
   MagicLinkMailTemplate,
   MagicLinkRecord,
@@ -32,6 +38,7 @@ import type {
 } from "@/application/ports";
 import type { Deps } from "@/application/deps";
 import type { CollectionKind } from "@/domain/sections";
+import { DEFAULT_RSVP_SETTINGS, type Household, type HouseholdResponse, type RsvpSettings } from "@/domain/guests";
 import { parseThemeManifest, type ThemeManifest } from "@/domain/theme";
 
 export class FakeClock implements Clock {
@@ -125,11 +132,18 @@ export class InMemoryRateLimiter implements RateLimiter {
 
 /** Repositories hand out snapshots, like a database would. */
 const copy = <T>(value: T): T => structuredClone(value);
+function omit<T extends object, K extends keyof T>(value: T, key: K): Omit<T, K> {
+  const rest = { ...value };
+  delete rest[key];
+  return rest;
+}
 
 export class InMemoryWebsites implements WebsiteRepository {
   websites: Website[] = [];
   sections = new Map<string, Section[]>();
   items: (Item & { websiteId: string })[] = [];
+  /** Stands in for ON DELETE CASCADE from websites. */
+  cascades: ((websiteId: string) => void)[] = [];
 
   async create(input: Parameters<WebsiteRepository["create"]>[0], sections: Section[]) {
     const now = new Date();
@@ -171,6 +185,7 @@ export class InMemoryWebsites implements WebsiteRepository {
     this.websites = this.websites.filter((w) => w.id !== id);
     this.sections.delete(id);
     this.items = this.items.filter((i) => i.websiteId !== id);
+    for (const cascade of this.cascades) cascade(id);
   }
   async listSections(websiteId: string) {
     return copy(this.sections.get(websiteId) ?? []);
@@ -301,6 +316,159 @@ export class FakeArchive implements ArchiveWriter {
   }
 }
 
+export class InMemoryGuests implements GuestRepository {
+  settings = new Map<string, RsvpSettings & { lastSummaryAt: Date | null; warnedFor: Date | null }>();
+  polls: (PollRecord & { websiteId: string })[] = [];
+  households: (Household & { websiteId: string; tokenHash: string })[] = [];
+  private n = 0;
+  private id = (prefix: string) => `${prefix}-${++this.n}`;
+
+  private state(websiteId: string) {
+    if (!this.settings.has(websiteId)) this.settings.set(websiteId, { ...DEFAULT_RSVP_SETTINGS, lastSummaryAt: null, warnedFor: null });
+    return this.settings.get(websiteId)!;
+  }
+  async getSettings(websiteId: string) {
+    const { replyBy, eventIds, meal, notify, whatsappMessage } = this.state(websiteId);
+    return copy({ replyBy, eventIds, meal, notify, whatsappMessage });
+  }
+  async saveSettings(websiteId: string, settings: RsvpSettings) {
+    Object.assign(this.state(websiteId), copy(settings));
+  }
+  async listPolls(websiteId: string) {
+    return copy(this.polls.filter((p) => p.websiteId === websiteId)).map((p) => omit(p, "websiteId"));
+  }
+  async createPoll(websiteId: string, poll: NewPoll) {
+    const record = { ...copy(poll), id: this.id("poll"), position: this.polls.length, websiteId };
+    this.polls.push(record);
+    return omit(copy(record), "websiteId");
+  }
+  async updatePoll(websiteId: string, pollId: string, poll: NewPoll) {
+    const record = this.polls.find((p) => p.id === pollId && p.websiteId === websiteId);
+    if (!record) return false;
+    Object.assign(record, copy(poll));
+    return true;
+  }
+  async deletePoll(websiteId: string, pollId: string) {
+    this.polls = this.polls.filter((p) => !(p.id === pollId && p.websiteId === websiteId));
+  }
+  private strip = (h: InMemoryGuests["households"][number]): Household => omit(omit(copy(h), "websiteId"), "tokenHash");
+  async listHouseholds(websiteId: string) {
+    return this.households.filter((h) => h.websiteId === websiteId).map(this.strip);
+  }
+  async findHousehold(websiteId: string, householdId: string) {
+    const h = this.households.find((x) => x.id === householdId && x.websiteId === websiteId);
+    return h ? this.strip(h) : null;
+  }
+  async findByTokenHash(tokenHash: string) {
+    const h = this.households.find((x) => x.tokenHash === tokenHash);
+    return h ? { websiteId: h.websiteId, household: this.strip(h) } : null;
+  }
+  private person = (p: HouseholdData["people"][number]) => ({
+    id: p.id ?? this.id("guest"),
+    name: p.name,
+    isChild: p.isChild,
+    attending: null,
+    eventIds: [],
+    mealOptionId: null,
+    allergies: "",
+    pollAnswers: {},
+    fromRequest: false,
+  });
+  async createHousehold(websiteId: string, data: HouseholdData, tokenHashFor: (id: string) => string) {
+    const id = this.id("household");
+    const household = {
+      id,
+      websiteId,
+      tokenHash: tokenHashFor(id),
+      name: data.name,
+      invitedEventIds: data.invitedEventIds,
+      message: "",
+      pollAnswers: {},
+      respondedAt: null,
+      createdAt: new Date(),
+      people: data.people.map((p) => this.person({ ...p, id: null })),
+      requests: [],
+    };
+    this.households.push(household);
+    return this.strip(household);
+  }
+  async updateHousehold(websiteId: string, householdId: string, data: HouseholdData) {
+    const h = this.households.find((x) => x.id === householdId && x.websiteId === websiteId)!;
+    h.name = data.name;
+    h.invitedEventIds = data.invitedEventIds;
+    h.people = data.people.map((p) => {
+      const existing = h.people.find((x) => x.id === p.id);
+      return existing ? { ...existing, name: p.name, isChild: p.isChild } : this.person({ ...p, id: null });
+    });
+  }
+  async deleteHousehold(websiteId: string, householdId: string) {
+    this.households = this.households.filter((h) => !(h.id === householdId && h.websiteId === websiteId));
+  }
+  async saveResponse(householdId: string, response: HouseholdResponse, at: Date) {
+    const h = this.households.find((x) => x.id === householdId)!;
+    for (const answer of response.people) {
+      const { guestId, ...rest } = answer;
+      Object.assign(h.people.find((p) => p.id === guestId)!, copy(rest));
+    }
+    h.pollAnswers = copy(response.pollAnswers);
+    h.message = response.message;
+    h.respondedAt = at;
+    for (const name of response.requests) h.requests.push({ id: this.id("request"), name, status: "pending", createdAt: at, decidedAt: null });
+  }
+  async decideRequest(websiteId: string, requestId: string, status: "added" | "declined", at: Date) {
+    const h = this.households.find((x) => x.websiteId === websiteId && x.requests.some((r) => r.id === requestId));
+    const request = h?.requests.find((r) => r.id === requestId);
+    if (!h || !request || request.status !== "pending") return false;
+    request.status = status;
+    request.decidedAt = at;
+    if (status === "added") h.people.push({ ...this.person({ id: null, name: request.name, isChild: false }), fromRequest: true });
+    return true;
+  }
+  async deleteGuestData(websiteId: string) {
+    const before = this.households.length;
+    this.households = this.households.filter((h) => h.websiteId !== websiteId);
+    return before - this.households.length;
+  }
+  async listWebsiteIdsWithGuests() {
+    return [...new Set(this.households.map((h) => h.websiteId))];
+  }
+  async listWebsiteIdsWithDailySummary() {
+    return [...this.settings.entries()].filter(([, s]) => s.notify === "daily").map(([id]) => id);
+  }
+  async lastSummaryAt(websiteId: string) {
+    return this.state(websiteId).lastSummaryAt;
+  }
+  async claimDailySummary(websiteId: string, previous: Date | null, at: Date) {
+    const state = this.state(websiteId);
+    if ((state.lastSummaryAt?.getTime() ?? null) !== (previous?.getTime() ?? null)) return false;
+    state.lastSummaryAt = at;
+    return true;
+  }
+  async claimRetentionWarning(websiteId: string, deleteAt: Date) {
+    const state = this.state(websiteId);
+    if (state.warnedFor?.getTime() === deleteAt.getTime()) return false;
+    state.warnedFor = deleteAt;
+    return true;
+  }
+  /** Stands in for ON DELETE CASCADE from websites. */
+  dropWebsite(websiteId: string) {
+    this.households = this.households.filter((h) => h.websiteId !== websiteId);
+    this.polls = this.polls.filter((p) => p.websiteId !== websiteId);
+    this.settings.delete(websiteId);
+  }
+}
+
+export const fakeGuestLinks: GuestLinks = {
+  tokenFor: (householdId) => `link-${householdId}`,
+  hash: (token) => createHash("sha256").update(token).digest("hex"),
+};
+
+export const fakeGuestMail: GuestMailTemplates = {
+  answer: (m) => ({ subject: `Antwort: ${m.household}`, text: JSON.stringify(m), html: "" }),
+  dailySummary: (m) => ({ subject: `Zusammenfassung: ${m.websiteTitle}`, text: JSON.stringify(m), html: "" }),
+  retentionWarning: (m) => ({ subject: `Löschung: ${m.websiteTitle}`, text: JSON.stringify(m), html: "" }),
+};
+
 export const fakeMailTemplate: MagicLinkMailTemplate = {
   render: (link, minutes) => ({ subject: "Login", text: `${link} (${minutes})`, html: `<a href="${link}">login</a>` }),
 };
@@ -343,6 +511,8 @@ export class FakeThemes implements ThemeCatalog {
 export function createFakes() {
   const websites = new InMemoryWebsites();
   const billingRepo = new InMemoryBilling(websites);
+  const guests = new InMemoryGuests();
+  websites.cascades.push((id) => guests.dropWebsite(id));
   const fakes = {
     users: new InMemoryUsers(),
     magicLinks: new InMemoryMagicLinks(),
@@ -369,6 +539,9 @@ export function createFakes() {
     billingRepo,
     payments: new FakePayments() as FakePayments | null,
     archive: new FakeArchive(),
+    guests,
+    guestLinks: fakeGuestLinks,
+    guestMail: fakeGuestMail,
     appUrl: "http://localhost:3000",
   };
   fakes.users.cascades.push((userId) => {

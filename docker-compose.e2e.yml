@@ -7,6 +7,9 @@ x-no-legal-files: &no-legal-files
   PRIVACY_FILE: ""
   TERMS_FILE: ""
   BILLING_ENABLED: "false"
+  # The guest jobs run only when a test asks (/api/test/jobs), scoped to its own website.
+  GUEST_JOBS_INTERVAL_MINUTES: "0"
+  TEST_HOOKS: "true"
 
 services:
   app:
@@ -46,7 +49,8 @@ services:
       CREEM_PRODUCT_RSVP: prod_e2e_rsvp
       CREEM_PRODUCT_INVITATIONS: prod_e2e_invitations
       CREEM_PRODUCT_COMPLETE: prod_e2e_complete
-      BILLING_TEST_UNLOCK_TIERS: rsvp
+      GUEST_JOBS_INTERVAL_MINUTES: "0"
+      TEST_HOOKS: "true"
       # Legal texts of a fictitious operator, to test the pages and their links.
       IMPRINT_FILE: /legal/impressum.md
       PRIVACY_FILE: /legal/datenschutz.md

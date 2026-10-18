@@ -1,10 +1,8 @@
-/** Runs once when the server starts: tells the operator what still needs configuring. */
+/**
+ * Runs once when the server starts: tells the operator what still needs configuring and starts the guest
+ * jobs. The Node.js-only code lives in its own module, imported only in this branch, so it never ends up
+ * in the Edge bundle Next.js also builds from this file.
+ */
 export async function register() {
-  if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  const { loadConfig, startupWarnings } = await import("@/composition/config");
-  const { FileLegalPages } = await import("@/infrastructure/legal/files");
-  const config = loadConfig();
-  const unreadable = await new FileLegalPages({ imprint: config.IMPRINT_FILE, privacy: config.PRIVACY_FILE, terms: config.TERMS_FILE }).unreadableSettings();
-  const warnings = [...startupWarnings(config), ...(unreadable.length ? [`${unreadable.join(", ")} set but not readable: those pages do not exist.`] : [])];
-  for (const warning of warnings) console.warn(`[traureise] WARNING: ${warning}`);
+  if (process.env.NEXT_RUNTIME === "nodejs") await (await import("./instrumentation-node")).registerNode();
 }

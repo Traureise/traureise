@@ -152,3 +152,94 @@ export const billingEvents = pgTable("billing_events", {
   id: text("id").primaryKey(),
   receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Guests and RSVP. Everything hangs off the website (ON DELETE CASCADE), so deleting a website or an
+// account removes the guest list; retention deletes the households, which takes people, answers and requests along.
+export const rsvpSettings = pgTable("rsvp_settings", {
+  websiteId: uuid("website_id")
+    .primaryKey()
+    .references(() => websites.id, { onDelete: "cascade" }),
+  replyBy: date("reply_by", { mode: "string" }),
+  // null = every schedule item.
+  eventIds: jsonb("event_ids").$type<string[] | null>(),
+  meal: jsonb("meal").$type<{ eventId: string | null; options: { id: string; label: string }[] } | null>(),
+  notify: text("notify").notNull().default("off"),
+  whatsappMessage: text("whatsapp_message"),
+  lastSummaryAt: timestamp("last_summary_at", { withTimezone: true }),
+  retentionWarnedFor: timestamp("retention_warned_for", { withTimezone: true }),
+});
+
+export const rsvpPolls = pgTable(
+  "rsvp_polls",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    question: text("question").notNull(),
+    multiple: boolean("multiple").notNull().default(false),
+    allowOther: boolean("allow_other").notNull().default(false),
+    per: text("per").notNull().default("person"),
+    options: jsonb("options").$type<{ id: string; label: string }[]>().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("rsvp_polls_website_idx").on(t.websiteId, t.position)],
+);
+
+type PollAnswersJson = Record<string, { optionIds: string[]; other: string | null }>;
+
+export const households = pgTable(
+  "households",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    // Hash of the personal link's token; the token itself is derived from the id and never stored.
+    tokenHash: text("token_hash").notNull().unique(),
+    // null = every RSVP event.
+    invitedEventIds: jsonb("invited_event_ids").$type<string[] | null>(),
+    message: text("message").notNull().default(""),
+    pollAnswers: jsonb("poll_answers").$type<PollAnswersJson>().notNull().default({}),
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("households_website_idx").on(t.websiteId, t.createdAt)],
+);
+
+export const guests = pgTable(
+  "guests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    name: text("name").notNull(),
+    isChild: boolean("is_child").notNull().default(false),
+    attending: boolean("attending"),
+    eventIds: jsonb("event_ids").$type<string[]>().notNull().default([]),
+    mealOptionId: text("meal_option_id"),
+    allergies: text("allergies").notNull().default(""),
+    pollAnswers: jsonb("poll_answers").$type<PollAnswersJson>().notNull().default({}),
+    fromRequest: boolean("from_request").notNull().default(false),
+  },
+  (t) => [index("guests_household_idx").on(t.householdId, t.position)],
+);
+
+export const guestRequests = pgTable(
+  "guest_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    status: text("status").notNull().default("pending"),
+    createdAt: createdAt(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+  },
+  (t) => [index("guest_requests_household_idx").on(t.householdId)],
+);

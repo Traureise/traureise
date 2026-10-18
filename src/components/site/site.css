@@ -75,3 +75,41 @@
   font-size: 0.875rem;
   letter-spacing: 0.04em;
 }
+/* The guests' RSVP form, in the website's theme. */
+.site-field {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--site-text) 22%, transparent);
+  background: var(--site-bg);
+  color: var(--site-text);
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.75rem;
+}
+.site-field:focus-visible,
+.site-choice input:focus-visible {
+  outline: 2px solid var(--site-primary);
+  outline-offset: 2px;
+}
+.site-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.site-choice input {
+  accent-color: var(--site-primary);
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.site-submit {
+  background: var(--site-primary);
+  color: var(--site-surface);
+  border-radius: 999px;
+  padding: 0.7rem 1.6rem;
+  font-weight: 500;
+}
+.site-submit:disabled {
+  opacity: 0.6;
+}
+.site-error {
+  color: #b42318;
+  font-size: 0.875rem;
+}

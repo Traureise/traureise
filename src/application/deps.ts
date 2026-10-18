@@ -5,6 +5,9 @@ import type {
   PaymentProvider,
   Clock,
   FileStorage,
+  GuestLinks,
+  GuestMailTemplates,
+  GuestRepository,
   ImageProcessor,
   MagicLinkMailTemplate,
   MagicLinkRepository,
@@ -38,5 +41,8 @@ export type Deps = {
   /** Set only when billing is enabled and configured. */
   payments: PaymentProvider | null;
   archive: ArchiveWriter;
+  guests: GuestRepository;
+  guestLinks: GuestLinks;
+  guestMail: GuestMailTemplates;
   appUrl: string;
 };
