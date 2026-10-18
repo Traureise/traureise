@@ -394,7 +394,7 @@
         },
         "payment": {
           "title": "Bezahlung",
-          "body": "Kostenpflichtige Pakete verkauft {provider} ({details}) als Händler (Merchant of Record). Wenn du ein Paket kaufst, leiten wir dich auf die Bezahlseite von {provider} weiter und übermitteln dafür deine E-Mail-Adresse, das Paket und die Website, für die du es kaufst. Deine Zahlungsdaten gibst du direkt bei {provider} ein; wir erhalten nur eine Bestellnummer und das gekaufte Paket, auch bei Erstattungen. {provider} stellt die Rechnung aus und verarbeitet deine Daten in eigener Verantwortung nach seiner Datenschutzerklärung. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO; Kaufbelege bewahren wir so lange auf, wie es das Steuer- und Handelsrecht verlangt, sonst bis zur Löschung deines Kontos."
+          "body": "Kostenpflichtige Pakete verkauft {provider} ({details}, Estland) als Händler (Merchant of Record). Wenn du ein Paket kaufst, leiten wir dich auf die Bezahlseite von {provider} weiter und übermitteln dafür deine E-Mail-Adresse, das Paket und die Website, für die du es kaufst. Deine Zahlungsdaten gibst du direkt bei {provider} ein; wir erhalten nur eine Bestellnummer und das gekaufte Paket, auch bei Erstattungen. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO. Diese Kaufdaten löschen wir zusammen mit der Website oder deinem Konto. Rechnungen und Belege stellt {provider} aus und bewahrt sie nach seinen eigenen gesetzlichen Pflichten auf; dafür gilt seine Datenschutzerklärung."
         },
         "cookies": {
           "title": "Cookies",
@@ -406,7 +406,7 @@
         },
         "rateLimit": {
           "title": "Schutz vor Missbrauch",
-          "body": "Damit niemand massenhaft Anmeldelinks anfordern kann, zählen wir Anforderungen je E-Mail-Adresse und je IP-Adresse. Diese Einträge löschen wir nach {minutes} Minuten (Art. 6 Abs. 1 lit. f DSGVO)."
+          "body": "Damit niemand massenhaft Anmeldelinks anfordern kann, zählen wir Anforderungen je E-Mail-Adresse und je IP-Adresse. Einträge, die älter als {minutes} Minuten sind, löschen wir bei der nächsten Anforderung (Art. 6 Abs. 1 lit. f DSGVO)."
         },
         "websites": {
           "title": "Gäste von Hochzeitswebsites",

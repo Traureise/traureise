@@ -168,7 +168,7 @@ export type PaymentEvent =
 export type CheckoutRequest = { productId: string; websiteId: string; tier: PaidTier; customerEmail: string; successUrl: string; requestId: string };
 
 export interface PaymentProvider {
-  /** Shown in the privacy policy, e.g. "Creem" and its legal entity. */
+  /** Shown in the privacy policy: e.g. "Creem" and its legal entity name (no translatable text). */
   readonly name: string;
   readonly legalEntity: string;
   /** Returns the hosted checkout page the buyer is sent to. */

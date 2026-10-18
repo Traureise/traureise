@@ -20,6 +20,6 @@ test("the privacy policy names the configured processors and the payment provide
   await expect(page.getByTestId("privacy-controller").getByTestId("operator-address")).toContainText("Erika Musterfrau");
   await expect(page.getByTestId("privacy-hosting")).toContainText("Beispiel Hosting GmbH, Musterstadt");
   await expect(page.getByTestId("privacy-email")).toContainText("Beispiel Mail GmbH, Musterstadt");
-  await expect(page.getByTestId("privacy-payment")).toContainText("Creem (Armitage Labs OÜ, Tallinn, Estland)");
+  await expect(page.getByTestId("privacy-payment")).toContainText("Creem (Armitage Labs OÜ, Estland)");
   await expect(page.getByTestId("app-footer").getByRole("link", { name: "Preise" })).toHaveAttribute("href", "/preise");
 });
