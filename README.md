@@ -148,8 +148,12 @@ Decisions are recorded in [docs/adr](docs/adr).
 
 ### Adding a language
 
-Add `messages/<locale>.json` with the same keys as `messages/de.json`, then add the locale to
-`src/i18n/config.ts`. Theme names are translated inside each theme's `theme.json`.
+1. Copy `messages/de.json` to `messages/<locale>.json` (for example `en.json`) and translate every value.
+2. Add the locale to `locales` in `src/i18n/config.ts`.
+
+The UI language then follows the `traureise_locale` cookie if it is set, otherwise the browser's
+`Accept-Language` header, otherwise German. Theme names are translated inside each theme's `theme.json`.
+Wedding websites are shown in the visitor's language the same way. Login emails always use German for now.
 
 ## Fonts
 
