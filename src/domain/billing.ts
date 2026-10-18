@@ -5,8 +5,9 @@ export type PaidTier = Exclude<Tier, "website">;
 export const PAID_TIERS = ["rsvp", "invitations", "complete"] as const satisfies readonly PaidTier[];
 
 /**
- * Which tier unlocks a feature. Setting up guests is free; `rsvp` is sending: active personal links,
- * sharing them and notifications.
+ * Which tier unlocks a feature. Setting up guests and designing cards is free; the tiers unlock sending:
+ * `rsvp` active personal links, sharing them and notifications; `invitations` Save the Dates and invitations
+ * (links, export), email sending and email reminders; `complete` thank-you cards and the engagement announcement.
  */
 export const FEATURE_TIERS = {
   website: "website",
@@ -16,14 +17,17 @@ export const FEATURE_TIERS = {
   polls: "website",
   mealChoices: "website",
   rsvp: "rsvp",
-  invitations: "invitations",
   saveTheDates: "invitations",
-  cards: "complete",
+  invitations: "invitations",
+  emailSending: "invitations",
+  emailReminders: "invitations",
+  thankYouCards: "complete",
+  engagementCards: "complete",
 } as const satisfies Record<string, Tier>;
 export type Feature = keyof typeof FEATURE_TIERS;
 
 /** Tiers whose features all exist. A tier is only sold once it is released. */
-const RELEASED_TIERS: readonly Tier[] = ["website", "rsvp"];
+const RELEASED_TIERS: readonly Tier[] = ["website", "rsvp", "invitations", "complete"];
 
 export type Entitlement = { tier: PaidTier; purchaseRef: string; validUntil: Date; revokedAt: Date | null };
 

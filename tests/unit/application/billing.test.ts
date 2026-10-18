@@ -41,7 +41,7 @@ describe("StartCheckout", () => {
     ]);
   });
 
-  it("refuses tiers that are not released, unknown or already owned", async () => {
+  it("refuses tiers without a product, unknown or already owned", async () => {
     const checkout = new StartCheckout(f.deps);
     await expect(checkout.execute(anna, websiteId, "invitations")).rejects.toMatchObject({ fieldErrors: { tier: "not_available" } });
     await expect(checkout.execute(anna, websiteId, "website" as never)).rejects.toBeInstanceOf(ValidationError);

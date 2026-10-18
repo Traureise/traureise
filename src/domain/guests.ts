@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidEmail, normalizeEmail } from "./email";
 import { isoDate, optional, requiredText, text } from "./fields";
 import { parseWith, type FieldErrors, type Parsed } from "./result";
 
@@ -51,6 +52,12 @@ export type Household = {
   /** When the household last answered; null while open. */
   respondedAt: Date | null;
   createdAt: Date;
+  /** Optional: cards and reminders by email (v4). */
+  email: string | null;
+  /** Optional line on this household's thank-you card. */
+  personalLine: string;
+  /** Set when the household asked for no more emails (which cleared the address). */
+  unsubscribedAt: Date | null;
   people: Guest[];
   requests: GuestRequest[];
 };
@@ -144,9 +151,13 @@ export function parsePoll(input: unknown): Parsed<PollInput> {
   return parseWith(pollSchema, input);
 }
 
+export const PERSONAL_LINE_MAX = 300;
+
 const householdSchema = z.object({
   name: requiredText(NAME_MAX),
   invitedEventIds: ids.nullable().default(null),
+  email: optional(z.string().transform(normalizeEmail).refine(isValidEmail, "invalid_email")).default(null),
+  personalLine: text(PERSONAL_LINE_MAX),
   people: z
     .array(z.object({ id: optional(z.string().max(64)).default(null), name: text(NAME_MAX), isChild: z.boolean().default(false) }))
     .max(30)

@@ -28,7 +28,7 @@ const offers: TierOffer[] = [
 describe("canUse", () => {
   it("allows everything when billing is off (self-hosted)", () => {
     expect(canUse("rsvp", { billingEnabled: false, entitlements: [] }, now)).toBe(true);
-    expect(canUse("cards", { billingEnabled: false, entitlements: [] }, now)).toBe(true);
+    expect(canUse("thankYouCards", { billingEnabled: false, entitlements: [] }, now)).toBe(true);
   });
 
   it("always allows the free website features", () => {
@@ -47,8 +47,21 @@ describe("canUse", () => {
     expect(canUse("rsvp", ctx, now)).toBe(true);
     expect(canUse("mealChoices", ctx, now)).toBe(true);
     expect(canUse("invitations", ctx, now)).toBe(false);
-    expect(canUse("cards", { billingEnabled: true, entitlements: [entitlement({ tier: "complete" })] }, now)).toBe(true);
+    expect(canUse("thankYouCards", { billingEnabled: true, entitlements: [entitlement({ tier: "complete" })] }, now)).toBe(true);
     expect(canUse("rsvp", { billingEnabled: true, entitlements: [] }, now)).toBe(false);
+  });
+
+  it("gates v4: Save the Dates, invitations, email sending and reminders need Einladungen; cards need Komplett", () => {
+    const rsvp = { billingEnabled: true, entitlements: [entitlement({ tier: "rsvp" })] };
+    const invitations = { billingEnabled: true, entitlements: [entitlement({ tier: "invitations" })] };
+    for (const feature of ["saveTheDates", "invitations", "emailSending", "emailReminders"] as const) {
+      expect(canUse(feature, rsvp, now)).toBe(false);
+      expect(canUse(feature, invitations, now)).toBe(true);
+    }
+    for (const feature of ["thankYouCards", "engagementCards"] as const) {
+      expect(canUse(feature, invitations, now)).toBe(false);
+      expect(canUse(feature, { billingEnabled: true, entitlements: [entitlement({ tier: "complete" })] }, now)).toBe(true);
+    }
   });
 
   it("ignores revoked and expired entitlements", () => {
@@ -85,17 +98,14 @@ describe("entitlementValidUntil", () => {
 });
 
 describe("tier availability", () => {
-  it("releases only tiers whose features exist", () => {
-    expect(isTierReleased("website")).toBe(true);
-    expect(isTierReleased("rsvp")).toBe(true);
-    expect(isTierReleased("invitations")).toBe(false);
-    expect(isTierReleased("invitations", ["invitations"])).toBe(true);
+  it("releases every tier now that all their features exist", () => {
+    for (const tier of ["website", "rsvp", "invitations", "complete"] as const) expect(isTierReleased(tier)).toBe(true);
   });
 
   it("sells released tiers above the current one", () => {
-    expect(sellableTiers(offers, [], [])).toEqual(["rsvp"]);
-    expect(sellableTiers(offers, ["rsvp", "complete"], [])).toEqual(["rsvp", "complete"]);
-    expect(sellableTiers(offers, ["rsvp", "complete"], [entitlement({ tier: "rsvp" })], now)).toEqual(["complete"]);
+    expect(sellableTiers(offers, [], [])).toEqual(["rsvp", "invitations", "complete"]);
+    expect(sellableTiers(offers, [], [entitlement({ tier: "rsvp" })], now)).toEqual(["invitations", "complete"]);
+    expect(sellableTiers(offers, [], [entitlement({ tier: "invitations" })], now)).toEqual(["complete"]);
   });
 
   it("does not sell tiers without a product id", () => {
@@ -108,8 +118,12 @@ describe("pricingTable", () => {
     expect(pricingTable(offers, [])).toEqual([
       { tier: "website", priceCents: 0, status: "included" },
       { tier: "rsvp", priceCents: 4900, status: "available" },
-      { tier: "invitations", priceCents: 13900, status: "comingSoon" },
-      { tier: "complete", priceCents: 14900, status: "comingSoon" },
+      { tier: "invitations", priceCents: 13900, status: "available" },
+      { tier: "complete", priceCents: 14900, status: "available" },
     ]);
+  });
+
+  it("shows a tier without a product as coming soon", () => {
+    expect(pricingTable([{ tier: "complete", priceCents: 14900, productId: null }], []).at(-1)).toEqual({ tier: "complete", priceCents: 14900, status: "comingSoon" });
   });
 });
