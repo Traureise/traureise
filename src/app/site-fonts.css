@@ -1,0 +1,21 @@
+/* Fonts available to wedding websites (see src/domain/fonts.ts). Self-hosted, SIL Open Font License. */
+@import "@fontsource/cormorant-garamond/latin-500.css";
+@import "@fontsource/cormorant-garamond/latin-600.css";
+@import "@fontsource/source-sans-3/latin-400.css";
+@import "@fontsource/source-sans-3/latin-600.css";
+@import "@fontsource/great-vibes/latin-400.css";
+@import "@fontsource/lora/latin-400.css";
+@import "@fontsource/lora/latin-600.css";
+@import "@fontsource/josefin-sans/latin-400.css";
+@import "@fontsource/josefin-sans/latin-600.css";
+@import "@fontsource/work-sans/latin-400.css";
+@import "@fontsource/work-sans/latin-600.css";
+@import "@fontsource/playfair-display/latin-500.css";
+@import "@fontsource/nunito-sans/latin-400.css";
+@import "@fontsource/nunito-sans/latin-700.css";
+@import "@fontsource/parisienne/latin-400.css";
+@import "@fontsource/raleway/latin-400.css";
+@import "@fontsource/raleway/latin-600.css";
+@import "@fontsource/dm-serif-display/latin-400.css";
+@import "@fontsource/dm-sans/latin-400.css";
+@import "@fontsource/dm-sans/latin-600.css";
