@@ -18,19 +18,18 @@ describe("loadConfig", () => {
 });
 
 describe("startupWarnings", () => {
-  it("warns about missing operator details and incomplete billing", () => {
-    const warnings = startupWarnings(loadConfig({ ...base, OPERATOR_NAME: "Erika", BILLING_ENABLED: "true" }));
+  it("warns about missing legal pages and incomplete billing", () => {
+    const warnings = startupWarnings(loadConfig({ ...base, IMPRINT_FILE: "/legal/impressum.md", BILLING_ENABLED: "true" }));
     expect(warnings).toHaveLength(2);
-    expect(warnings[0]).toContain("OPERATOR_ADDRESS, OPERATOR_EMAIL");
+    expect(warnings[0]).toContain("IMPRINT_FILE and PRIVACY_FILE");
     expect(warnings[1]).toContain("CREEM_API_KEY, CREEM_WEBHOOK_SECRET");
   });
 
   it("is quiet for a fully configured instance", () => {
     const config = loadConfig({
       ...base,
-      OPERATOR_NAME: "Erika",
-      OPERATOR_ADDRESS: "Musterstraße 1, 12345 Musterstadt",
-      OPERATOR_EMAIL: "kontakt@example.org",
+      IMPRINT_FILE: "/legal/impressum.md",
+      PRIVACY_FILE: "/legal/datenschutz.md",
       BILLING_ENABLED: "true",
       CREEM_API_KEY: "k",
       CREEM_WEBHOOK_SECRET: "s",

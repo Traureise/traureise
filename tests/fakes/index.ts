@@ -280,7 +280,6 @@ export class InMemoryBilling implements BillingRepository {
 
 export class FakePayments implements PaymentProvider {
   readonly name = "Testpay";
-  readonly legalEntity = "Testpay Ltd., Testland";
   checkouts: CheckoutRequest[] = [];
   /** Webhooks are "signed" with this value; the body is the PaymentEvent as JSON. */
   static SIGNATURE = "valid";

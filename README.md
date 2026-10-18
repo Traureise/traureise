@@ -19,8 +19,8 @@ backups, themes, architecture and design decisions. The sources are in [`docs/`]
 - Themes are data: add a folder to `themes/` ([how](https://docs.traureise.de/themes/)).
 - Privacy by design: no analytics, no CDNs, no third-party requests at runtime; uploaded photos lose
   their EXIF data. Only technically necessary cookies, so no cookie banner.
-- Impressum and privacy policy generated from the operator's configuration, linked from the app and
-  from every wedding website.
+- Your own Impressum, privacy policy and terms as Markdown files, linked from the app and from every
+  wedding website. Traureise ships none of the texts.
 - Account rights: download all your data as a ZIP (data.json plus images) and delete your account
   with everything in it, under `/konto`.
 - Optional billing for operators who run Traureise as a service: one-time prices per wedding on
@@ -43,34 +43,49 @@ docker compose up -d --build
 For production (real SMTP, HTTPS, backups), follow the
 [self-hosting guide](https://docs.traureise.de/getting-started/).
 
-## Operator, privacy and billing settings
+## Legal pages and billing settings
 
 All settings are environment variables in `.env` (see [`.env.example`](.env.example) and the
-[configuration reference](https://docs.traureise.de/configuration/)). Anyone who runs a public instance
-must show their own legal details, so these come from configuration, never from code.
+[configuration reference](https://docs.traureise.de/configuration/)).
 
-| Variable | Required | Shown as |
-|---|---|---|
-| `OPERATOR_NAME`, `OPERATOR_ADDRESS`, `OPERATOR_EMAIL` | yes | Impressum (§ 5 DDG) and controller in the privacy policy. `OPERATOR_ADDRESS` is comma-separated. |
-| `OPERATOR_BUSINESS_NAME`, `OPERATOR_PHONE` | no | Impressum. |
-| `OPERATOR_VAT_ID` or `OPERATOR_VAT_NOTE` | no | VAT ID (§ 27a UStG), or a note such as the § 19 UStG small-business statement. |
-| `OPERATOR_CONTENT_RESPONSIBLE` | no | Person responsible for content (§ 18 Abs. 2 MStV); defaults to `OPERATOR_NAME`. |
-| `OPERATOR_DISPUTE_RESOLUTION` | no | Consumer dispute-resolution statement (§ 36 VSBG), shown as written. |
-| `PRIVACY_HOSTING_PROVIDER`, `PRIVACY_SMTP_PROVIDER`, `PRIVACY_STORAGE_PROVIDER` | no | Processors named in the privacy policy; neutral wording when empty. |
-| `BILLING_ENABLED` | no | `true` turns billing on, but only together with `CREEM_API_KEY` and `CREEM_WEBHOOK_SECRET`. |
-| `CREEM_API_URL`, `CREEM_API_KEY`, `CREEM_WEBHOOK_SECRET` | with billing | Creem API (`https://test-api.creem.io` for test mode) and webhook secret. Point the Creem webhook at `<APP_URL>/api/billing/webhook`. |
-| `CREEM_PRODUCT_RSVP`, `CREEM_PRODUCT_INVITATIONS`, `CREEM_PRODUCT_COMPLETE` | with billing | Creem product ids per tier. A tier without a product cannot be bought. |
-| `PRICE_RSVP_EUR`, `PRICE_INVITATIONS_EUR`, `PRICE_COMPLETE_EUR` | no | Prices on `/preise` in euros, VAT included (defaults 49, 139, 149). |
-| `BILLING_TEST_UNLOCK_TIERS` | no | **Testing only.** Sells tiers whose features are not built yet. Never set it in production. |
+**Legal pages.** Traureise ships no Impressum, privacy policy or terms: who runs an instance and what it does
+with personal data differs for each one. Write them as Markdown files and point Traureise at them:
 
-If the required operator values are missing, the instance still runs, logs a warning at startup, and
-`/impressum` and `/datenschutz` say that they are not configured. A tier whose features do not exist yet
-is shown as "bald verfügbar" and cannot be bought. Without billing, prices, plans and purchases do not
-appear anywhere.
+```yaml
+services:
+  app:
+    environment:
+      IMPRINT_FILE: /legal/impressum.md     # /impressum, "Impressum" in the footers
+      PRIVACY_FILE: /legal/datenschutz.md   # /datenschutz, "Datenschutz"
+      TERMS_FILE: /legal/agb.md             # /agb, "AGB"
+    volumes:
+      - ./legal:/legal:ro
+```
 
-> **Have your legal texts reviewed.** The Impressum and privacy policy are generated drafts that describe
-> what the software does. They are not legal advice. Before you run a public instance, have them checked
-> by a lawyer or a generator service and adjust the copy in `messages/de.json` where needed.
+- Each file is optional. Without one the page is a 404 and nothing links to it. With one, the app footer
+  and a discreet footer on every wedding website link to it.
+- Files are read on every request, so an edit shows at once. Keep them in version control: for a privacy
+  policy it matters what it said on which day.
+- Raw HTML in a file is shown as text, and only web, mail and phone links are kept.
+- The app logs a warning at startup when `IMPRINT_FILE` or `PRIVACY_FILE` is missing or unreadable.
+
+> **Have your legal texts reviewed.** A privacy policy says who is responsible, where the instance is hosted,
+> what it stores (accounts, websites, images, login links for 15 minutes, sessions for 30 days, rate-limit
+> entries for 15 minutes), which processors it uses (SMTP, S3, the payment provider) and which rights people
+> have. That is yours to write, and worth a lawyer's look.
+
+**Billing** (for operators who run Traureise as a paid service; off by default):
+
+| Variable | Purpose |
+|---|---|
+| `BILLING_ENABLED` | `true` turns billing on, but only together with `CREEM_API_KEY` and `CREEM_WEBHOOK_SECRET`. |
+| `CREEM_API_URL`, `CREEM_API_KEY`, `CREEM_WEBHOOK_SECRET` | Creem API (`https://test-api.creem.io` for test mode) and webhook secret. Point the Creem webhook at `<APP_URL>/api/billing/webhook`. |
+| `CREEM_PRODUCT_RSVP`, `CREEM_PRODUCT_INVITATIONS`, `CREEM_PRODUCT_COMPLETE` | Creem product ids per tier. A tier without a product cannot be bought. |
+| `PRICE_RSVP_EUR`, `PRICE_INVITATIONS_EUR`, `PRICE_COMPLETE_EUR` | Prices on `/preise` in euros, VAT included (defaults 49, 139, 149). |
+| `BILLING_TEST_UNLOCK_TIERS` | **Testing only.** Sells tiers whose features are not built yet. Never set it in production. |
+
+A tier whose features do not exist yet is shown as "bald verfügbar" and cannot be bought. Without billing,
+`/preise`, plans and purchases do not appear anywhere.
 
 ## Development
 

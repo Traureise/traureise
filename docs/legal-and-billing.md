@@ -1,23 +1,37 @@
 # Legal pages, account rights and billing
 
-## Impressum and privacy policy
+## Impressum, privacy policy and terms
 
-Traureise generates `/impressum` (§ 5 DDG) and `/datenschutz` from your configuration. Set at least
-`OPERATOR_NAME`, `OPERATOR_ADDRESS` and `OPERATOR_EMAIL` (see [Configuration](configuration.md)).
-Until then the instance runs, logs a warning at startup, and both pages say they are not configured.
+Traureise ships no legal texts: who runs an instance and what it does with data differs for each one. A
+public instance in Germany needs an Impressum (§ 5 DDG) and a privacy policy (Art. 13 DSGVO); with billing on,
+terms as well. Write them as Markdown files and point Traureise at them:
 
-The privacy policy describes what your instance actually does: hosting, the PostgreSQL database, the
-SMTP server, local or S3 storage, the payment provider (only with billing on), the two essential cookies,
-and the retention of login and rate-limit data. Name your processors with `PRIVACY_HOSTING_PROVIDER`,
-`PRIVACY_SMTP_PROVIDER` and, for S3, `PRIVACY_STORAGE_PROVIDER`.
+```yaml
+services:
+  app:
+    environment:
+      IMPRINT_FILE: /legal/impressum.md     # /impressum
+      PRIVACY_FILE: /legal/datenschutz.md   # /datenschutz
+      TERMS_FILE: /legal/agb.md             # /agb
+    volumes:
+      - ./legal:/legal:ro
+```
 
-Both pages are linked from the app footer and from a small footer on every wedding website. There is no
-cookie banner because Traureise only sets technically necessary cookies
-([ADR 0011](adr/0011-no-cookie-banner.md)).
+- Each is optional; without a file the page is a 404 and nothing links to it.
+- Each existing page is linked from the app footer and from a discreet footer on every wedding website.
+- The file is read on every request, so a change shows at once. Keep the files in version control.
+- Raw HTML is shown as text; only web, mail and phone links are kept.
 
-!!! warning "Have your texts reviewed"
-    The generated texts are drafts that describe the software, not legal advice. Have them reviewed by a
-    lawyer or a generator service before you go live, and adjust the copy in `messages/de.json`.
+### What to write
+
+That is yours to decide, and worth a lawyer's look. A privacy policy for Traureise usually covers: who is
+responsible and how to reach them; where the instance is hosted; the account (email address, first name) and
+the wedding websites with their images; the login links (valid 15 minutes, stored only as a hash), sessions
+(up to 30 days) and rate-limit entries (purged after 15 minutes); the SMTP provider; S3 storage if used; the
+payment provider if billing is on; the two essential cookies (`traureise_session`, optional
+`traureise_locale`), so no consent banner is needed ([ADR 0011](adr/0011-no-cookie-banner.md)); that guests of
+wedding websites get no cookies and nothing is stored about them; how long backups keep deleted data; and
+which rights people have, including the self-service export and deletion under `/konto`.
 
 ## Account rights
 

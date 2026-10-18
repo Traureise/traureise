@@ -38,7 +38,7 @@ nav:
           - File storage abstraction: adr/0007-file-storage-abstraction.md
           - Test strategy: adr/0008-test-strategy.md
           - Documentation site: adr/0009-documentation-site-with-material-for-mkdocs.md
-          - Legal pages from configuration: adr/0010-legal-pages-generated-from-configuration.md
+          - Legal pages as Markdown files: adr/0010-legal-pages-as-operator-markdown-files.md
           - No cookie banner: adr/0011-no-cookie-banner.md
           - Account export and deletion: adr/0012-account-export-and-deletion.md
           - Creem as merchant of record: adr/0013-creem-as-merchant-of-record.md

@@ -168,9 +168,8 @@ export type PaymentEvent =
 export type CheckoutRequest = { productId: string; websiteId: string; tier: PaidTier; customerEmail: string; successUrl: string; requestId: string };
 
 export interface PaymentProvider {
-  /** Shown in the privacy policy: e.g. "Creem" and its legal entity name (no translatable text). */
+  /** Identifies the provider on stored purchases, e.g. "Creem". */
   readonly name: string;
-  readonly legalEntity: string;
   /** Returns the hosted checkout page the buyer is sent to. */
   createCheckout(request: CheckoutRequest): Promise<{ url: string }>;
   /** Verifies the signature of a webhook (raw body) and parses it; null if the signature is invalid. */

@@ -8,7 +8,7 @@ import type { User } from "./ports";
 
 export const MAGIC_LINK_TTL_MS = 15 * 60 * 1000;
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-export const RATE_WINDOW_MS = 15 * 60 * 1000;
+const RATE_WINDOW_MS = 15 * 60 * 1000;
 const MAX_PER_EMAIL = 5;
 const MAX_PER_IP = 20;
 

@@ -48,7 +48,7 @@ VAT and refunds are handled by Creem.
 * Good, because another provider means one new adapter plus its config; use cases and UI stay as
   they are.
 * Bad, because buyers leave the instance for the provider's checkout page (a deliberate navigation,
-  like the OpenStreetMap links). The privacy policy names the provider only when billing is on.
+  like the OpenStreetMap links). The operator's privacy policy has to name the provider when billing is on.
 
 ## More Information
 

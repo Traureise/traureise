@@ -21,7 +21,6 @@ const event = z.object({
 /** Creem (Armitage Labs OÜ, Estonia) is the merchant of record: it sells, invoices and handles VAT. */
 export class CreemPaymentProvider implements PaymentProvider {
   readonly name = "Creem";
-  readonly legalEntity = "Armitage Labs OÜ";
 
   constructor(private options: CreemOptions) {}
 

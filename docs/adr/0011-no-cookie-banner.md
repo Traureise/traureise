@@ -26,7 +26,7 @@ needs consent:
 * Guests of wedding websites get no cookies. There is no analytics, tracking or third-party content
   (see ADR 0005).
 
-The privacy policy lists both cookies. A banner would add friction and suggest tracking that does not
+The privacy policy should list both cookies. A banner would add friction and suggest tracking that does not
 exist.
 
 ### Consequences

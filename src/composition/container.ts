@@ -6,17 +6,13 @@ import { DeleteAccount, ExportAccount } from "@/application/account";
 import {
   GetCurrentUser,
   Logout,
-  MAGIC_LINK_TTL_MS,
-  RATE_WINDOW_MS,
   RequestMagicLink,
-  SESSION_TTL_MS,
   UpdateProfile,
   VerifyMagicLink,
 } from "@/application/auth";
 import { GetPricing, HandlePaymentWebhook, ListPurchases, ListWebsitePlans, StartCheckout } from "@/application/billing";
 import type { Deps } from "@/application/deps";
 import type { BillingSettings, FileStorage, PaymentProvider } from "@/application/ports";
-import { buildPrivacyPolicy } from "@/domain/privacy";
 import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
 import { CreemPaymentProvider } from "@/infrastructure/payments/creem";
 import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing";
@@ -46,7 +42,8 @@ import { LocalFileStorage } from "@/infrastructure/storage/local";
 import { S3FileStorage } from "@/infrastructure/storage/s3";
 import { cryptoTokens, systemClock } from "@/infrastructure/system";
 import { FsThemeCatalog } from "@/infrastructure/themes/fs-catalog";
-import { billingProblems, loadConfig, operatorFromConfig, type AppConfig } from "./config";
+import { FileLegalPages } from "@/infrastructure/legal/files";
+import { billingProblems, loadConfig, type AppConfig } from "./config";
 
 function createStorage(config: AppConfig): FileStorage {
   if (config.STORAGE_DRIVER === "s3") {
@@ -88,7 +85,6 @@ function build() {
   const { db } = createDatabase(config.DATABASE_URL);
   const themes = new FsThemeCatalog(path.resolve(config.THEMES_DIR));
   const payments = createPayments(config);
-  const operator = operatorFromConfig(config).details;
   const deps: Deps = {
     users: new DrizzleUserRepository(db),
     magicLinks: new DrizzleMagicLinkRepository(db),
@@ -123,20 +119,7 @@ function build() {
     appUrl: deps.appUrl,
     billingEnabled: deps.billing.enabled,
     sourceCodeUrl: config.SOURCE_CODE_URL,
-    /** Null until OPERATOR_NAME, OPERATOR_ADDRESS and OPERATOR_EMAIL are set. */
-    operator,
-    privacyPolicy: buildPrivacyPolicy({
-      controller: operator,
-      hostingProvider: config.PRIVACY_HOSTING_PROVIDER ?? null,
-      smtpProvider: config.PRIVACY_SMTP_PROVIDER ?? null,
-      storage: config.STORAGE_DRIVER === "s3" ? { driver: "s3", provider: config.PRIVACY_STORAGE_PROVIDER ?? null } : { driver: "local" },
-      paymentProvider: payments ? { name: payments.name, details: payments.legalEntity } : null,
-      retention: {
-        magicLinkMinutes: MAGIC_LINK_TTL_MS / 60_000,
-        sessionDays: SESSION_TTL_MS / 86_400_000,
-        rateLimitMinutes: RATE_WINDOW_MS / 60_000,
-      },
-    }),
+    legalPages: new FileLegalPages({ imprint: config.IMPRINT_FILE, privacy: config.PRIVACY_FILE, terms: config.TERMS_FILE }),
     async healthCheck(): Promise<boolean> {
       try {
         await db.execute(sql`select 1`);

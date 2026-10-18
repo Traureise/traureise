@@ -42,6 +42,6 @@ use it, your S3 provider (photos). Prefer EU providers and sign data processing 
 ## Cookies, legal pages and account rights
 
 Traureise sets only two technically necessary cookies (`traureise_session`, and optionally
-`traureise_locale`), so it needs no consent banner. The privacy policy at `/datenschutz` is generated
-from what the instance is configured to do, and users can export or delete all their data themselves
+`traureise_locale`), so it needs no consent banner. The operator supplies the privacy policy at `/datenschutz`
+as a Markdown file, and users can export or delete all their data themselves
 under `/konto`. See [Legal pages, account rights and billing](legal-and-billing.md).

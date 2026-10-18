@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { PAID_TIERS } from "@/domain/billing";
-import { operatorDetails } from "@/domain/operator";
 
 const schema = z.object({
   APP_URL: z.url().default("http://localhost:3000"),
@@ -23,21 +22,10 @@ const schema = z.object({
   // Linked in the footer (AGPL § 13). Point it at your own source if you run a modified version.
   SOURCE_CODE_URL: z.url().default("https://github.com/Traureise/traureise"),
 
-  // Who runs this instance (Impressum, privacy policy). Name, address and email are required for both pages.
-  OPERATOR_NAME: z.string().optional(),
-  OPERATOR_BUSINESS_NAME: z.string().optional(),
-  OPERATOR_ADDRESS: z.string().optional(),
-  OPERATOR_EMAIL: z.string().optional(),
-  OPERATOR_PHONE: z.string().optional(),
-  OPERATOR_VAT_ID: z.string().optional(),
-  OPERATOR_VAT_NOTE: z.string().optional(),
-  OPERATOR_CONTENT_RESPONSIBLE: z.string().optional(),
-  OPERATOR_DISPUTE_RESOLUTION: z.string().optional(),
-
-  // Processors named in the privacy policy.
-  PRIVACY_HOSTING_PROVIDER: z.string().optional(),
-  PRIVACY_SMTP_PROVIDER: z.string().optional(),
-  PRIVACY_STORAGE_PROVIDER: z.string().optional(),
+  // The operator's own Impressum, privacy policy and terms as Markdown files; Traureise ships none of the texts.
+  IMPRINT_FILE: z.string().optional(),
+  PRIVACY_FILE: z.string().optional(),
+  TERMS_FILE: z.string().optional(),
 
   // Billing: off unless enabled and every Creem setting is present.
   BILLING_ENABLED: z.stringbool().default(false),
@@ -73,26 +61,12 @@ export function billingProblems(config: AppConfig): string[] {
   return required.filter((key) => !config[key]);
 }
 
-export function operatorFromConfig(config: AppConfig) {
-  return operatorDetails({
-    name: config.OPERATOR_NAME,
-    businessName: config.OPERATOR_BUSINESS_NAME,
-    address: config.OPERATOR_ADDRESS,
-    email: config.OPERATOR_EMAIL,
-    phone: config.OPERATOR_PHONE,
-    vatId: config.OPERATOR_VAT_ID,
-    vatNote: config.OPERATOR_VAT_NOTE,
-    contentResponsible: config.OPERATOR_CONTENT_RESPONSIBLE,
-    disputeResolution: config.OPERATOR_DISPUTE_RESOLUTION,
-  });
-}
 
 /** Problems an operator should fix; logged once at startup. The instance runs regardless. */
 export function startupWarnings(config: AppConfig): string[] {
   const warnings: string[] = [];
-  const { missing } = operatorFromConfig(config);
-  if (missing.length > 0) {
-    warnings.push(`Legal pages are not configured: set ${missing.join(", ")}. /impressum and /datenschutz say so until then.`);
+  if (!config.IMPRINT_FILE || !config.PRIVACY_FILE) {
+    warnings.push("No Impressum or privacy policy: set IMPRINT_FILE and PRIVACY_FILE before running a public instance.");
   }
   const billing = billingProblems(config);
   if (billing.length > 0) warnings.push(`BILLING_ENABLED=true but ${billing.join(", ")} missing: billing stays off.`);
