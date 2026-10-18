@@ -20,6 +20,7 @@ All settings are environment variables. `docker-compose.yml` reads them from `.e
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | empty, `true` | S3 settings when `STORAGE_DRIVER=s3`. |
 | `THEMES_DIR` | `./themes` | Directory with theme packages. See [Themes](themes.md). |
 | `MAILPIT_UI_PORT` / `MAILPIT_SMTP_PORT` | `8025` / `1025` | Host ports of the bundled Mailpit, bound to `127.0.0.1`. |
+| `MAILPIT_UI_BIND` | `127.0.0.1` | Address the Mailpit UI is published on. `0.0.0.0` makes it reachable from your LAN, for development only. |
 | `SOURCE_CODE_URL` | the Traureise repository | Linked in the footer (AGPL-3.0 § 13). Point it at your own source if you run a modified version. |
 | `IMPRINT_FILE`, `PRIVACY_FILE`, `TERMS_FILE` | empty | Your Impressum, privacy policy and terms as Markdown files (paths in the container). Without a file the page is a 404 and not linked. See [Legal pages, account rights and billing](legal-and-billing.md). |
 | `BILLING_ENABLED` | `false` | Paid tiers through Creem. Only takes effect with `CREEM_API_KEY` and `CREEM_WEBHOOK_SECRET`. See [Legal pages, account rights and billing](legal-and-billing.md). |
