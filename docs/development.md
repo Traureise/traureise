@@ -33,8 +33,14 @@ DATABASE_URL=postgres://traureise:<password>@localhost:5432/traureise SMTP_HOST=
 - **End-to-end tests** run in Chromium against `docker compose up`. They log in through magic links read
   from the Mailpit API and cover the dashboard, every editor section and field with the live preview,
   the public page, calendar export, sharing, theming, authorization, deletion and logout, plus the legal
-  pages, data export and account deletion. Every E2E test fails if the browser makes a request to a host
-  other than the app.
+  pages, data export and account deletion, and guests and RSVP (guest list, settings, polls, preview,
+  answers through personal links, isolation between households, overview, CSV and account export,
+  notification email, reply-by date and retention). Every E2E test fails if the browser makes a request to
+  a host other than the app; guest browsers opened by a test are checked the same way.
+- **Clock and jobs in E2E.** Both instances in `docker-compose.e2e.yml` run with `TEST_HOOKS=true` and
+  `GUEST_JOBS_INTERVAL_MINUTES=0`. Tests move the app's clock with `POST /api/test/clock` (`{"offsetDays": n}`,
+  reset to 0 in a `finally`) and run the guest jobs for their own website with `POST /api/test/jobs`
+  (`{"websiteId": "…"}`), so they never touch other tests' data.
 - **Billing E2E tests** (`*.billing.spec.ts`) run against a second app instance from
   `docker-compose.e2e.yml` (port 3001) with billing on, a fictitious operator, and a local Creem stub
   (`e2e/creem-stub/`, port 4010) that plays the checkout page and sends signed webhooks. The checkout

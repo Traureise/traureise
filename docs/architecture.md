@@ -62,4 +62,10 @@ Every table holding user data cascades from `users.id`: deleting a user deletes 
 websites, sections, items and upload records. Section items are one table with a `jsonb` column whose
 shape is validated by the zod schemas in `src/domain/sections.ts`.
 
+The guest list (`rsvp_settings`, `rsvp_polls`, `households`, `guests`, `guest_requests`) cascades from
+`websites.id`. Households are found by the SHA-256 of their personal link's token, which is an HMAC of
+the household id with `APP_SECRET` ([ADR 0015](adr/0015-households-with-hashed-personal-links.md)).
+Retention and daily summaries run as `RunGuestJobs` on a timer started in `src/instrumentation.ts`
+([ADR 0018](adr/0018-background-jobs-inside-the-app.md)).
+
 The reasoning behind these choices is recorded in the [design decisions](adr/0001-nextjs-with-layered-architecture.md).

@@ -7,6 +7,8 @@ All settings are environment variables. `docker-compose.yml` reads them from `.e
 |---|---|---|
 | `APP_URL` | `http://localhost:3000` | Public URL of the instance, used in login and share links. If it starts with `https://`, the session cookie is marked `Secure`. |
 | `APP_PORT` | `3000` | Host port the app is published on. |
+| `APP_SECRET` | – | Signs the guests' personal RSVP links. Set a long random value (`openssl rand -base64 48`) before you send links, and keep it: changing it stops every link already sent. Missing or still `change-me`, the app logs a warning. |
+| `GUEST_JOBS_INTERVAL_MINUTES` | `15` | How often the app deletes guest data whose package has ended and sends daily summaries. `0` turns the jobs off. See [Guests and RSVP](guests.md). |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | `traureise` / – / `traureise` | Credentials for the bundled PostgreSQL. The app's `DATABASE_URL` is built from these. |
 | `POSTGRES_PORT` | `5432` | Host port for PostgreSQL, bound to `127.0.0.1` only (used by the integration tests). |
 | `SMTP_HOST` / `SMTP_PORT` | `mailpit` / `1025` | SMTP server for login emails. See [Email](email.md). |
@@ -25,5 +27,6 @@ All settings are environment variables. `docker-compose.yml` reads them from `.e
 | `CREEM_PRODUCT_RSVP`, `CREEM_PRODUCT_INVITATIONS`, `CREEM_PRODUCT_COMPLETE` | empty | Creem product id per tier. |
 | `PRICE_RSVP_EUR`, `PRICE_INVITATIONS_EUR`, `PRICE_COMPLETE_EUR` | `49`, `139`, `149` | Prices shown on `/preise`, whole euros, VAT included. |
 | `BILLING_TEST_UNLOCK_TIERS` | empty | Testing only: sells tiers whose features are not built yet. |
+| `TEST_HOOKS` | `false` | Testing only: `/api/test/clock` moves the app's clock and `/api/test/jobs` runs the guest jobs. Anyone could use them to delete guest data, so never set it on a real instance. |
 
 Empty values count as "not set", so unused lines from `.env.example` can stay in place.

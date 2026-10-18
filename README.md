@@ -21,6 +21,10 @@ backups, themes, architecture and design decisions. The sources are in [`docs/`]
   their EXIF data. Only technically necessary cookies, so no cookie banner.
 - Your own Impressum, privacy policy and terms as Markdown files, linked from the app and from every
   wedding website. Traureise ships none of the texts.
+- Guests and RSVP: a guest list of households with a personal link each (copy it or send it by
+  WhatsApp), a themed answer form (attendance, events, meal, allergies, polls, requests to bring someone,
+  a message), an overview with a pie chart and counts, email notifications, CSV export, and automatic
+  deletion of guest data 12 months after the wedding ([how](https://docs.traureise.de/guests/)).
 - Account rights: download all your data as a ZIP (data.json plus images) and delete your account
   with everything in it, under `/konto`.
 - Optional billing for operators who run Traureise as a service: one-time prices per wedding on
@@ -33,7 +37,7 @@ Requirements: Docker with Compose v2.
 ```bash
 git clone https://github.com/Traureise/traureise.git
 cd traureise
-cp .env.example .env        # then set POSTGRES_PASSWORD
+cp .env.example .env        # then set POSTGRES_PASSWORD and APP_SECRET
 docker compose up -d --build
 ```
 
@@ -74,6 +78,12 @@ services:
 > entries for 15 minutes), which processors it uses (SMTP, S3, the payment provider) and which rights people
 > have. That is yours to write, and worth a lawyer's look.
 
+**Guest links.** Set `APP_SECRET` to a long random value (`openssl rand -base64 48`) before couples send
+links, and keep it: each household's personal link is derived from it, so changing it stops every link
+already sent. Retention and daily summaries run inside the app every `GUEST_JOBS_INTERVAL_MINUTES`
+(default 15). Your privacy policy should cover what is stored about guests (see the
+[guests guide](https://docs.traureise.de/guests/)).
+
 **Billing** (for operators who run Traureise as a paid service; off by default):
 
 | Variable | Purpose |
@@ -83,8 +93,10 @@ services:
 | `CREEM_PRODUCT_RSVP`, `CREEM_PRODUCT_INVITATIONS`, `CREEM_PRODUCT_COMPLETE` | Creem product ids per tier. A tier without a product cannot be bought. |
 | `PRICE_RSVP_EUR`, `PRICE_INVITATIONS_EUR`, `PRICE_COMPLETE_EUR` | Prices on `/preise` in euros, VAT included (defaults 49, 139, 149). |
 | `BILLING_TEST_UNLOCK_TIERS` | **Testing only.** Sells tiers whose features are not built yet. Never set it in production. |
+| `TEST_HOOKS` | **Testing only.** Lets anyone move the clock and run the guest jobs. Never set it in production. |
 
-A tier whose features do not exist yet is shown as "bald verfügbar" and cannot be bought. Without billing,
+Setting up guests is free; the RSVP tier activates the personal links, sharing and notifications. A tier
+whose features do not exist yet is shown as "bald verfügbar" and cannot be bought. Without billing,
 `/preise`, plans and purchases do not appear anywhere.
 
 ## Development

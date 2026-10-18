@@ -13,6 +13,14 @@ obligations as an operator; have your own privacy policy reviewed.
 | Hash of each session token | Staying logged in | 30 days; expired sessions are deleted with the next login |
 | Rate-limit entries (email address or client address, time) | Protection against abuse | Deleted with the next login request once older than 15 minutes |
 | Website content and uploaded photos | The wedding website | Until the website or account is deleted |
+| Guest list: households, names, child flag, answers (attendance, events, meal, allergies, poll answers), requests to bring someone, messages | RSVP for the couple | Until the couple deletes them, the website or the account is deleted, or automatically at the end of the RSVP package (12 months after the wedding) |
+| Hash of each household's link | Finding the household behind a link | As long as the household |
+| Rate-limit entries for answers (link hash or client address, time) | Protection against abuse | 15 minutes |
+
+Allergies and intolerances can be health data (Art. 9 DSGVO). They are only asked for so the couple can
+tell the caterer, appear only to the couple (overview, CSV export) and are deleted with the rest of the
+guest list. Guests have no account and get no cookies; their personal link is the only key, and the form
+sends `Referrer-Policy: no-referrer` and `noindex`. See [Guests and RSVP](guests.md).
 
 Photos are re-encoded on upload, which strips EXIF data such as GPS positions and camera details.
 Deleting a website deletes its photos from storage.
@@ -36,7 +44,8 @@ and its reasons are in [ADR 0005](adr/0005-gdpr-no-runtime-third-party-requests.
 
 ## Your processors
 
-What leaves your server depends on your configuration: your SMTP provider (login emails) and, if you
+What leaves your server depends on your configuration: your SMTP provider (login emails, and RSVP
+notifications to the couple, which contain guests' names, answers and messages) and, if you
 use it, your S3 provider (photos). Prefer EU providers and sign data processing agreements with them.
 
 ## Cookies, legal pages and account rights

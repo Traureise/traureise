@@ -10,7 +10,7 @@
 ```bash
 git clone https://github.com/Traureise/traureise.git
 cd traureise
-cp .env.example .env        # then set POSTGRES_PASSWORD
+cp .env.example .env        # then set POSTGRES_PASSWORD and APP_SECRET (openssl rand -base64 48)
 docker compose up -d --build
 ```
 
