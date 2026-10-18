@@ -12,3 +12,5 @@ coverage/
 data/
 dist/
 next-env.d.ts
+site/
+.cache/

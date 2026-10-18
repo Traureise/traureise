@@ -1,0 +1,55 @@
+/* Traureise palette (same tokens as the app): plum for links and accents, a quiet
+   paper-white header in light mode and a plum-tinted charcoal in dark mode. */
+
+:root > * {
+  --tr-plum: #4a2342;
+  --tr-plum-soft: #7d4a72;
+  --tr-ink: #1f1d2b;
+
+  --md-primary-fg-color: #ffffff;
+  --md-primary-fg-color--light: #ffffff;
+  --md-primary-fg-color--dark: #ffffff;
+  --md-primary-bg-color: var(--tr-ink);
+  --md-primary-bg-color--light: #5d5b68;
+  --md-accent-fg-color: var(--tr-plum-soft);
+  --md-typeset-a-color: var(--tr-plum);
+  --md-typeset-color: var(--tr-ink);
+  --md-footer-bg-color: #2a1626;
+  --md-footer-bg-color--dark: #1f101c;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-hue: 315;
+  --tr-plum: #e3b7d6;
+  --tr-plum-soft: #f0cfe6;
+  --tr-ink: #ece8ef;
+
+  --md-primary-fg-color: hsla(315, 15%, 12%, 1);
+  --md-primary-fg-color--light: hsla(315, 15%, 12%, 1);
+  --md-primary-fg-color--dark: hsla(315, 15%, 12%, 1);
+  --md-primary-bg-color: var(--tr-ink);
+  --md-typeset-a-color: var(--tr-plum);
+  --md-typeset-color: hsla(315, 10%, 90%, 1);
+}
+
+/* Header: a hairline instead of a coloured bar. */
+.md-header {
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+  box-shadow: none;
+}
+
+/* The logo is plum on white; draw it light in dark mode. */
+[data-md-color-scheme="slate"] .md-header__button.md-logo img {
+  filter: brightness(0) invert(0.88);
+}
+
+.md-typeset h1 {
+  font-weight: 600;
+  color: var(--md-typeset-color);
+}
+
+/* Screenshots get a frame so they separate from the page. */
+.md-typeset img.screenshot {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.6rem;
+}
