@@ -2,5 +2,15 @@
   "app": {
     "name": "Traureise",
     "tagline": "Eure Hochzeitswebsite – selbst gehostet, datensparsam, ohne Umwege."
+  },
+  "email": {
+    "magicLink": {
+      "subject": "Dein Anmeldelink für Traureise",
+      "greeting": "Hallo!",
+      "intro": "Mit diesem Link meldest du dich bei Traureise an:",
+      "button": "Jetzt anmelden",
+      "expiry": "Der Link ist {minutes} Minuten gültig und funktioniert nur einmal.",
+      "ignore": "Du hast keinen Link angefordert? Dann kannst du diese E-Mail ignorieren."
+    }
   }
 }
