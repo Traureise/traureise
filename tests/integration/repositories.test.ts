@@ -2,7 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import type { Section } from "@/application/ports";
 import { SECTION_KINDS } from "@/domain/sections";
-import { sectionItems, uploads, users, websiteSections } from "@/infrastructure/db/schema";
+import { magicLinkTokens, rateLimitHits, sectionItems, sessions, uploads, users, websiteSections } from "@/infrastructure/db/schema";
 import { DrizzleMagicLinkRepository, DrizzleSessionRepository, PostgresRateLimiter } from "@/infrastructure/repositories/auth";
 import { DrizzleUploadRepository } from "@/infrastructure/repositories/uploads";
 import { DrizzleUserRepository } from "@/infrastructure/repositories/users";
@@ -63,6 +63,26 @@ describe("magic links and sessions", () => {
     expect(await limiter.hit("k", 2, 60_000, t0)).toBe(false);
     expect(await limiter.hit("other", 2, 60_000, t0)).toBe(true);
     expect(await limiter.hit("k", 2, 60_000, new Date(t0.getTime() + 60_001))).toBe(true);
+  });
+
+  it("keeps no expired personal data around", async () => {
+    const limiter = new PostgresRateLimiter(db);
+    const t0 = new Date("2026-10-18T10:00:00Z");
+    await limiter.hit("magic-link:email:old@example.org", 5, 60_000, t0);
+    await limiter.hit("magic-link:ip:10.0.0.1", 5, 60_000, new Date(t0.getTime() + 120_000));
+    const keys = (await db.select().from(rateLimitHits)).map((r) => r.key);
+    expect(keys).toEqual(["magic-link:ip:10.0.0.1"]);
+
+    const links = new DrizzleMagicLinkRepository(db);
+    await links.create({ email: "old@example.org", tokenHash: "expired", expiresAt: new Date(Date.now() - 1000) });
+    await links.create({ email: "new@example.org", tokenHash: "fresh", expiresAt: new Date(Date.now() + 60_000) });
+    expect((await db.select().from(magicLinkTokens)).map((r) => r.email)).toEqual(["new@example.org"]);
+
+    const sessionRepo = new DrizzleSessionRepository(db);
+    const user = await userRepo.create("anna@example.org");
+    await sessionRepo.create({ userId: user.id, tokenHash: "old", expiresAt: new Date(Date.now() - 1000) });
+    await sessionRepo.create({ userId: user.id, tokenHash: "new", expiresAt: new Date(Date.now() + 60_000) });
+    expect((await db.select().from(sessions)).map((r) => r.tokenHash)).toEqual(["new"]);
   });
 });
 

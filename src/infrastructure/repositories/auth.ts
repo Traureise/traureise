@@ -13,6 +13,8 @@ export class DrizzleMagicLinkRepository implements MagicLinkRepository {
   constructor(private db: Database) {}
 
   async create(input: { email: string; tokenHash: string; expiresAt: Date }): Promise<void> {
+    // Expired links hold email addresses and serve no purpose: purge them as new ones are made.
+    await this.db.delete(magicLinkTokens).where(lt(magicLinkTokens.expiresAt, new Date()));
     await this.db.insert(magicLinkTokens).values(input);
   }
 
@@ -35,6 +37,7 @@ export class DrizzleSessionRepository implements SessionRepository {
   constructor(private db: Database) {}
 
   async create(input: { userId: string; tokenHash: string; expiresAt: Date }): Promise<void> {
+    await this.db.delete(sessions).where(lt(sessions.expiresAt, new Date()));
     await this.db.insert(sessions).values(input);
   }
 
@@ -54,7 +57,8 @@ export class PostgresRateLimiter implements RateLimiter {
   async hit(key: string, limit: number, windowMs: number, now: Date): Promise<boolean> {
     const since = new Date(now.getTime() - windowMs);
     return this.db.transaction(async (tx) => {
-      await tx.delete(rateLimitHits).where(and(eq(rateLimitHits.key, key), lt(rateLimitHits.createdAt, since)));
+      // Hits are keyed by email or IP address; nothing older than the window is kept for any key.
+      await tx.delete(rateLimitHits).where(lt(rateLimitHits.createdAt, since));
       await tx.insert(rateLimitHits).values({ key, createdAt: now });
       const [row] = await tx
         .select({ count: sql<number>`count(*)::int` })
