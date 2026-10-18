@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { ChevronRight, House, Palette, Type } from "lucide-react";
+import { ChevronRight, House, Palette, Type, Users } from "lucide-react";
 import { Panel } from "@/components/editor/panel";
 import { container } from "@/composition/container";
 import { dateFromIso } from "@/lib/format";
@@ -54,6 +54,9 @@ export default async function EditorOverview({ params }: Props) {
           <NavRow href={`${base}/theme`} icon={<Palette className="size-4 text-muted-foreground" aria-hidden />} label={t("nav.theme")} />
           <NavRow href={`${base}/design`} icon={<Type className="size-4 text-muted-foreground" aria-hidden />} label={t("nav.design")} />
           <NavRow href={`${base}/home`} icon={<House className="size-4 text-muted-foreground" aria-hidden />} label={t("nav.home")} />
+        </ul>
+        <ul className="space-y-2">
+          <NavRow href={`/websites/${id}/gaeste`} icon={<Users className="size-4 text-muted-foreground" aria-hidden />} label={t("nav.guests")} status={t("nav.guestsHint")} />
         </ul>
         <div className="space-y-2">
           <h2 className="text-sm font-medium text-muted-foreground">{t("nav.sections")}</h2>

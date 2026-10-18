@@ -80,7 +80,7 @@ describe("guest list", () => {
     await expect(saveHousehold({ name: "", people: [] })).rejects.toBeInstanceOf(ValidationError);
     const a = await weber();
     const b = await saveHousehold({ name: "Müller", people: [{ name: "Tom" }] });
-    await expect(saveHousehold({ name: "Weber", people: [{ id: b.people[0]!.id, name: "Tom" }] }, a.id)).rejects.toMatchObject({ fieldErrors: { people: "invalid" } });
+    await expect(saveHousehold({ name: "Weber", people: [{ id: b.people[0]!.id, name: "Tom" }] }, a.id)).rejects.toMatchObject({ fieldErrors: { people: "invalid_person" } });
   });
 
   it("belongs to the website's owner only", async () => {
@@ -227,7 +227,7 @@ describe("the guest form", () => {
 
   it("has a free preview for the couple", async () => {
     f.deps.billing.enabled = true;
-    const preview = await new GetGuestFormPreview(f.deps).execute(anna.id, websiteId);
+    const preview = await new GetGuestFormPreview(f.deps).execute(anna.id, websiteId, { household: "Familie Muster", people: ["Alex", "Sam"] });
     expect(preview.state).toBe("preview");
     expect(preview.household.people.length).toBeGreaterThan(0);
   });

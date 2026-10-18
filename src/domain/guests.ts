@@ -136,7 +136,7 @@ const pollSchema = z.object({
   multiple: z.boolean().default(false),
   allowOther: z.boolean().default(false),
   per: z.enum(POLL_SCOPES, "invalid_option").default("person"),
-  options: options.refine((list) => list.length >= 2, "too_few"),
+  options: options.refine((list) => list.length >= 2, "too_few_options"),
 });
 export type PollInput = z.infer<typeof pollSchema>;
 
@@ -151,7 +151,7 @@ const householdSchema = z.object({
     .array(z.object({ id: optional(z.string().max(64)).default(null), name: text(NAME_MAX), isChild: z.boolean().default(false) }))
     .max(30)
     .transform((list) => list.filter((p) => p.name !== ""))
-    .refine((list) => list.length >= 1, "too_few"),
+    .refine((list) => list.length >= 1, "no_people"),
 });
 export type HouseholdInput = z.infer<typeof householdSchema>;
 
@@ -185,7 +185,7 @@ function pollAnswers(raw: Record<string, z.infer<typeof rawAnswer>>, polls: read
   for (const [pollId, answer] of Object.entries(raw)) {
     const poll = polls.find((p) => p.id === pollId);
     if (!poll) {
-      errors[key] ??= "invalid";
+      errors[key] ??= "invalid_option";
       continue;
     }
     const optionIds = [...new Set(answer.optionIds)];
@@ -207,14 +207,14 @@ function pollAnswers(raw: Record<string, z.infer<typeof rawAnswer>>, polls: read
  */
 export function parseResponse(input: unknown, ctx: ResponseContext): Parsed<HouseholdResponse> {
   const raw = rawResponse.safeParse(input);
-  if (!raw.success) return { ok: false, fieldErrors: { _: "invalid" } };
+  if (!raw.success) return { ok: false, fieldErrors: { _: "invalid_input" } };
   const errors: FieldErrors = {};
   const { household, meal } = ctx;
   const invited = householdEvents(household, ctx.events).map((e) => e.id);
   const personPolls = ctx.polls.filter((p) => p.per === "person");
   const householdPolls = ctx.polls.filter((p) => p.per === "household");
 
-  if (Object.keys(raw.data.people).some((id) => !household.people.some((p) => p.id === id))) errors.people = "invalid";
+  if (Object.keys(raw.data.people).some((id) => !household.people.some((p) => p.id === id))) errors.people = "invalid_person";
 
   const people: PersonResponse[] = [];
   for (const person of household.people) {

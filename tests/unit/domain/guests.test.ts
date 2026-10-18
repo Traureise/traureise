@@ -156,13 +156,13 @@ describe("parseResponse", () => {
 
   it("rejects people, events, options and polls from elsewhere", () => {
     const bad = (input: unknown) => parseResponse(input, ctx);
-    expect(bad({ people: { g1: { attending: false }, g2: { attending: false }, other: { attending: true } } })).toEqual({ ok: false, fieldErrors: { people: "invalid" } });
+    expect(bad({ people: { g1: { attending: false }, g2: { attending: false }, other: { attending: true } } })).toEqual({ ok: false, fieldErrors: { people: "invalid_person" } });
     expect(bad({ people: { g1: { attending: true, eventIds: ["ceremony"] }, g2: { attending: false } } })).toEqual({ ok: false, fieldErrors: { "people.g1.eventIds": "invalid_option" } });
     expect(bad({ people: { g1: { attending: true, eventIds: ["party"], mealOptionId: "steak" }, g2: { attending: false } } })).toEqual({
       ok: false,
       fieldErrors: { "people.g1.mealOptionId": "invalid_option" },
     });
-    expect(bad({ people: { g1: { attending: false }, g2: { attending: false } }, polls: { music: { optionIds: ["pop"] } } })).toEqual({ ok: false, fieldErrors: { polls: "invalid" } });
+    expect(bad({ people: { g1: { attending: false }, g2: { attending: false } }, polls: { music: { optionIds: ["pop"] } } })).toEqual({ ok: false, fieldErrors: { polls: "invalid_option" } });
     expect(bad({ people: { g1: { attending: false }, g2: { attending: false } }, polls: { shuttle: { optionIds: ["yes", "no"] } } })).toEqual({
       ok: false,
       fieldErrors: { "polls.shuttle": "invalid_option" },
@@ -189,7 +189,7 @@ describe("settings, polls and households", () => {
   });
 
   it("needs a question and two options for a poll", () => {
-    expect(parsePoll({ question: "", options: [{ id: "a", label: "A" }] })).toEqual({ ok: false, fieldErrors: { question: "required", options: "too_few" } });
+    expect(parsePoll({ question: "", options: [{ id: "a", label: "A" }] })).toEqual({ ok: false, fieldErrors: { question: "required", options: "too_few_options" } });
     expect(parsePoll({ question: "Shuttle?", per: "household", options: [{ id: "a", label: "Ja" }, { id: "b", label: "Nein" }] })).toEqual({
       ok: true,
       value: { question: "Shuttle?", multiple: false, allowOther: false, per: "household", options: [{ id: "a", label: "Ja" }, { id: "b", label: "Nein" }] },
@@ -197,7 +197,7 @@ describe("settings, polls and households", () => {
   });
 
   it("needs a name and at least one person for a household", () => {
-    expect(parseHouseholdInput({ name: "", people: [] })).toEqual({ ok: false, fieldErrors: { name: "required", people: "too_few" } });
+    expect(parseHouseholdInput({ name: "", people: [] })).toEqual({ ok: false, fieldErrors: { name: "required", people: "no_people" } });
     expect(parseHouseholdInput({ name: "Weber", invitedEventIds: null, people: [{ name: "Clara" }, { id: "g2", name: "Ida", isChild: true }, { name: " " }] })).toEqual({
       ok: true,
       value: { name: "Weber", invitedEventIds: null, people: [{ id: null, name: "Clara", isChild: false }, { id: "g2", name: "Ida", isChild: true }] },

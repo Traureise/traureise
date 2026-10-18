@@ -129,7 +129,7 @@ export class SaveHousehold {
 
     const existing = await guests.findHousehold(websiteId, householdId);
     if (!existing) throw new NotFoundError();
-    if (data.people.some((p) => p.id && !existing.people.some((x) => x.id === p.id))) throw new ValidationError({ people: "invalid" });
+    if (data.people.some((p) => p.id && !existing.people.some((x) => x.id === p.id))) throw new ValidationError({ people: "invalid_person" });
     await guests.updateHousehold(websiteId, householdId, data);
     return (await guests.findHousehold(websiteId, householdId))!;
   }
@@ -271,7 +271,7 @@ export class GetGuestFormPreview {
   constructor(private deps: Deps) {}
 
   /** The form as guests see it, for the first household or a sample one. Free, and it saves nothing. */
-  async execute(userId: string, websiteId: string, sample: { household: string; people: string[] } = { household: "Familie Muster", people: ["Alex", "Sam"] }): Promise<GuestForm> {
+  async execute(userId: string, websiteId: string, sample: { household: string; people: string[] }): Promise<GuestForm> {
     const website = await loadOwnedWebsite(this.deps, userId, websiteId);
     const ctx = await loadGuestContext(this.deps, website);
     const [first] = await this.deps.guests.listHouseholds(websiteId);

@@ -138,6 +138,8 @@ function build() {
     appUrl: deps.appUrl,
     billingEnabled: deps.billing.enabled,
     clock: deps.clock,
+    /** Only with TEST_HOOKS=true: moves the clock (tests of deadlines and retention). */
+    testHooks: config.TEST_HOOKS ? { setClockOffset: (ms: number) => adjustableClock.setOffset(ms) } : null,
     sourceCodeUrl: config.SOURCE_CODE_URL,
     legalPages: new FileLegalPages({ imprint: config.IMPRINT_FILE, privacy: config.PRIVACY_FILE, terms: config.TERMS_FILE }),
     async healthCheck(): Promise<boolean> {

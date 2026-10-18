@@ -1,0 +1,154 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Plus, Trash2 } from "lucide-react";
+import { saveRsvpSettingsAction } from "@/app/actions/guests";
+import { useSave } from "@/components/editor/use-save";
+import { FieldError } from "@/components/forms/field-error";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { NOTIFY_MODES, type NotifyMode, type RsvpSettings } from "@/domain/guests";
+
+type Option = { key: string; id: string | null; label: string };
+let counter = 0;
+export const blankOption = (): Option => ({ key: `new-${++counter}`, id: null, label: "" });
+
+/** Editable list of answer options (dishes, poll answers). Ids stay with their option across edits. */
+export function OptionList({ options, onChange, label, addLabel, removeLabel }: { options: Option[]; onChange: (o: Option[]) => void; label: (n: number) => string; addLabel: string; removeLabel: (n: number) => string }) {
+  return (
+    <div className="space-y-2">
+      <ul className="space-y-2">
+        {options.map((o, i) => (
+          <li key={o.key} className="flex items-center gap-2">
+            <Input aria-label={label(i + 1)} value={o.label} onChange={(e) => onChange(options.map((x) => (x.key === o.key ? { ...x, label: e.target.value } : x)))} />
+            <Button type="button" variant="ghost" size="icon" aria-label={removeLabel(i + 1)} onClick={() => onChange(options.filter((x) => x.key !== o.key))}>
+              <Trash2 aria-hidden />
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <Button type="button" variant="outline" size="sm" onClick={() => onChange([...options, blankOption()])}>
+        <Plus aria-hidden />
+        {addLabel}
+      </Button>
+    </div>
+  );
+}
+
+export const toOptions = (options: { id: string; label: string }[]): Option[] => options.map((o) => ({ key: o.id, id: o.id, label: o.label }));
+
+export function RsvpSettingsForm({
+  websiteId,
+  settings,
+  schedule,
+  whatsappDefault,
+  notificationsLocked,
+}: {
+  websiteId: string;
+  settings: RsvpSettings;
+  schedule: { id: string; name: string }[];
+  whatsappDefault: string;
+  notificationsLocked: boolean;
+}) {
+  const t = useTranslations("guests.settings");
+  const router = useRouter();
+  const { pending, errors, save } = useSave();
+  const [replyBy, setReplyBy] = useState(settings.replyBy ?? "");
+  const [eventIds, setEventIds] = useState<string[]>(settings.eventIds ?? schedule.map((e) => e.id));
+  const [mealOptions, setMealOptions] = useState<Option[]>(settings.meal ? toOptions(settings.meal.options) : []);
+  const [mealEvent, setMealEvent] = useState(settings.meal?.eventId ?? "");
+  const [notify, setNotify] = useState<NotifyMode>(settings.notify);
+  const [whatsapp, setWhatsapp] = useState(settings.whatsappMessage ?? "");
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    save(
+      () =>
+        saveRsvpSettingsAction(websiteId, {
+          replyBy,
+          eventIds: schedule.every((e) => eventIds.includes(e.id)) ? null : eventIds,
+          meal: { eventId: mealEvent, options: mealOptions.map(({ id, label }) => ({ id, label })) },
+          notify,
+          whatsappMessage: whatsapp,
+        }),
+      () => router.refresh(),
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-8" aria-label={t("title")}>
+      <div className="space-y-2">
+        <Label htmlFor="rsvp-reply-by">{t("replyBy")}</Label>
+        <Input id="rsvp-reply-by" type="date" value={replyBy} onChange={(e) => setReplyBy(e.target.value)} className="w-auto" />
+        <p className="text-xs text-muted-foreground">{t("replyByHint")}</p>
+        <FieldError code={errors.replyBy} />
+      </div>
+
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">{t("events")}</legend>
+        {schedule.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t("noSchedule")}</p>
+        ) : (
+          schedule.map((e) => (
+            <label key={e.id} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="size-4 accent-primary"
+                checked={eventIds.includes(e.id)}
+                onChange={(ev) => setEventIds((list) => (ev.target.checked ? [...list, e.id] : list.filter((id) => id !== e.id)))}
+              />
+              {e.name}
+            </label>
+          ))
+        )}
+        <FieldError code={errors.eventIds} />
+      </fieldset>
+
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-medium">{t("meal")}</legend>
+        <p className="text-xs text-muted-foreground">{t("mealHint")}</p>
+        <OptionList options={mealOptions} onChange={setMealOptions} label={(n) => t("dish", { n })} addLabel={t("addDish")} removeLabel={(n) => t("removeDish", { n })} />
+        {schedule.length > 0 && (
+          <div className="space-y-2">
+            <Label htmlFor="rsvp-meal-event">{t("mealEvent")}</Label>
+            <select id="rsvp-meal-event" value={mealEvent} onChange={(e) => setMealEvent(e.target.value)} className="h-9 rounded-lg border border-input bg-transparent px-3 text-sm">
+              <option value="">{t("mealEveryEvent")}</option>
+              {schedule.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name}
+                </option>
+              ))}
+            </select>
+            <FieldError code={errors["meal.eventId"]} />
+          </div>
+        )}
+      </fieldset>
+
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">{t("notify")}</legend>
+        {NOTIFY_MODES.map((mode) => (
+          <label key={mode} className="flex items-center gap-2 text-sm">
+            <input type="radio" name="notify" value={mode} checked={notify === mode} onChange={() => setNotify(mode)} className="size-4 accent-primary" />
+            {t(`notifyModes.${mode}`)}
+          </label>
+        ))}
+        {notificationsLocked && <p className="text-xs text-muted-foreground">{t("notifyLocked")}</p>}
+      </fieldset>
+
+      <div className="space-y-2">
+        <Label htmlFor="rsvp-whatsapp">{t("whatsapp")}</Label>
+        <Textarea id="rsvp-whatsapp" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder={whatsappDefault} rows={3} />
+        <p className="text-xs text-muted-foreground">{t("whatsappHint")}</p>
+        <FieldError code={errors.whatsappMessage} />
+      </div>
+
+      <Button type="submit" disabled={pending}>
+        {t("save")}
+      </Button>
+    </form>
+  );
+}

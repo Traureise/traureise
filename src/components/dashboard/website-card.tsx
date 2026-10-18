@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { CalendarDays, Eye, MapPin, PencilLine } from "lucide-react";
+import { CalendarDays, Eye, MapPin, PencilLine, Users } from "lucide-react";
 import type { Website } from "@/application/ports";
 import type { Tier } from "@/domain/billing";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +70,12 @@ export async function WebsiteCard({ website, appUrl, tier }: { website: Website;
             <Link href={`/websites/${website.id}/edit`}>
               <PencilLine aria-hidden />
               {t("edit")}
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={`/websites/${website.id}/gaeste`}>
+              <Users aria-hidden />
+              {t("guests")}
             </Link>
           </Button>
           <ShareDialog url={publicUrl} slug={website.slug} />
