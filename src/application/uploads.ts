@@ -1,10 +1,10 @@
+import { checkUpload } from "@/domain/images";
 import type { Deps } from "./deps";
 import { ValidationError } from "./errors";
 import { loadOwnedWebsite } from "./owned";
 import type { StoredFile } from "./ports";
 
-export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
-export const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"];
+export { ACCEPTED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "@/domain/images";
 const KEY_PATTERN = /^[A-Za-z0-9_-]+\.(webp|jpg|png)$/;
 
 export class UploadImage {
@@ -13,9 +13,8 @@ export class UploadImage {
   /** Validates, re-encodes (stripping EXIF) and stores an image; returns its storage key. */
   async execute(userId: string, websiteId: string, file: { bytes: Uint8Array; size: number; contentType: string }): Promise<string> {
     await loadOwnedWebsite(this.deps, userId, websiteId);
-    if (!ACCEPTED_IMAGE_TYPES.includes(file.contentType)) throw new ValidationError({ file: "invalid_type" });
-    if (file.size === 0) throw new ValidationError({ file: "empty" });
-    if (file.size > MAX_UPLOAD_BYTES) throw new ValidationError({ file: "too_large" });
+    const problem = checkUpload(file);
+    if (problem) throw new ValidationError({ file: problem });
 
     let processed;
     try {

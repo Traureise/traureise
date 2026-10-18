@@ -35,7 +35,12 @@ export function ShareDialog({ url, slug }: { url: string; slug: string }) {
       await navigator.clipboard.writeText(url);
       toast.success(t("share.linkCopied"));
     } catch {
-      toast.error(t("share.copyFailed"));
+      // The Clipboard API only exists on https and localhost; self-hosts on plain http (for example a
+      // LAN address) fall back to copying the selected text of the URL field.
+      const field = document.getElementById(`share-url-${slug}`) as HTMLInputElement | null;
+      field?.select();
+      if (field && document.execCommand("copy")) toast.success(t("share.linkCopied"));
+      else toast.error(t("share.copyFailed"));
     }
   }
 

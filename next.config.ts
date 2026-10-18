@@ -8,7 +8,9 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   serverExternalPackages: ["sharp"],
   experimental: {
+    // Uploads are capped at 10 MB (src/domain/images.ts); leave room for multipart overhead.
     serverActions: { bodySizeLimit: "12mb" },
+    proxyClientMaxBodySize: "12mb",
   },
 };
 
