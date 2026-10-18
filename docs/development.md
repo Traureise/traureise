@@ -21,7 +21,7 @@ DATABASE_URL=postgres://traureise:<password>@localhost:5432/traureise SMTP_HOST=
 | `npm run typecheck` | TypeScript in strict mode |
 | `npm run test:unit` | Vitest: domain rules and use cases with in-memory fakes |
 | `npm run test:integration` | Vitest against the Compose PostgreSQL and Mailpit. It creates and migrates a separate `traureise_test` database. |
-| `npm run test:e2e` | Playwright against the running Compose stack (`docker compose up -d --build` first). Run `npx playwright install chromium` once. |
+| `npm run test:e2e` | Playwright against the running E2E stack (`docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build --wait` first). Run `npx playwright install chromium` once. |
 | `npm run db:generate` | Generates a migration after changing `src/infrastructure/db/schema.ts` |
 
 ## Test levels
@@ -32,8 +32,14 @@ DATABASE_URL=postgres://traureise:<password>@localhost:5432/traureise SMTP_HOST=
   send email through Mailpit, and process real images with sharp.
 - **End-to-end tests** run in Chromium against `docker compose up`. They log in through magic links read
   from the Mailpit API and cover the dashboard, every editor section and field with the live preview,
-  the public page, calendar export, sharing, theming, authorization, deletion and logout. Every E2E test
-  fails if the browser makes a request to a host other than the app.
+  the public page, calendar export, sharing, theming, authorization, deletion and logout, plus the legal
+  pages, data export and account deletion. Every E2E test fails if the browser makes a request to a host
+  other than the app.
+- **Billing E2E tests** (`*.billing.spec.ts`) run against a second app instance from
+  `docker-compose.e2e.yml` (port 3001) with billing on, a fictitious operator, and a local Creem stub
+  (`e2e/creem-stub/`, port 4010) that plays the checkout page and sends signed webhooks. The checkout
+  test is the only one allowed to visit the stub's host. The default instance checks that billing is
+  invisible when it is off.
 
 No test is skipped, and Playwright runs with `retries: 0`, so flaky tests show up instead of being
 hidden.
@@ -41,7 +47,8 @@ hidden.
 ## Continuous integration
 
 GitHub Actions runs everything on every pull request (`.github/workflows/ci.yml`). The E2E job starts
-the stack with `docker compose up` from `.env.example`, just like a fresh install.
+the stack from `.env.example`, just like a fresh install, with `docker-compose.e2e.yml` on top for the
+billing instance and the Creem stub.
 `.github/workflows/docker.yml` builds the image for every pull request and publishes it to
 `ghcr.io/traureise/traureise` from `main` and from `v*` tags. `.github/workflows/pages.yml` builds this
 documentation with `mkdocs build --strict` and publishes it.
