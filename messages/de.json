@@ -658,6 +658,7 @@
     "submit": "Antwort senden",
     "update": "Antwort ändern",
     "inactiveTitle": "Dieser Link ist noch nicht aktiv",
-    "inactiveBody": "Hier könnt ihr bald antworten. Schaut einfach später noch einmal vorbei."
+    "inactiveBody": "Hier könnt ihr bald antworten. Schaut einfach später noch einmal vorbei.",
+    "allergiesHint": "Freiwillig. Nur das Brautpaar sieht diese Angabe, damit es die Küche informieren kann. Sie wird mit der Gästeliste nach der Hochzeit gelöscht."
   }
 }

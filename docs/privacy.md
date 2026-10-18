@@ -15,7 +15,7 @@ obligations as an operator; have your own privacy policy reviewed.
 | Website content and uploaded photos | The wedding website | Until the website or account is deleted |
 | Guest list: households, names, child flag, answers (attendance, events, meal, allergies, poll answers), requests to bring someone, messages | RSVP for the couple | Until the couple deletes them, the website or the account is deleted, or automatically at the end of the RSVP package (12 months after the wedding) |
 | Hash of each household's link | Finding the household behind a link | As long as the household |
-| Rate-limit entries for answers (link hash or client address, time) | Protection against abuse | 15 minutes |
+| Rate-limit entries for answers (link hash or client address, time) | Protection against abuse | Deleted with the next answer or login request once older than 15 minutes |
 
 Allergies and intolerances can be health data (Art. 9 DSGVO). They are only asked for so the couple can
 tell the caterer, appear only to the couple (overview, CSV export) and are deleted with the rest of the

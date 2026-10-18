@@ -193,7 +193,10 @@ export function GuestForm({ form, token }: { form: GuestFormData; token: string 
                     <label htmlFor={`${p.id}-allergies`} className="font-medium">
                       {t("allergies")}
                     </label>
-                    <input id={`${p.id}-allergies`} className="site-field" value={state.allergies} onChange={(e) => update(p.id, { allergies: e.target.value })} placeholder={t("allergiesPlaceholder")} />
+                    <input id={`${p.id}-allergies`} className="site-field" value={state.allergies} onChange={(e) => update(p.id, { allergies: e.target.value })} placeholder={t("allergiesPlaceholder")} aria-describedby={`${p.id}-allergies-hint`} />
+                    <p id={`${p.id}-allergies-hint`} className="site-muted text-xs">
+                      {t("allergiesHint")}
+                    </p>
                     <FormError code={errors[`${key}.allergies`]} />
                   </div>
                   {personPolls.map((poll) => (
