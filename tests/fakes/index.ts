@@ -132,6 +132,11 @@ export class InMemoryRateLimiter implements RateLimiter {
 
 /** Repositories hand out snapshots, like a database would. */
 const copy = <T>(value: T): T => structuredClone(value);
+function omit<T extends object, K extends keyof T>(value: T, key: K): Omit<T, K> {
+  const rest = { ...value };
+  delete rest[key];
+  return rest;
+}
 
 export class InMemoryWebsites implements WebsiteRepository {
   websites: Website[] = [];
@@ -330,13 +335,12 @@ export class InMemoryGuests implements GuestRepository {
     Object.assign(this.state(websiteId), copy(settings));
   }
   async listPolls(websiteId: string) {
-    return copy(this.polls.filter((p) => p.websiteId === websiteId).map(({ websiteId: _, ...p }) => p));
+    return copy(this.polls.filter((p) => p.websiteId === websiteId)).map((p) => omit(p, "websiteId"));
   }
   async createPoll(websiteId: string, poll: NewPoll) {
     const record = { ...copy(poll), id: this.id("poll"), position: this.polls.length, websiteId };
     this.polls.push(record);
-    const { websiteId: _, ...rest } = record;
-    return copy(rest);
+    return omit(copy(record), "websiteId");
   }
   async updatePoll(websiteId: string, pollId: string, poll: NewPoll) {
     const record = this.polls.find((p) => p.id === pollId && p.websiteId === websiteId);
@@ -347,7 +351,7 @@ export class InMemoryGuests implements GuestRepository {
   async deletePoll(websiteId: string, pollId: string) {
     this.polls = this.polls.filter((p) => !(p.id === pollId && p.websiteId === websiteId));
   }
-  private strip = ({ websiteId: _, tokenHash: __, ...h }: InMemoryGuests["households"][number]): Household => copy(h);
+  private strip = (h: InMemoryGuests["households"][number]): Household => omit(omit(copy(h), "websiteId"), "tokenHash");
   async listHouseholds(websiteId: string) {
     return this.households.filter((h) => h.websiteId === websiteId).map(this.strip);
   }

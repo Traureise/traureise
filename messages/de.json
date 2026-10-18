@@ -11,6 +11,30 @@
       "button": "Jetzt anmelden",
       "expiry": "Der Link ist {minutes} Minuten gültig und funktioniert nur einmal.",
       "ignore": "Du hast keinen Link angefordert? Dann kannst du diese E-Mail ignorieren."
+    },
+    "answer": {
+      "subject": "{household} hat geantwortet",
+      "intro": "{household} hat für „{title}“ geantwortet.",
+      "coming": "Kommen: {names}",
+      "notComing": "Kommen nicht: {names}",
+      "message": "Nachricht: {message}",
+      "requests": "Möchten gern mitbringen: {names}",
+      "button": "Zur Gästeliste",
+      "footer": "Du bekommst diese E-Mail, weil in den RSVP-Einstellungen „E-Mail bei jeder Antwort“ gewählt ist."
+    },
+    "summary": {
+      "subject": "Neue Antworten für „{title}“",
+      "intro": "Seit der letzten Zusammenfassung {count, plural, one {hat # Haushalt} other {haben # Haushalte}} geantwortet:",
+      "line": "{name}: {coming} kommen, {notComing} kommen nicht",
+      "totals": "Insgesamt: {coming} kommen, {notComing} kommen nicht, {open} offen.",
+      "button": "Zur Gästeliste",
+      "footer": "Du bekommst diese E-Mail, weil in den RSVP-Einstellungen „Tägliche Zusammenfassung“ gewählt ist."
+    },
+    "retention": {
+      "subject": "Eure Gästeliste wird am {date} gelöscht",
+      "body": "Das RSVP-Paket für „{title}“ endet bald. Am {date} löschen wir die Gästeliste mit allen Antworten automatisch, so wie es in unserer Datenschutzerklärung steht.",
+      "hint": "Wenn ihr die Antworten behalten wollt, ladet vorher auf der Gäste-Seite die CSV-Datei herunter.",
+      "button": "Zur Gästeliste"
     }
   },
   "landing": {

@@ -17,6 +17,22 @@ import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
 import { CreemPaymentProvider } from "@/infrastructure/payments/creem";
 import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing";
 import { GetEventIcs, GetPublicWebsite } from "@/application/public";
+import {
+  DecideGuestRequest,
+  DeleteHousehold,
+  DeletePoll,
+  ExportGuestsCsv,
+  GetGuestForm,
+  GetGuestFormPreview,
+  GetGuestPage,
+  RunGuestJobs,
+  SaveHousehold,
+  SavePoll,
+  SaveRsvpSettings,
+  SubmitGuestResponse,
+} from "@/application/guests";
+import { createGuestMailTemplates } from "@/infrastructure/mail/guest-templates";
+import { DrizzleGuestRepository } from "@/infrastructure/repositories/guests";
 import { AddItem, DeleteItem, MoveItem, UpdateItem, UpdateSection } from "@/application/sections";
 import { GetUpload, UploadImage } from "@/application/uploads";
 import {
@@ -40,10 +56,10 @@ import { DrizzleUserRepository } from "@/infrastructure/repositories/users";
 import { DrizzleWebsiteRepository } from "@/infrastructure/repositories/websites";
 import { LocalFileStorage } from "@/infrastructure/storage/local";
 import { S3FileStorage } from "@/infrastructure/storage/s3";
-import { cryptoTokens, systemClock } from "@/infrastructure/system";
+import { adjustableClock, cryptoTokens, hmacGuestLinks, systemClock } from "@/infrastructure/system";
 import { FsThemeCatalog } from "@/infrastructure/themes/fs-catalog";
 import { FileLegalPages } from "@/infrastructure/legal/files";
-import { billingProblems, loadConfig, type AppConfig } from "./config";
+import { appSecret, billingProblems, loadConfig, type AppConfig } from "./config";
 
 function createStorage(config: AppConfig): FileStorage {
   if (config.STORAGE_DRIVER === "s3") {
@@ -104,12 +120,15 @@ function build() {
     }),
     mailTemplate: createMagicLinkTemplate(),
     themes,
-    clock: systemClock,
+    clock: config.TEST_HOOKS ? adjustableClock : systemClock,
     tokens: cryptoTokens,
     billing: billingSettings(config, payments),
     billingRepo: new DrizzleBillingRepository(db),
     payments,
     archive: new FflateArchiveWriter(),
+    guests: new DrizzleGuestRepository(db),
+    guestLinks: hmacGuestLinks(appSecret(config)),
+    guestMail: createGuestMailTemplates(),
     appUrl: config.APP_URL.replace(/\/$/, ""),
   };
 
@@ -118,6 +137,7 @@ function build() {
     themes,
     appUrl: deps.appUrl,
     billingEnabled: deps.billing.enabled,
+    clock: deps.clock,
     sourceCodeUrl: config.SOURCE_CODE_URL,
     legalPages: new FileLegalPages({ imprint: config.IMPRINT_FILE, privacy: config.PRIVACY_FILE, terms: config.TERMS_FILE }),
     async healthCheck(): Promise<boolean> {
@@ -158,6 +178,18 @@ function build() {
     listPurchases: new ListPurchases(deps),
     startCheckout: new StartCheckout(deps),
     handlePaymentWebhook: new HandlePaymentWebhook(deps),
+    getGuestPage: new GetGuestPage(deps),
+    saveHousehold: new SaveHousehold(deps),
+    deleteHousehold: new DeleteHousehold(deps),
+    saveRsvpSettings: new SaveRsvpSettings(deps),
+    savePoll: new SavePoll(deps),
+    deletePoll: new DeletePoll(deps),
+    decideGuestRequest: new DecideGuestRequest(deps),
+    exportGuestsCsv: new ExportGuestsCsv(deps),
+    getGuestForm: new GetGuestForm(deps),
+    getGuestFormPreview: new GetGuestFormPreview(deps),
+    submitGuestResponse: new SubmitGuestResponse(deps),
+    runGuestJobs: new RunGuestJobs(deps),
   };
 }
 

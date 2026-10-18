@@ -242,7 +242,7 @@ function formFor(ctx: GuestContext, household: Household, state: GuestForm["stat
     household,
     events,
     meal: mealApplies(ctx.meal, events.map((e) => e.id)) ? ctx.meal : null,
-    polls: ctx.polls.map(({ position: _, ...poll }) => poll),
+    polls: ctx.polls.map(({ id, question, multiple, allowOther, per, options }) => ({ id, question, multiple, allowOther, per, options })),
     replyBy: ctx.settings.replyBy,
   };
 }
