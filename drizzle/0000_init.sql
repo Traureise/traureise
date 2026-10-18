@@ -51,7 +51,7 @@ CREATE TABLE "users" (
 CREATE TABLE "website_sections" (
 	"website_id" uuid NOT NULL,
 	"kind" text NOT NULL,
-	"title" text NOT NULL,
+	"title" text,
 	"visible" boolean DEFAULT true NOT NULL,
 	"body" text DEFAULT '' NOT NULL,
 	CONSTRAINT "website_sections_website_id_kind_pk" PRIMARY KEY("website_id","kind")

@@ -95,7 +95,8 @@ export const websiteSections = pgTable(
       .notNull()
       .references(() => websites.id, { onDelete: "cascade" }),
     kind: text("kind").notNull(),
-    title: text("title").notNull(),
+    // null = use the translated default title for this section kind.
+    title: text("title"),
     visible: boolean("visible").notNull().default(true),
     body: text("body").notNull().default(""),
   },
