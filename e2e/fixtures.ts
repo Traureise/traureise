@@ -7,13 +7,15 @@ export function isAllowedUrl(rawUrl: string, baseURL: string): boolean {
   return url.host === new URL(baseURL).host;
 }
 
-type Fixtures = { thirdPartyRequests: string[] };
+type Fixtures = { thirdPartyRequests: string[]; clientAddress: string };
 
-/**
- * Every test records requests to foreign hosts and fails if there were any.
- * This enforces "no runtime dependency on third-party services" across all E2E flows.
- */
+const randomIp = () => `10.${[0, 0, 0].map(() => Math.floor(Math.random() * 250) + 1).join(".")}`;
+
 export const test = base.extend<Fixtures>({
+  /**
+   * Every test records requests to foreign hosts and fails if there were any.
+   * This enforces "no runtime requests to third-party services" across all E2E flows.
+   */
   thirdPartyRequests: [
     async ({ context, baseURL }, use) => {
       const foreign: string[] = [];
@@ -22,6 +24,15 @@ export const test = base.extend<Fixtures>({
       });
       await use(foreign);
       expect(foreign, "requests to third-party hosts").toEqual([]);
+    },
+    { auto: true },
+  ],
+  /** Each test appears to come from its own address, so login rate limits never couple tests. */
+  clientAddress: [
+    async ({ context }, use) => {
+      const ip = randomIp();
+      await context.setExtraHTTPHeaders({ "x-forwarded-for": ip });
+      await use(ip);
     },
     { auto: true },
   ],
