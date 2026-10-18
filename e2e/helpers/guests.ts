@@ -13,7 +13,13 @@ export const websiteIdOf = (editorUrl: string) => /\/websites\/([0-9a-f-]{36})\/
 export const household = (page: Page, name: string) => page.getByTestId("household").filter({ has: page.getByRole("heading", { name, exact: true }) });
 
 /** Adds a household from the Gäste page; `events` limits the invitation to those events. */
-export async function addHousehold(page: Page, name: string, people: { name: string; child?: boolean }[], events?: { uninvite: string[] }) {
+export async function addHousehold(
+  page: Page,
+  name: string,
+  people: { name: string; child?: boolean }[],
+  events?: { uninvite: string[] },
+  extra: { email?: string; personalLine?: string } = {},
+) {
   await page.getByRole("button", { name: "Haushalt hinzufügen" }).click();
   const form = page.getByRole("form", { name: "Neuer Haushalt" });
   await form.getByLabel("Name des Haushalts").fill(name);
@@ -23,6 +29,8 @@ export async function addHousehold(page: Page, name: string, people: { name: str
     if (person.child) await form.getByTestId("household-person").nth(i).getByLabel("Kind").check();
   }
   for (const event of events?.uninvite ?? []) await form.getByLabel(event, { exact: true }).uncheck();
+  if (extra.email) await form.getByLabel("E-Mail-Adresse (optional)").fill(extra.email);
+  if (extra.personalLine) await form.getByLabel("Persönliche Zeile für die Dankeskarte (optional)").fill(extra.personalLine);
   await form.getByRole("button", { name: "Speichern" }).click();
   await expect(form).toBeHidden();
   await expect(household(page, name)).toBeVisible();

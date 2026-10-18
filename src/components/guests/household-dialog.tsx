@@ -14,7 +14,16 @@ import { Label } from "@/components/ui/label";
 import type { FieldErrors } from "@/domain/result";
 
 type Person = { key: string; id: string | null; name: string; isChild: boolean };
-export type HouseholdDraft = { id: string; name: string; invitedEventIds: string[] | null; people: { id: string; name: string; isChild: boolean }[] };
+export type HouseholdDraft = {
+  id: string;
+  name: string;
+  invitedEventIds: string[] | null;
+  email: string | null;
+  personalLine: string;
+  /** The household asked for no more emails (which cleared the address). */
+  unsubscribed: boolean;
+  people: { id: string; name: string; isChild: boolean }[];
+};
 
 let counter = 0;
 const newPerson = (): Person => ({ key: `new-${++counter}`, id: null, name: "", isChild: false });
@@ -30,12 +39,16 @@ export function HouseholdDialog({ websiteId, events, household }: { websiteId: s
   const [name, setName] = useState(household?.name ?? "");
   const [people, setPeople] = useState<Person[]>(household ? household.people.map((p) => ({ ...p, key: p.id })) : [newPerson()]);
   const [invited, setInvited] = useState<string[]>(household?.invitedEventIds ?? events.map((e) => e.id));
+  const [email, setEmail] = useState(household?.email ?? "");
+  const [personalLine, setPersonalLine] = useState(household?.personalLine ?? "");
   const idPrefix = household ? `household-${household.id}` : "household-new";
 
   function reset() {
     setErrors({});
     if (!household) {
       setName("");
+      setEmail("");
+      setPersonalLine("");
       setPeople([newPerson()]);
       setInvited(events.map((e) => e.id));
     }
@@ -48,6 +61,8 @@ export function HouseholdDialog({ websiteId, events, household }: { websiteId: s
       const result = await saveHouseholdAction(websiteId, household?.id ?? null, {
         name,
         invitedEventIds: allInvited ? null : invited,
+        email,
+        personalLine,
         people: people.map(({ id, name, isChild }) => ({ id, name, isChild })),
       });
       if (!result.ok) {
@@ -111,6 +126,19 @@ export function HouseholdDialog({ websiteId, events, household }: { websiteId: s
             </Button>
             <FieldError code={errors.people} />
           </fieldset>
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-email`}>{t("email")}</Label>
+            <Input id={`${idPrefix}-email`} type="email" value={email} onChange={(e) => setEmail(e.target.value)} aria-describedby={`${idPrefix}-email-hint`} />
+            <p id={`${idPrefix}-email-hint`} className="text-xs text-muted-foreground">
+              {household?.unsubscribed ? t("emailUnsubscribed") : t("emailHint")}
+            </p>
+            <FieldError code={errors.email} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-personal-line`}>{t("personalLine")}</Label>
+            <Input id={`${idPrefix}-personal-line`} value={personalLine} onChange={(e) => setPersonalLine(e.target.value)} placeholder={t("personalLinePlaceholder")} />
+            <FieldError code={errors.personalLine} />
+          </div>
           {events.length > 0 && (
             <fieldset className="space-y-2">
               <legend className="text-sm font-medium">{t("invitedTo")}</legend>

@@ -1,19 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { Download, Lock, MessageCircle } from "lucide-react";
+import { Download, Lock, Mail, MessageCircle } from "lucide-react";
 import type { GuestListEntry, GuestPage } from "@/application/guests";
+import { CardSendButtons, ReminderButton, RemindAllButton, SendAllButton } from "@/components/guests/card-sending";
 import { CopyLinkButton } from "@/components/guests/copy-link-button";
 import { DeleteHouseholdButton, RequestActions } from "@/components/guests/guest-actions";
 import { HouseholdDialog } from "@/components/guests/household-dialog";
 import { PieChart } from "@/components/guests/pie-chart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cardCounts, deliveryStatus, emailRecipients, sentAt, type DeliveryStatus, type HouseholdCardKind } from "@/domain/cards";
 import { whatsappUrl, type HouseholdStatus } from "@/domain/guests";
 import { loadGuestPage } from "@/lib/guests";
 import { cn } from "@/lib/utils";
 
-type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ status?: string }> };
+type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ status?: string; karte?: string; versand?: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { page } = await loadGuestPage((await params).id);
@@ -21,6 +23,36 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 const STATUSES: HouseholdStatus[] = ["open", "answered", "declined"];
+/** Filters by what happened with the chosen card ("Einladung nicht geöffnet"). */
+const DELIVERY_FILTERS = {
+  "nicht-gesendet": (s: DeliveryStatus) => s === "notSent" || s === "queued" || s === "failed",
+  "nicht-geoeffnet": (s: DeliveryStatus) => s === "sent",
+  geoeffnet: (s: DeliveryStatus) => s === "opened",
+} as const;
+type DeliveryFilter = keyof typeof DELIVERY_FILTERS;
+
+/** Sent how and when, or opened when: one line per household and card. */
+async function DeliveryBadge({ entry, kind, timeZone }: { entry: GuestListEntry; kind: HouseholdCardKind; timeZone: string }) {
+  const t = await getTranslations("guests.sending.status");
+  const format = await getFormatter();
+  const d = entry.deliveries[kind];
+  const status = deliveryStatus(d);
+  const date = (at: Date | null) => (at ? format.dateTime(at, { dateStyle: "medium", timeStyle: "short", timeZone }) : "");
+  const via = d?.emailedAt && (!d.sharedAt || d.emailedAt <= d.sharedAt) ? "email" : (d?.sharedVia ?? "link");
+  const label =
+    status === "opened"
+      ? t("opened", { date: date(d!.openedAt) })
+      : status === "sent"
+        ? t(`sent.${via}`, { date: date(sentAt(d)) })
+        : status === "failed"
+          ? t("failed")
+          : t(status);
+  return (
+    <Badge variant={status === "opened" ? "secondary" : "outline"} data-testid="delivery-status" data-status={status}>
+      {label}
+    </Badge>
+  );
+}
 const COLORS = { coming: "var(--color-primary)", notComing: "var(--color-muted-foreground)", open: "color-mix(in srgb, var(--color-primary) 22%, white)" };
 
 function Card({ title, children, testId, className }: { title: string; children: React.ReactNode; testId: string; className?: string }) {
@@ -183,16 +215,31 @@ async function HouseholdDetails({ entry, page }: { entry: GuestListEntry; page: 
 
 export default async function GuestsPage({ params, searchParams }: Props) {
   const { id } = await params;
-  const { status: statusParam } = await searchParams;
+  const { status: statusParam, karte, versand } = await searchParams;
   const { page } = await loadGuestPage(id);
   const t = await getTranslations("guests");
   const tStatus = await getTranslations("guests.status");
+  const tSending = await getTranslations("guests.sending");
+  const tKinds = await getTranslations("cardKinds");
   const format = await getFormatter();
   const status = STATUSES.find((s) => s === statusParam);
-  const shown = status ? page.households.filter((h) => h.status === status) : page.households;
+  const card = page.cards.find((c) => c.kind === karte) ?? null;
+  const deliveryFilter = card && versand && versand in DELIVERY_FILTERS ? (versand as DeliveryFilter) : null;
+  const shown = page.households
+    .filter((h) => !status || h.status === status)
+    .filter((h) => !card || !deliveryFilter || DELIVERY_FILTERS[deliveryFilter](deliveryStatus(h.deliveries[card.kind])));
   const base = `/websites/${id}/gaeste`;
+  const query = (patch: Record<string, string | undefined>) => {
+    const all: Record<string, string | undefined> = { status, karte: card?.kind, versand: deliveryFilter ?? undefined, ...patch };
+    const params = new URLSearchParams(Object.entries(all).flatMap(([k, v]) => (v ? [[k, v]] : [])));
+    return params.size ? `${base}?${params}` : base;
+  };
   const whatsappMessage = page.settings.whatsappMessage ?? t("list.whatsappDefault", { title: page.website.title });
   const locked = page.billingEnabled && !page.sending;
+  const openHouseholds = page.households.filter((h) => h.status === "open");
+  const remindable = page.sending || page.emailReminders;
+  const counts = card ? cardCounts(page.households.map((h) => h.deliveries[card.kind])) : null;
+  const recipients = card ? emailRecipients(page.households.map((h) => ({ ...h, delivery: h.deliveries[card.kind] }))).length : 0;
 
   return (
     <div className="space-y-10">
@@ -231,78 +278,169 @@ export default async function GuestsPage({ params, searchParams }: Props) {
             <HouseholdDialog websiteId={id} events={page.events} />
           </div>
         </div>
-        <nav aria-label={t("list.filter")} className="flex flex-wrap gap-2 text-sm">
-          {[undefined, ...STATUSES].map((s) => {
-            const count = s ? page.households.filter((h) => h.status === s).length : page.households.length;
-            return (
+
+        {page.cards.length > 0 && (
+          <nav aria-label={tSending("choose")} className="flex flex-wrap items-center gap-2 text-sm" data-testid="card-picker">
+            <span className="text-muted-foreground">{tSending("choose")}</span>
+            {[null, ...page.cards.map((c) => c.kind)].map((kind) => (
               <Link
-                key={s ?? "all"}
-                href={s ? `${base}?status=${s}` : base}
-                aria-current={s === status ? "page" : undefined}
-                className={cn("rounded-full border px-3 py-1", s === status ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary/40")}
+                key={kind ?? "rsvp"}
+                href={query({ karte: kind ?? undefined, versand: undefined })}
+                aria-current={(card?.kind ?? null) === kind ? "page" : undefined}
+                className={cn("rounded-full border px-3 py-1", (card?.kind ?? null) === kind ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary/40")}
               >
-                {t("list.filterItem", { label: s ? tStatus(s) : t("list.all"), count })}
+                {kind ? tKinds(kind) : tSending("rsvpLink")}
               </Link>
-            );
-          })}
-        </nav>
+            ))}
+          </nav>
+        )}
+
+        {card && counts && (
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-4" data-testid="card-sending">
+            <p className="text-sm" data-testid="card-sending-counts">
+              {tSending("counts", counts)}
+            </p>
+            <div className="ml-auto flex flex-wrap gap-2">
+              {!card.active ? (
+                <Button asChild>
+                  <Link href="/preise">
+                    <Lock aria-hidden />
+                    {tSending("unlock")}
+                  </Link>
+                </Button>
+              ) : page.emailSending ? (
+                <SendAllButton websiteId={id} kind={card.kind} count={recipients} />
+              ) : (
+                <Button asChild variant="outline">
+                  <Link href="/preise">
+                    <Lock aria-hidden />
+                    {tSending("emailLocked")}
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <nav aria-label={t("list.filter")} className="flex flex-wrap gap-2 text-sm">
+            {[undefined, ...STATUSES].map((s) => {
+              const count = s ? page.households.filter((h) => h.status === s).length : page.households.length;
+              return (
+                <Link
+                  key={s ?? "all"}
+                  href={query({ status: s })}
+                  aria-current={s === status ? "page" : undefined}
+                  className={cn("rounded-full border px-3 py-1", s === status ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary/40")}
+                >
+                  {t("list.filterItem", { label: s ? tStatus(s) : t("list.all"), count })}
+                </Link>
+              );
+            })}
+          </nav>
+          {remindable && (!card || card.kind === "invitation") && (
+            <RemindAllButton websiteId={id} open={openHouseholds.length} withEmail={page.emailReminders && page.cards.some((c) => c.kind === "invitation") ? openHouseholds.filter((h) => h.email).length : 0} />
+          )}
+        </div>
+        {card && (
+          <nav aria-label={tSending("filter")} className="flex flex-wrap gap-2 text-sm" data-testid="delivery-filter">
+            {[undefined, ...(Object.keys(DELIVERY_FILTERS) as DeliveryFilter[])].map((f) => (
+              <Link
+                key={f ?? "all"}
+                href={query({ versand: f })}
+                aria-current={f === (deliveryFilter ?? undefined) ? "page" : undefined}
+                className={cn("rounded-full border px-3 py-1", f === (deliveryFilter ?? undefined) ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary/40")}
+              >
+                {f ? tSending(`filters.${f}`, { kind: tKinds(card.kind) }) : t("list.all")}
+              </Link>
+            ))}
+          </nav>
+        )}
         {shown.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-border px-6 py-10 text-muted-foreground" data-testid="guests-empty">
             {page.households.length === 0 ? t("list.empty") : t("list.emptyFilter")}
           </p>
         ) : (
           <ul className="space-y-3">
-            {shown.map((h) => (
-              <li key={h.id} className="space-y-3 rounded-2xl border border-border bg-card p-4" data-testid="household">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h3 className="font-heading text-xl font-medium">{h.name}</h3>
-                  <Badge variant={h.status === "open" ? "outline" : "secondary"} data-testid="household-status">
-                    {tStatus(h.status)}
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">{t("list.people", { count: h.people.length, names: h.people.map((p) => p.name).join(", ") })}</span>
-                  {h.invitedEventIds && page.events.length > 0 && (
-                    <span className="text-sm text-muted-foreground">{t("list.invitedTo", { events: h.events.map((e) => e.name).join(", ") || t("list.noEvent") })}</span>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {h.link ? (
-                    <>
-                      <CopyLinkButton url={h.link} household={h.name} />
-                      <Button asChild variant="secondary" size="sm">
-                        <a href={whatsappUrl(whatsappMessage, h.name, h.link)} target="_blank" rel="noopener noreferrer">
-                          <MessageCircle aria-hidden />
-                          {t("list.whatsapp")}
-                        </a>
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button asChild variant="secondary" size="sm">
-                        <Link href="/preise">
-                          <Lock aria-hidden />
-                          {t("list.copyLink")}
-                        </Link>
-                      </Button>
-                      <Button asChild variant="secondary" size="sm">
-                        <Link href="/preise">
-                          <Lock aria-hidden />
-                          {t("list.whatsapp")}
-                        </Link>
-                      </Button>
-                    </>
-                  )}
-                  <span className="ml-auto flex gap-1">
-                    <HouseholdDialog
-                      websiteId={id}
-                      events={page.events}
-                      household={{ id: h.id, name: h.name, invitedEventIds: h.invitedEventIds, people: h.people.map((p) => ({ id: p.id, name: p.name, isChild: p.isChild })) }}
-                    />
-                    <DeleteHouseholdButton websiteId={id} householdId={h.id} name={h.name} />
-                  </span>
-                </div>
-                <HouseholdDetails entry={h} page={page} />
-              </li>
-            ))}
+            {shown.map((h) => {
+              const household = h.link ? { id: h.id, name: h.name, email: h.email, link: h.link } : null;
+              return (
+                <li key={h.id} className="space-y-3 rounded-2xl border border-border bg-card p-4" data-testid="household">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h3 className="font-heading text-xl font-medium">{h.name}</h3>
+                    <Badge variant={h.status === "open" ? "outline" : "secondary"} data-testid="household-status">
+                      {tStatus(h.status)}
+                    </Badge>
+                    {card && <DeliveryBadge entry={h} kind={card.kind} timeZone={page.website.timezone} />}
+                    <span className="text-sm text-muted-foreground">{t("list.people", { count: h.people.length, names: h.people.map((p) => p.name).join(", ") })}</span>
+                    {h.invitedEventIds && page.events.length > 0 && (
+                      <span className="text-sm text-muted-foreground">{t("list.invitedTo", { events: h.events.map((e) => e.name).join(", ") || t("list.noEvent") })}</span>
+                    )}
+                    <span className="inline-flex items-center gap-1 text-sm text-muted-foreground" data-testid="household-channel">
+                      {h.email ? <Mail className="size-3.5" aria-hidden /> : <MessageCircle className="size-3.5" aria-hidden />}
+                      {h.email ? tSending("channelEmail", { email: h.email }) : h.unsubscribedAt ? tSending("channelUnsubscribed") : tSending("channelLink")}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {card && household && card.active ? (
+                      <CardSendButtons
+                        websiteId={id}
+                        kind={card.kind}
+                        household={household}
+                        message={card.message}
+                        emailSending={page.emailSending}
+                        excluded={h.deliveries[card.kind]?.excluded ?? false}
+                      />
+                    ) : !card && h.link ? (
+                      <>
+                        <CopyLinkButton url={h.link} household={h.name} />
+                        <Button asChild variant="secondary" size="sm">
+                          <a href={whatsappUrl(whatsappMessage, h.name, h.link)} target="_blank" rel="noopener noreferrer">
+                            <MessageCircle aria-hidden />
+                            {t("list.whatsapp")}
+                          </a>
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button asChild variant="secondary" size="sm">
+                          <Link href="/preise">
+                            <Lock aria-hidden />
+                            {t("list.copyLink")}
+                          </Link>
+                        </Button>
+                        <Button asChild variant="secondary" size="sm">
+                          <Link href="/preise">
+                            <Lock aria-hidden />
+                            {t("list.whatsapp")}
+                          </Link>
+                        </Button>
+                      </>
+                    )}
+                    {household && h.status === "open" && remindable && (!card || card.kind === "invitation") && (
+                      <ReminderButton websiteId={id} household={household} byEmail={page.emailReminders && page.cards.some((c) => c.kind === "invitation")} message={page.reminderMessage} />
+                    )}
+                    <span className="ml-auto flex gap-1">
+                      <HouseholdDialog
+                        websiteId={id}
+                        events={page.events}
+                        household={{
+                          id: h.id,
+                          name: h.name,
+                          invitedEventIds: h.invitedEventIds,
+                          email: h.email,
+                          personalLine: h.personalLine,
+                          unsubscribed: !!h.unsubscribedAt && !h.email,
+                          people: h.people.map((p) => ({ id: p.id, name: p.name, isChild: p.isChild })),
+                        }}
+                      />
+                      <DeleteHouseholdButton websiteId={id} householdId={h.id} name={h.name} />
+                    </span>
+                  </div>
+                  <HouseholdDetails entry={h} page={page} />
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

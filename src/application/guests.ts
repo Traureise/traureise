@@ -62,6 +62,8 @@ export type GuestPage = {
   /** Email sending and email reminders (Einladungen tier, or no billing). */
   emailSending: boolean;
   emailReminders: boolean;
+  /** WhatsApp text of reminders ("{name}" is the household). */
+  reminderMessage: string;
 };
 
 export class GetGuestPage {
@@ -96,6 +98,7 @@ export class GetGuestPage {
       }),
       emailSending: ctx.can("emailSending"),
       emailReminders: ctx.can("emailReminders"),
+      reminderMessage: ctx.cards.find((c) => c.kind === "invitation")?.reminderMessage ?? this.deps.cardTexts.reminderMessage,
     };
   }
 }

@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 
 /** QR code is rendered in the browser (no external service), so sharing works offline. */
-export function ShareDialog({ url, slug }: { url: string; slug: string }) {
+export function ShareDialog({ url, slug, title }: { url: string; slug: string; title?: string }) {
   const t = useTranslations("dashboard");
   const [open, setOpen] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
@@ -54,7 +54,7 @@ export function ShareDialog({ url, slug }: { url: string; slug: string }) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle className="font-heading text-2xl font-medium">{t("share.title")}</DialogTitle>
+          <DialogTitle className="font-heading text-2xl font-medium">{title ?? t("share.title")}</DialogTitle>
         </DialogHeader>
         <div className="flex aspect-square items-center justify-center rounded-xl border bg-white p-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -49,3 +49,32 @@ export async function waitForMail(request: APIRequestContext, to: string, subjec
     .toBe(true);
   return text;
 }
+
+export type MailpitMessage = { ID: string; Subject: string; Text: string; HTML: string; From: { Name: string; Address: string }; Inline: { ContentType: string; ContentID: string }[] };
+
+/** Every email to `to` whose subject contains `subject`, newest first (full messages). */
+export async function messagesFor(request: APIRequestContext, to: string, subject = ""): Promise<MailpitMessage[]> {
+  const query = subject ? `to:"${to}" subject:"${subject}"` : `to:"${to}"`;
+  const res = await request.get(`${MAILPIT_URL}/api/v1/search`, { params: { query } });
+  const list = ((await res.json()) as { messages: Summary[] }).messages;
+  return Promise.all(list.map(async (m) => (await (await request.get(`${MAILPIT_URL}/api/v1/message/${m.ID}`)).json()) as MailpitMessage));
+}
+
+/** Waits until `count` emails to `to` with `subject` arrived, and returns them. */
+export async function waitForMessages(request: APIRequestContext, to: string, subject: string, count = 1): Promise<MailpitMessage[]> {
+  let found: MailpitMessage[] = [];
+  await expect
+    .poll(
+      async () => {
+        found = await messagesFor(request, to, subject);
+        return found.length;
+      },
+      { timeout: 20_000, message: `${count} email(s) "${subject}" to ${to}` },
+    )
+    .toBe(count);
+  return found;
+}
+
+export async function messageHeaders(request: APIRequestContext, id: string): Promise<Record<string, string[]>> {
+  return (await request.get(`${MAILPIT_URL}/api/v1/message/${id}/headers`)).json();
+}

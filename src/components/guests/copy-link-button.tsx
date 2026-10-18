@@ -6,12 +6,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 /** Copies a household's personal link; on plain http (no Clipboard API) it falls back to a hidden field. */
-export function CopyLinkButton({ url, household }: { url: string; household: string }) {
+export function CopyLinkButton({ url, household, onCopied }: { url: string; household: string; onCopied?: () => void }) {
   const t = useTranslations("guests.list");
   async function copy() {
     try {
       await navigator.clipboard.writeText(url);
       toast.success(t("linkCopied", { household }));
+      onCopied?.();
     } catch {
       const field = document.createElement("textarea");
       field.value = url;
@@ -19,8 +20,10 @@ export function CopyLinkButton({ url, household }: { url: string; household: str
       field.select();
       const ok = document.execCommand("copy");
       field.remove();
-      if (ok) toast.success(t("linkCopied", { household }));
-      else toast.error(t("copyFailed"));
+      if (ok) {
+        toast.success(t("linkCopied", { household }));
+        onCopied?.();
+      } else toast.error(t("copyFailed"));
     }
   }
   return (

@@ -5,7 +5,7 @@ import { createWebsite } from "./helpers/editor";
 
 const STUB_URL = process.env.E2E_CREEM_STUB_URL ?? "http://localhost:4010";
 
-test("the pricing page lists every tier, and unreleased ones cannot be bought", async ({ page }) => {
+test("the pricing page lists every tier, and all of them can be bought", async ({ page }) => {
   await page.goto("/");
   await page.getByTestId("app-footer").getByRole("link", { name: "Preise" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Preise" })).toBeVisible();
@@ -17,10 +17,9 @@ test("the pricing page lists every tier, and unreleased ones cannot be bought", 
   await expect(tier("complete").getByTestId("tier-price")).toHaveText(/^149\s€$/);
   await expect(page.getByText("inkl. MwSt.", { exact: false })).toBeVisible();
 
-  await expect(tier("rsvp").getByRole("link", { name: "Anmelden, um zu kaufen" })).toBeVisible();
-  for (const id of ["invitations", "complete"]) {
-    await expect(tier(id).getByTestId("coming-soon")).toHaveText("bald verfügbar");
-    await expect(tier(id).getByRole("button")).toHaveCount(0);
+  for (const id of ["rsvp", "invitations", "complete"]) {
+    await expect(tier(id).getByRole("link", { name: "Anmelden, um zu kaufen" })).toBeVisible();
+    await expect(tier(id).getByTestId("coming-soon")).toHaveCount(0);
   }
 });
 

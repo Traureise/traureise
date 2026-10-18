@@ -290,22 +290,23 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
     await guest.close();
   });
 
-  await test.step("placeholder tabs show empty states", async () => {
+  await test.step("card tabs show empty states until a card exists; there is no archive", async () => {
     await page.goto("/dashboard");
     const expectations: [string, string][] = [
       ["Save the Dates", "Deine Save the Dates erscheinen hier"],
       ["Einladungen", "Deine Einladungen erscheinen hier"],
       ["Karten", "Deine Karten erscheinen hier"],
-      ["Archiviert", "Archivierte Entwürfe erscheinen hier"],
     ];
     for (const [tab, text] of expectations) {
       await page.getByRole("link", { name: tab, exact: true }).click();
       await expect(page.getByTestId("empty-state")).toContainText(text);
     }
+    await expect(page.getByRole("link", { name: "Archiviert" })).toHaveCount(0);
     await page.getByRole("button", { name: "Erstellen", exact: true }).click();
     await page.getByRole("menuitem", { name: "Einladung" }).click();
-    await expect(page).toHaveURL(/tab=invitations/);
-    await expect(page.getByTestId("empty-state")).toContainText("Deine Einladungen erscheinen hier");
+    await expect(page).toHaveURL(/\/websites\/[0-9a-f-]{36}\/karten\/einladung$/);
+    await page.goto("/dashboard?tab=invitations");
+    await expect(page.getByTestId("card-item")).toHaveCount(1);
   });
 
   await test.step("another user cannot see or edit the website", async () => {

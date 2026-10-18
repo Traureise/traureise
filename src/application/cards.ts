@@ -13,6 +13,7 @@ import {
   sentAt,
   type CardDesign,
   type CardKind,
+  type CardLabels,
   type CardModel,
   type HouseholdCardKind,
   type SharedVia,
@@ -112,7 +113,7 @@ export class CreateCard {
       paletteId: sameTheme ? website.paletteId : null,
       fontPairingId: sameTheme ? website.fontPairingId : null,
       layoutId: cardLayoutsFor(theme, kind)[0]?.id ?? null,
-      envelope: kind !== "engagement",
+      envelope: true,
       photoKey: website.coverImageKey,
       content: { ...defaultCardContent(kind, website, this.deps.cardTexts.defaults[kind]), eventId: kind === "invitation" ? (main?.id ?? null) : null },
       message: null,
@@ -138,6 +139,8 @@ export type CardEditor = {
   billingEnabled: boolean;
   defaultMessage: string;
   defaultReminderMessage: string;
+  /** For the live preview, which builds the card in the browser with the same rules. */
+  labels: CardLabels;
 };
 
 export class GetCardEditor {
@@ -168,6 +171,7 @@ export class GetCardEditor {
       billingEnabled: this.deps.billing.enabled,
       defaultMessage: this.deps.cardTexts.defaults[kind].message,
       defaultReminderMessage: this.deps.cardTexts.reminderMessage,
+      labels: this.deps.cardTexts.labels,
     };
   }
 }
