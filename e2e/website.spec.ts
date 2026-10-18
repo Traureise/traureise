@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Page } from "@playwright/test";
-import { expect, test } from "./fixtures";
+import { expect, recordForeignRequests, test } from "./fixtures";
 import { login, uniqueEmail } from "./helpers/auth";
 import {
   addItem,
@@ -310,9 +310,7 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
 
   await test.step("another user cannot see or edit the website", async () => {
     const ben = await browser.newContext({ extraHTTPHeaders: { "x-forwarded-for": "10.200.0.1" } });
-    ben.on("request", (r) => {
-      if (new URL(r.url()).host !== new URL(baseURL!).host && !r.url().startsWith("data:")) thirdPartyRequests.push(r.url());
-    });
+    const benForeign = recordForeignRequests(ben, baseURL!);
     const benPage = await ben.newPage();
     await login(benPage, uniqueEmail("ben"), "Ben");
     await expect(benPage.getByTestId("website-card")).toHaveCount(0);
@@ -322,6 +320,7 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
       await expect(benPage.getByRole("heading", { name: "Seite nicht gefunden" })).toBeVisible();
     }
     await ben.close();
+    thirdPartyRequests.push(...benForeign);
   });
 
   await test.step("delete the website", async () => {
