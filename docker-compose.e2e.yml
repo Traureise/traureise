@@ -1,0 +1,79 @@
+# E2E test stack: the regular stack plus a second app instance with billing switched on, paying
+# through a local Creem stub. Never use this for a real deployment.
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build --wait
+x-blank-operator: &blank-operator
+  # The default app tests the "not configured" legal pages, whatever the local .env says.
+  OPERATOR_NAME: ""
+  OPERATOR_BUSINESS_NAME: ""
+  OPERATOR_ADDRESS: ""
+  OPERATOR_EMAIL: ""
+  OPERATOR_PHONE: ""
+  OPERATOR_VAT_ID: ""
+  OPERATOR_VAT_NOTE: ""
+  OPERATOR_CONTENT_RESPONSIBLE: ""
+  OPERATOR_DISPUTE_RESOLUTION: ""
+  PRIVACY_HOSTING_PROVIDER: ""
+  PRIVACY_SMTP_PROVIDER: ""
+  BILLING_ENABLED: "false"
+
+services:
+  app:
+    environment:
+      <<: *blank-operator
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+
+  creem-stub:
+    image: node:24-bookworm-slim
+    command: ["node", "/stub/server.mjs"]
+    volumes:
+      - ./e2e/creem-stub:/stub:ro
+    environment:
+      PORT: "4010"
+      PUBLIC_URL: http://localhost:4010
+      API_KEY: creem_test_e2e
+      WEBHOOK_SECRET: whsec_e2e
+      WEBHOOK_URL: http://app-billing:3000/api/billing/webhook
+    ports:
+      - "127.0.0.1:4010:4010"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4010/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app-billing:
+    image: traureise:local
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      APP_URL: http://localhost:3001
+      BILLING_ENABLED: "true"
+      CREEM_API_URL: http://creem-stub:4010
+      CREEM_API_KEY: creem_test_e2e
+      CREEM_WEBHOOK_SECRET: whsec_e2e
+      CREEM_PRODUCT_RSVP: prod_e2e_rsvp
+      CREEM_PRODUCT_INVITATIONS: prod_e2e_invitations
+      CREEM_PRODUCT_COMPLETE: prod_e2e_complete
+      BILLING_TEST_UNLOCK_TIERS: rsvp
+      # Fictitious operator, to test the configured legal pages.
+      OPERATOR_NAME: Erika Musterfrau
+      OPERATOR_BUSINESS_NAME: Musterfrau Hochzeitsdienste
+      OPERATOR_ADDRESS: Musterstraße 1, 12345 Musterstadt, Deutschland
+      OPERATOR_EMAIL: kontakt@example.org
+      OPERATOR_PHONE: "+49 30 1234567"
+      OPERATOR_VAT_ID: ""
+      OPERATOR_VAT_NOTE: Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).
+      OPERATOR_CONTENT_RESPONSIBLE: Erika Musterfrau, Anschrift wie oben
+      OPERATOR_DISPUTE_RESOLUTION: Wir sind nicht bereit und nicht verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
+      PRIVACY_HOSTING_PROVIDER: Beispiel Hosting GmbH, Musterstadt
+      PRIVACY_SMTP_PROVIDER: Beispiel Mail GmbH, Musterstadt
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      # The default app runs the migrations first; two instances migrating at once could collide.
+      app:
+        condition: service_healthy
+      creem-stub:
+        condition: service_healthy
