@@ -31,3 +31,21 @@ export async function watchInbox(request: APIRequestContext, to: string) {
     },
   };
 }
+
+/** Waits for an email to `to` whose subject contains `subject`, and returns its text. */
+export async function waitForMail(request: APIRequestContext, to: string, subject: string): Promise<string> {
+  let text = "";
+  await expect
+    .poll(
+      async () => {
+        const res = await request.get(`${MAILPIT_URL}/api/v1/search`, { params: { query: `to:"${to}" subject:"${subject}"` } });
+        const [message] = ((await res.json()) as { messages: Summary[] }).messages;
+        if (!message) return false;
+        text = (await (await request.get(`${MAILPIT_URL}/api/v1/message/${message.ID}`)).json()).Text as string;
+        return true;
+      },
+      { timeout: 15_000, message: `email "${subject}" to ${to}` },
+    )
+    .toBe(true);
+  return text;
+}
