@@ -10,7 +10,6 @@ const config = [
   {
     // Every user-facing string lives in messages/*.json (German-first i18n).
     files: ["src/app/**/*.tsx", "src/components/**/*.tsx"],
-    ignores: ["src/components/ui/**"],
     rules: {
       "react/jsx-no-literals": ["error", { noStrings: true, ignoreProps: true, allowedStrings: ["·", "|", "–", "—", "&", "#", "/", ":", "×", "%"] }],
     },

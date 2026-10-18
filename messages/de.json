@@ -315,6 +315,7 @@
     "previewNote": "Vorschau"
   },
   "common": {
-    "closeNotice": "Hinweis schließen"
+    "closeNotice": "Hinweis schließen",
+    "close": "Schließen"
   }
 }
