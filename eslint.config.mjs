@@ -5,7 +5,7 @@ const config = [
   ...nextVitals,
   ...nextTs,
   {
-    ignores: [".secrets/**", ".playwright-mcp/**", "docs/superpowers/**", ".next/**", "dist/**", "node_modules/**", "test-results/**", "playwright-report/**", "next-env.d.ts"],
+    ignores: [".secrets/**", ".playwright-mcp/**", "docs/superpowers/**", ".next/**", "dist/**", "node_modules/**", "test-results/**", "playwright-report/**", "next-env.d.ts", "site/**", ".cache/**"],
   },
   {
     // Every user-facing string lives in messages/*.json (German-first i18n).

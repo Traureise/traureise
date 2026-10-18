@@ -2,14 +2,18 @@ import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { CalendarDays, Eye, MapPin, PencilLine } from "lucide-react";
 import type { Website } from "@/application/ports";
+import type { Tier } from "@/domain/billing";
+import { Badge } from "@/components/ui/badge";
 import { LogoMark } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { dateFromIso, uploadUrl } from "@/lib/format";
 import { DeleteWebsiteButton } from "./delete-website-button";
 import { ShareDialog } from "./share-dialog";
 
-export async function WebsiteCard({ website, appUrl }: { website: Website; appUrl: string }) {
+/** `tier` is only passed when billing is on. */
+export async function WebsiteCard({ website, appUrl, tier }: { website: Website; appUrl: string; tier?: Tier }) {
   const t = await getTranslations("dashboard.card");
+  const tTiers = await getTranslations("pricing.tiers");
   const format = await getFormatter();
   const publicUrl = `${appUrl}/${website.slug}`;
   return (
@@ -25,7 +29,19 @@ export async function WebsiteCard({ website, appUrl }: { website: Website; appUr
         )}
       </div>
       <div className="flex min-w-0 flex-col gap-4">
-        <h2 className="font-heading text-3xl font-medium tracking-tight">{website.title}</h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="font-heading text-3xl font-medium tracking-tight">{website.title}</h2>
+          {tier && (
+            <Badge variant="secondary" data-testid="website-plan">
+              {t("plan", { tier: tTiers(`${tier}.name`) })}
+            </Badge>
+          )}
+          {tier && tier !== "complete" && (
+            <Link href="/preise" className="text-sm text-primary underline-offset-4 hover:underline">
+              {t("upgrade")}
+            </Link>
+          )}
+        </div>
         <dl className="space-y-1.5 text-sm">
           <div className="flex items-center gap-2">
             <dt>

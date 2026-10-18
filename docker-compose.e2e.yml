@@ -1,0 +1,64 @@
+# E2E test stack: the regular stack plus a second app instance with billing switched on, paying
+# through a local Creem stub. Never use this for a real deployment.
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build --wait
+x-no-legal-files: &no-legal-files
+  # The default app has no legal texts, whatever the local .env says: those pages must not exist there.
+  IMPRINT_FILE: ""
+  PRIVACY_FILE: ""
+  TERMS_FILE: ""
+  BILLING_ENABLED: "false"
+
+services:
+  app:
+    environment:
+      <<: *no-legal-files
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+
+  creem-stub:
+    image: node:24-bookworm-slim
+    command: ["node", "/stub/server.mjs"]
+    volumes:
+      - ./e2e/creem-stub:/stub:ro
+    environment:
+      PORT: "4010"
+      PUBLIC_URL: http://localhost:4010
+      API_KEY: creem_test_e2e
+      WEBHOOK_SECRET: whsec_e2e
+      WEBHOOK_URL: http://app-billing:3000/api/billing/webhook
+    ports:
+      - "127.0.0.1:4010:4010"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4010/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app-billing:
+    image: traureise:local
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      APP_URL: http://localhost:3001
+      BILLING_ENABLED: "true"
+      CREEM_API_URL: http://creem-stub:4010
+      CREEM_API_KEY: creem_test_e2e
+      CREEM_WEBHOOK_SECRET: whsec_e2e
+      CREEM_PRODUCT_RSVP: prod_e2e_rsvp
+      CREEM_PRODUCT_INVITATIONS: prod_e2e_invitations
+      CREEM_PRODUCT_COMPLETE: prod_e2e_complete
+      BILLING_TEST_UNLOCK_TIERS: rsvp
+      # Legal texts of a fictitious operator, to test the pages and their links.
+      IMPRINT_FILE: /legal/impressum.md
+      PRIVACY_FILE: /legal/datenschutz.md
+      TERMS_FILE: /legal/agb.md
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - uploads:/data/uploads
+      - ./e2e/legal:/legal:ro
+    depends_on:
+      # The default app runs the migrations first; two instances migrating at once could collide.
+      app:
+        condition: service_healthy
+      creem-stub:
+        condition: service_healthy

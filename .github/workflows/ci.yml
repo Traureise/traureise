@@ -72,15 +72,15 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Start the stack exactly as self-hosters do
+      - name: Start the stack as self-hosters do, plus a billing instance and the Creem stub
         run: |
           cp .env.example .env
-          docker compose up -d --build --wait --wait-timeout 300
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build --wait --wait-timeout 300
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - name: App logs
         if: failure()
-        run: docker compose logs app
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml logs app app-billing creem-stub
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

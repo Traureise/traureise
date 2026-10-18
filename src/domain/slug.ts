@@ -20,6 +20,9 @@ export const RESERVED_SLUGS = [
   "admin",
   "impressum",
   "datenschutz",
+  "preise",
+  "konto",
+  "agb",
   "hilfe",
   "_next",
 ] as const;

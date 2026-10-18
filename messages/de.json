@@ -17,7 +17,8 @@
     "title": "Eure Hochzeit, eure Website.",
     "lead": "Mit Traureise gestaltet ihr in wenigen Minuten eine Website für eure Gäste: Tagesablauf, Anreise, Fragen und Antworten. Ohne Tracking, ohne Passwort.",
     "cta": "Jetzt anmelden",
-    "dashboard": "Zum Dashboard"
+    "dashboard": "Zum Dashboard",
+    "accountDeleted": "Dein Konto und alle deine Daten wurden gelöscht."
   },
   "auth": {
     "loginTitle": "Anmelden",
@@ -66,7 +67,9 @@
     "unknown": "Etwas ist schiefgelaufen. Bitte versuche es noch einmal.",
     "notFoundTitle": "Seite nicht gefunden",
     "notFoundBody": "Diese Seite gibt es nicht oder sie gehört zu einem anderen Konto.",
-    "backHome": "Zur Startseite"
+    "backHome": "Zur Startseite",
+    "email_mismatch": "Bitte gib genau die E-Mail-Adresse deines Kontos ein.",
+    "not_available": "Dieses Paket kannst du für diese Website gerade nicht kaufen."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -102,7 +105,9 @@
       "edit": "Bearbeiten",
       "share": "Teilen",
       "delete": "Löschen",
-      "coverAlt": "Titelbild von {title}"
+      "coverAlt": "Titelbild von {title}",
+      "plan": "Paket: {tier}",
+      "upgrade": "Paket wählen"
     },
     "deleteDialog": {
       "title": "Website löschen?",
@@ -133,7 +138,8 @@
       "themeLabel": "Theme",
       "submit": "Website erstellen",
       "cancel": "Abbrechen"
-    }
+    },
+    "purchaseThanks": "Danke für deinen Kauf! Sobald die Zahlung bestätigt ist, ist dein Paket bei der Website freigeschaltet."
   },
   "editor": {
     "back": "Zurück zum Dashboard",
@@ -312,10 +318,104 @@
     "oclock": "{time} Uhr",
     "navLabel": "Abschnitte",
     "madeWith": "Erstellt mit Traureise",
-    "previewNote": "Vorschau"
+    "previewNote": "Vorschau",
+    "imprint": "Impressum",
+    "privacy": "Datenschutz",
+    "terms": "AGB"
   },
   "common": {
     "closeNotice": "Hinweis schließen",
     "close": "Schließen"
+  },
+  "footer": {
+    "label": "Rechtliches",
+    "imprint": "Impressum",
+    "privacy": "Datenschutz",
+    "pricing": "Preise",
+    "license": "Freie Software (AGPL-3.0)",
+    "terms": "AGB"
+  },
+  "legal": {
+    "imprint": "Impressum",
+    "privacy": "Datenschutzerklärung",
+    "terms": "AGB"
+  },
+  "pricing": {
+    "title": "Preise",
+    "lead": "Die Hochzeitswebsite ist kostenlos. Für mehr bezahlt ihr einmal pro Hochzeit – kein Abo, keine versteckten Kosten.",
+    "note": "Einmalpreise pro Hochzeit, inkl. MwSt. Ein Paket gilt bis 12 Monate nach eurem Hochzeitstag. Verkauf und Rechnung über unseren Zahlungsdienstleister.",
+    "free": "kostenlos",
+    "price": "{price, number, ::currency/EUR precision-integer}",
+    "once": "einmalig",
+    "included": "Immer dabei",
+    "comingSoon": "bald verfügbar",
+    "buy": "Jetzt kaufen",
+    "websiteLabel": "Für welche Website?",
+    "loginToBuy": "Anmelden, um zu kaufen",
+    "createWebsiteFirst": "Lege zuerst eine Hochzeitswebsite an.",
+    "owned": "Deine Websites haben dieses Paket schon.",
+    "checkoutFailed": "Die Bezahlseite konnte nicht geöffnet werden. Bitte versuch es noch einmal.",
+    "tiers": {
+      "website": {
+        "name": "Website",
+        "features": [
+          "Hochzeitswebsite mit allen Bereichen",
+          "QR-Code und Link zum Teilen",
+          "Themes, Farben und Schriften"
+        ]
+      },
+      "rsvp": {
+        "name": "RSVP",
+        "features": [
+          "Alles aus „Website“",
+          "Gästeliste",
+          "Zu- und Absagen auf der Website",
+          "Umfragen und Menüwahl"
+        ]
+      },
+      "invitations": {
+        "name": "Einladungen",
+        "features": [
+          "Alles aus „RSVP“",
+          "Digitale Einladungen",
+          "Save the Dates per Link oder E-Mail"
+        ]
+      },
+      "complete": {
+        "name": "Komplett",
+        "features": [
+          "Alles aus „Einladungen“",
+          "Verlobungs- und Dankeskarten",
+          "Passende Designs für alles"
+        ]
+      }
+    }
+  },
+  "account": {
+    "title": "Konto",
+    "profile": "Deine Angaben",
+    "email": "E-Mail-Adresse",
+    "firstName": "Vorname",
+    "export": {
+      "title": "Daten herunterladen",
+      "body": "Lade alle Daten deines Kontos als ZIP-Datei herunter: deine Angaben, alle Hochzeitswebsites mit ihren Inhalten (data.json) und alle hochgeladenen Bilder.",
+      "button": "ZIP-Datei herunterladen"
+    },
+    "purchases": {
+      "title": "Käufe",
+      "empty": "Du hast noch kein Paket gekauft.",
+      "item": "{tier} für „{website}“",
+      "validUntil": "gültig bis {date}",
+      "inactive": "nicht mehr aktiv",
+      "purchasedAt": "gekauft am {date}",
+      "pricing": "Zu den Preisen"
+    },
+    "delete": {
+      "title": "Konto löschen",
+      "body": "Damit löschst du dein Konto, alle Hochzeitswebsites mit ihren Inhalten und alle hochgeladenen Bilder endgültig. Deine Websites sind danach nicht mehr erreichbar. Das lässt sich nicht rückgängig machen.",
+      "confirmLabel": "Gib zur Bestätigung deine E-Mail-Adresse ein",
+      "button": "Konto endgültig löschen",
+      "deleting": "Wird gelöscht …"
+    }
   }
 }

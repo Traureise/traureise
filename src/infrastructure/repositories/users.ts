@@ -23,4 +23,8 @@ export class DrizzleUserRepository implements UserRepository {
   async updateFirstName(id: string, firstName: string): Promise<void> {
     await this.db.update(users).set({ firstName }).where(eq(users.id, id));
   }
+
+  async delete(id: string): Promise<void> {
+    await this.db.delete(users).where(eq(users.id, id));
+  }
 }

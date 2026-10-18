@@ -38,3 +38,10 @@ and its reasons are in [ADR 0005](adr/0005-gdpr-no-runtime-third-party-requests.
 
 What leaves your server depends on your configuration: your SMTP provider (login emails) and, if you
 use it, your S3 provider (photos). Prefer EU providers and sign data processing agreements with them.
+
+## Cookies, legal pages and account rights
+
+Traureise sets only two technically necessary cookies (`traureise_session`, and optionally
+`traureise_locale`), so it needs no consent banner. The operator supplies the privacy policy at `/datenschutz`
+as a Markdown file, and users can export or delete all their data themselves
+under `/konto`. See [Legal pages, account rights and billing](legal-and-billing.md).

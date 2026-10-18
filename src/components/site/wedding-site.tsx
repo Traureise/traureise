@@ -1,7 +1,10 @@
+import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 import type { RenderableSection, WebsiteView } from "@/application/views";
 import { renderableSections } from "@/application/views";
 import { dateFromIso, daysUntil, uploadUrl } from "@/lib/format";
+import { LEGAL_HREFS } from "@/components/app/app-footer";
+import { container } from "@/composition/container";
 import { siteStyle } from "./site-style";
 import { SectionBody } from "./sections";
 
@@ -10,6 +13,7 @@ type Props = { view: WebsiteView; now: Date; mode: "public" | "preview" };
 /** The guest-facing website. The editor preview renders exactly this component. */
 export async function WeddingSite({ view, now, mode }: Props) {
   const t = await getTranslations("site");
+  const legal = await container().legalPages.available();
   const tSections = await getTranslations("sections.titles");
   const format = await getFormatter();
   const { website, design } = view;
@@ -66,7 +70,14 @@ export async function WeddingSite({ view, now, mode }: Props) {
         </section>
       ))}
 
-      <footer className="site-muted px-6 py-12 text-center text-sm">{t("madeWith")}</footer>
+      <footer className="site-muted flex flex-wrap justify-center gap-x-4 gap-y-1 px-6 py-12 text-center text-xs" data-testid="site-footer">
+        <span>{t("madeWith")}</span>
+        {legal.map((page) => (
+          <Link key={page} href={LEGAL_HREFS[page]} target={mode === "preview" ? "_blank" : undefined} className="underline-offset-4 hover:underline">
+            {t(page)}
+          </Link>
+        ))}
+      </footer>
     </div>
   );
 }

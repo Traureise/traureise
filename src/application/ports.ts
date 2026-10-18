@@ -1,4 +1,5 @@
 import type { CollectionKind, ItemData, SectionKind } from "@/domain/sections";
+import type { Entitlement, PaidTier, Tier, TierOffer } from "@/domain/billing";
 import type { ThemeManifest } from "@/domain/theme";
 
 export type User = { id: string; email: string; firstName: string | null; createdAt: Date };
@@ -40,6 +41,8 @@ export interface UserRepository {
   findByEmail(email: string): Promise<User | null>;
   create(email: string): Promise<User>;
   updateFirstName(id: string, firstName: string): Promise<void>;
+  /** Deletes the user and, through the cascades, everything that belongs to them. */
+  delete(id: string): Promise<void>;
 }
 
 export type MagicLinkRecord = { id: string; email: string; expiresAt: Date; usedAt: Date | null };
@@ -49,6 +52,7 @@ export interface MagicLinkRepository {
   findByHash(tokenHash: string): Promise<MagicLinkRecord | null>;
   /** Marks the token used; returns false if it was already used (single use, race-safe). */
   markUsed(id: string, at: Date): Promise<boolean>;
+  deleteByEmail(email: string): Promise<void>;
 }
 
 export type SessionRecord = { id: string; userId: string; expiresAt: Date };
@@ -62,6 +66,8 @@ export interface SessionRepository {
 export interface RateLimiter {
   /** Records a hit for `key` and returns whether it is within `limit` hits per `windowMs`. */
   hit(key: string, limit: number, windowMs: number, now: Date): Promise<boolean>;
+  /** Drops all hits for `key`. */
+  forget(key: string): Promise<void>;
 }
 
 export interface WebsiteRepository {
@@ -84,10 +90,13 @@ export interface WebsiteRepository {
   setItemOrder(websiteId: string, kind: CollectionKind, orderedIds: string[]): Promise<void>;
 }
 
+export type UploadRecord = { key: string; websiteId: string | null; contentType: string; size: number; createdAt: Date };
+
 export interface UploadRepository {
   create(input: { key: string; ownerId: string; websiteId: string; contentType: string; size: number }): Promise<void>;
   belongsToWebsite(key: string, websiteId: string): Promise<boolean>;
   listKeysByWebsite(websiteId: string): Promise<string[]>;
+  listByOwner(ownerId: string): Promise<UploadRecord[]>;
   delete(key: string): Promise<void>;
 }
 
@@ -132,4 +141,45 @@ export interface TokenGenerator {
   generate(): string;
   /** One-way hash stored instead of the token. */
   hash(token: string): string;
+}
+
+export type EntitlementRecord = Entitlement & { id: string; websiteId: string; provider: string; createdAt: Date };
+
+export type BillingChange =
+  | { kind: "grant"; websiteId: string; tier: PaidTier; purchaseRef: string; provider: string; validUntil: Date }
+  | { kind: "revoke"; purchaseRef: string; at: Date }
+  | { kind: "none" };
+
+export interface BillingRepository {
+  /**
+   * Records the provider event id and applies the change in one transaction, at most once per event.
+   * A purchase reference is granted at most once, so a replayed payment never undoes a refund.
+   */
+  applyEvent(eventId: string, change: BillingChange): Promise<"applied" | "duplicate">;
+  listByWebsite(websiteId: string): Promise<EntitlementRecord[]>;
+  listByOwner(ownerId: string): Promise<EntitlementRecord[]>;
+}
+
+export type PaymentEvent =
+  | { type: "paid"; eventId: string; purchaseRef: string; productId: string; websiteId: string | null }
+  | { type: "revoked"; eventId: string; purchaseRef: string | null }
+  | { type: "ignored"; eventId: string };
+
+export type CheckoutRequest = { productId: string; websiteId: string; tier: PaidTier; customerEmail: string; successUrl: string; requestId: string };
+
+export interface PaymentProvider {
+  /** Identifies the provider on stored purchases, e.g. "Creem". */
+  readonly name: string;
+  /** Returns the hosted checkout page the buyer is sent to. */
+  createCheckout(request: CheckoutRequest): Promise<{ url: string }>;
+  /** Verifies the signature of a webhook (raw body) and parses it; null if the signature is invalid. */
+  parseWebhook(rawBody: string, signature: string | null): PaymentEvent | null;
+}
+
+export type BillingSettings = { enabled: boolean; offers: TierOffer[]; unlockedTiers: Tier[] };
+
+export type ArchiveEntry = { path: string; bytes: Uint8Array };
+
+export interface ArchiveWriter {
+  zip(entries: ArchiveEntry[]): Promise<Uint8Array>;
 }

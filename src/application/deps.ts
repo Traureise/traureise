@@ -1,4 +1,8 @@
 import type {
+  ArchiveWriter,
+  BillingRepository,
+  BillingSettings,
+  PaymentProvider,
   Clock,
   FileStorage,
   ImageProcessor,
@@ -29,5 +33,10 @@ export type Deps = {
   themes: ThemeCatalog;
   clock: Clock;
   tokens: TokenGenerator;
+  billing: BillingSettings;
+  billingRepo: BillingRepository;
+  /** Set only when billing is enabled and configured. */
+  payments: PaymentProvider | null;
+  archive: ArchiveWriter;
   appUrl: string;
 };

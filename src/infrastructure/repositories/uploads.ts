@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import type { UploadRepository } from "@/application/ports";
+import type { UploadRecord, UploadRepository } from "@/application/ports";
 import type { Database } from "../db/client";
 import { uploads } from "../db/schema";
 
@@ -21,6 +21,14 @@ export class DrizzleUploadRepository implements UploadRepository {
   async listKeysByWebsite(websiteId: string): Promise<string[]> {
     const rows = await this.db.select({ key: uploads.key }).from(uploads).where(eq(uploads.websiteId, websiteId));
     return rows.map((r) => r.key);
+  }
+
+  async listByOwner(ownerId: string): Promise<UploadRecord[]> {
+    return this.db
+      .select({ key: uploads.key, websiteId: uploads.websiteId, contentType: uploads.contentType, size: uploads.size, createdAt: uploads.createdAt })
+      .from(uploads)
+      .where(eq(uploads.ownerId, ownerId))
+      .orderBy(uploads.createdAt, uploads.key);
   }
 
   async delete(key: string): Promise<void> {
