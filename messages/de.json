@@ -17,7 +17,8 @@
     "title": "Eure Hochzeit, eure Website.",
     "lead": "Mit Traureise gestaltet ihr in wenigen Minuten eine Website für eure Gäste: Tagesablauf, Anreise, Fragen und Antworten. Ohne Tracking, ohne Passwort.",
     "cta": "Jetzt anmelden",
-    "dashboard": "Zum Dashboard"
+    "dashboard": "Zum Dashboard",
+    "accountDeleted": "Dein Konto und alle deine Daten wurden gelöscht."
   },
   "auth": {
     "loginTitle": "Anmelden",
@@ -66,7 +67,9 @@
     "unknown": "Etwas ist schiefgelaufen. Bitte versuche es noch einmal.",
     "notFoundTitle": "Seite nicht gefunden",
     "notFoundBody": "Diese Seite gibt es nicht oder sie gehört zu einem anderen Konto.",
-    "backHome": "Zur Startseite"
+    "backHome": "Zur Startseite",
+    "email_mismatch": "Bitte gib genau die E-Mail-Adresse deines Kontos ein.",
+    "not_available": "Dieses Paket kannst du für diese Website gerade nicht kaufen."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -102,7 +105,9 @@
       "edit": "Bearbeiten",
       "share": "Teilen",
       "delete": "Löschen",
-      "coverAlt": "Titelbild von {title}"
+      "coverAlt": "Titelbild von {title}",
+      "plan": "Paket: {tier}",
+      "upgrade": "Paket wählen"
     },
     "deleteDialog": {
       "title": "Website löschen?",
@@ -133,7 +138,8 @@
       "themeLabel": "Theme",
       "submit": "Website erstellen",
       "cancel": "Abbrechen"
-    }
+    },
+    "purchaseThanks": "Danke für deinen Kauf! Sobald die Zahlung bestätigt ist, ist dein Paket bei der Website freigeschaltet."
   },
   "editor": {
     "back": "Zurück zum Dashboard",
@@ -312,10 +318,187 @@
     "oclock": "{time} Uhr",
     "navLabel": "Abschnitte",
     "madeWith": "Erstellt mit Traureise",
-    "previewNote": "Vorschau"
+    "previewNote": "Vorschau",
+    "imprint": "Impressum",
+    "privacy": "Datenschutz"
   },
   "common": {
     "closeNotice": "Hinweis schließen",
     "close": "Schließen"
+  },
+  "footer": {
+    "label": "Rechtliches",
+    "imprint": "Impressum",
+    "privacy": "Datenschutz",
+    "pricing": "Preise",
+    "license": "Freie Software (AGPL-3.0)"
+  },
+  "legal": {
+    "notConfigured": "Die Angaben zum Betreiber dieser Instanz sind noch nicht eingerichtet. Der Betreiber muss sie in der Konfiguration ergänzen (siehe README).",
+    "imprint": {
+      "title": "Impressum",
+      "intro": "Angaben gemäß § 5 DDG",
+      "contact": "Kontakt",
+      "email": "E-Mail: {email}",
+      "phone": "Telefon: {phone}",
+      "vat": "Umsatzsteuer",
+      "vatId": "Umsatzsteuer-Identifikationsnummer gemäß § 27a UStG: {vatId}",
+      "contentResponsible": "Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV",
+      "disputeResolution": "Verbraucherstreitbeilegung",
+      "userContent": "Inhalte von Hochzeitswebsites",
+      "userContentBody": "Die Inhalte der einzelnen Hochzeitswebsites stellen die jeweiligen Paare selbst ein und verantworten sie. Wenn dir dort ein rechtswidriger Inhalt auffällt, schreib uns bitte; wir prüfen ihn und entfernen ihn gegebenenfalls umgehend."
+    },
+    "privacy": {
+      "title": "Datenschutzerklärung",
+      "intro": "Hier erfährst du, welche personenbezogenen Daten diese Traureise-Instanz verarbeitet, wozu und wie lange.",
+      "sections": {
+        "controller": {
+          "title": "Verantwortlicher",
+          "body": "Verantwortlich für die Datenverarbeitung im Sinne der DSGVO ist:"
+        },
+        "overview": {
+          "title": "Das Wichtigste in Kürze",
+          "body": "Wir verarbeiten personenbezogene Daten nur, soweit es für den Betrieb von Traureise nötig ist. Es gibt kein Tracking, keine Analysedienste, keine Werbung und keine eingebetteten Inhalte Dritter: Schriften, Skripte und Bilder liefert ausschließlich dieser Server aus."
+        },
+        "hosting": {
+          "title": "Hosting und Server-Protokolle",
+          "body": "Traureise läuft auf Servern von {provider}. Beim Aufruf jeder Seite verarbeitet der Server technisch notwendig deine IP-Adresse, Datum und Uhrzeit, die aufgerufene Adresse und die Angaben deines Browsers, um die Seite auszuliefern und den Betrieb abzusichern (Art. 6 Abs. 1 lit. f DSGVO). Mit dem Hoster besteht ein Vertrag zur Auftragsverarbeitung (Art. 28 DSGVO)."
+        },
+        "hostingUnnamed": {
+          "title": "Hosting und Server-Protokolle",
+          "body": "Traureise läuft auf Servern, die der Betreiber selbst betreibt oder bei einem Hoster in seinem Auftrag betreiben lässt. Beim Aufruf jeder Seite verarbeitet der Server technisch notwendig deine IP-Adresse, Datum und Uhrzeit, die aufgerufene Adresse und die Angaben deines Browsers, um die Seite auszuliefern und den Betrieb abzusichern (Art. 6 Abs. 1 lit. f DSGVO)."
+        },
+        "database": {
+          "title": "Konto und Hochzeitswebsites",
+          "body": "Für dein Konto speichern wir deine E-Mail-Adresse und deinen Vornamen, für jede Hochzeitswebsite die Inhalte, die du einträgst. Diese Daten liegen in einer PostgreSQL-Datenbank auf den Servern dieser Instanz. Wir verarbeiten sie, um dir Traureise bereitzustellen (Art. 6 Abs. 1 lit. b DSGVO), und speichern sie, bis du sie oder dein Konto löschst."
+        },
+        "email": {
+          "title": "E-Mail-Versand",
+          "body": "Anmeldelinks verschicken wir über {provider}. Dabei werden deine E-Mail-Adresse und der Inhalt der Nachricht übermittelt (Art. 6 Abs. 1 lit. b DSGVO)."
+        },
+        "emailUnnamed": {
+          "title": "E-Mail-Versand",
+          "body": "Anmeldelinks verschicken wir über einen E-Mail-Server des Betreibers oder eines von ihm beauftragten Dienstleisters. Dabei werden deine E-Mail-Adresse und der Inhalt der Nachricht übermittelt (Art. 6 Abs. 1 lit. b DSGVO)."
+        },
+        "storageLocal": {
+          "title": "Bilder",
+          "body": "Hochgeladene Bilder speichern wir auf den Servern dieser Instanz. Beim Hochladen rechnen wir sie neu und entfernen dabei eingebettete Metadaten wie Kameradaten und Standort (EXIF)."
+        },
+        "storageS3": {
+          "title": "Bilder",
+          "body": "Hochgeladene Bilder speichern wir im Objektspeicher von {provider} (Auftragsverarbeitung nach Art. 28 DSGVO). Beim Hochladen rechnen wir sie neu und entfernen dabei eingebettete Metadaten wie Kameradaten und Standort (EXIF). Ausgeliefert werden sie über diesen Server."
+        },
+        "storageS3Unnamed": {
+          "title": "Bilder",
+          "body": "Hochgeladene Bilder speichern wir in einem Objektspeicher, den der Betreiber beauftragt hat (Auftragsverarbeitung nach Art. 28 DSGVO). Beim Hochladen rechnen wir sie neu und entfernen dabei eingebettete Metadaten wie Kameradaten und Standort (EXIF). Ausgeliefert werden sie über diesen Server."
+        },
+        "payment": {
+          "title": "Bezahlung",
+          "body": "Kostenpflichtige Pakete verkauft {provider} ({details}) als Händler (Merchant of Record). Wenn du ein Paket kaufst, leiten wir dich auf die Bezahlseite von {provider} weiter und übermitteln dafür deine E-Mail-Adresse, das Paket und die Website, für die du es kaufst. Deine Zahlungsdaten gibst du direkt bei {provider} ein; wir erhalten nur eine Bestellnummer und das gekaufte Paket, auch bei Erstattungen. {provider} stellt die Rechnung aus und verarbeitet deine Daten in eigener Verantwortung nach seiner Datenschutzerklärung. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO; Kaufbelege bewahren wir so lange auf, wie es das Steuer- und Handelsrecht verlangt, sonst bis zur Löschung deines Kontos."
+        },
+        "cookies": {
+          "title": "Cookies",
+          "body": "Wir setzen nur technisch notwendige Cookies und brauchen deshalb keine Einwilligung (§ 25 Abs. 2 Nr. 2 TDDDG): „traureise_session“ hält dich nach der Anmeldung angemeldet, und „traureise_locale“ merkt sich auf Wunsch deine Sprache. Gäste von Hochzeitswebsites bekommen keine Cookies."
+        },
+        "login": {
+          "title": "Anmeldung ohne Passwort",
+          "body": "Wenn du einen Anmeldelink anforderst, speichern wir deine E-Mail-Adresse zusammen mit dem Link, den wir nur als nicht umkehrbaren Hash ablegen. Der Link ist {magicLinkMinutes} Minuten gültig und nur einmal nutzbar; abgelaufene Links löschen wir bei der nächsten Anforderung. Eine Anmeldung bleibt bis zu {sessionDays} Tage gültig oder bis du dich abmeldest (Art. 6 Abs. 1 lit. b DSGVO)."
+        },
+        "rateLimit": {
+          "title": "Schutz vor Missbrauch",
+          "body": "Damit niemand massenhaft Anmeldelinks anfordern kann, zählen wir Anforderungen je E-Mail-Adresse und je IP-Adresse. Diese Einträge löschen wir nach {minutes} Minuten (Art. 6 Abs. 1 lit. f DSGVO)."
+        },
+        "websites": {
+          "title": "Gäste von Hochzeitswebsites",
+          "body": "Hochzeitswebsites sind unter ihrer Adresse für alle abrufbar, die sie kennen, und für Suchmaschinen gesperrt. Über Gäste speichert die Anwendung keine Daten. Links wie „Karte ansehen“ führen zu OpenStreetMap; erst wenn du ihnen folgst, gilt die Datenschutzerklärung der jeweiligen Seite. Für die Inhalte einer Hochzeitswebsite, etwa Fotos und Namen, ist das Paar verantwortlich, das sie eingestellt hat."
+        },
+        "rights": {
+          "title": "Deine Rechte",
+          "body": "Du hast das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18), Datenübertragbarkeit (Art. 20) und Widerspruch (Art. 21). Unter „Konto“ kannst du alle deine Daten als ZIP-Datei herunterladen und dein Konto mit allen Daten selbst löschen. Für alles andere genügt eine E-Mail an den Verantwortlichen."
+        },
+        "complaint": {
+          "title": "Beschwerde",
+          "body": "Du kannst dich bei einer Datenschutz-Aufsichtsbehörde beschweren, zum Beispiel bei der für deinen Wohnort oder für den Sitz des Verantwortlichen zuständigen."
+        }
+      }
+    }
+  },
+  "pricing": {
+    "title": "Preise",
+    "lead": "Die Hochzeitswebsite ist kostenlos. Für mehr bezahlt ihr einmal pro Hochzeit – kein Abo, keine versteckten Kosten.",
+    "note": "Einmalpreise pro Hochzeit, inkl. MwSt. Ein Paket gilt bis 12 Monate nach eurem Hochzeitstag. Verkauf und Rechnung über unseren Zahlungsdienstleister.",
+    "free": "kostenlos",
+    "price": "{price, number, ::currency/EUR precision-integer}",
+    "once": "einmalig",
+    "included": "Immer dabei",
+    "comingSoon": "bald verfügbar",
+    "buy": "Jetzt kaufen",
+    "websiteLabel": "Für welche Website?",
+    "loginToBuy": "Anmelden, um zu kaufen",
+    "createWebsiteFirst": "Lege zuerst eine Hochzeitswebsite an.",
+    "owned": "Deine Websites haben dieses Paket schon.",
+    "checkoutFailed": "Die Bezahlseite konnte nicht geöffnet werden. Bitte versuch es noch einmal.",
+    "tiers": {
+      "website": {
+        "name": "Website",
+        "features": [
+          "Hochzeitswebsite mit allen Bereichen",
+          "QR-Code und Link zum Teilen",
+          "Themes, Farben und Schriften"
+        ]
+      },
+      "rsvp": {
+        "name": "RSVP",
+        "features": [
+          "Alles aus „Website“",
+          "Gästeliste",
+          "Zu- und Absagen auf der Website",
+          "Umfragen und Menüwahl"
+        ]
+      },
+      "invitations": {
+        "name": "Einladungen",
+        "features": [
+          "Alles aus „RSVP“",
+          "Digitale Einladungen",
+          "Save the Dates per Link oder E-Mail"
+        ]
+      },
+      "complete": {
+        "name": "Komplett",
+        "features": [
+          "Alles aus „Einladungen“",
+          "Verlobungs- und Dankeskarten",
+          "Passende Designs für alles"
+        ]
+      }
+    }
+  },
+  "account": {
+    "title": "Konto",
+    "profile": "Deine Angaben",
+    "email": "E-Mail-Adresse",
+    "firstName": "Vorname",
+    "export": {
+      "title": "Daten herunterladen",
+      "body": "Lade alle Daten deines Kontos als ZIP-Datei herunter: deine Angaben, alle Hochzeitswebsites mit ihren Inhalten (data.json) und alle hochgeladenen Bilder.",
+      "button": "ZIP-Datei herunterladen"
+    },
+    "purchases": {
+      "title": "Käufe",
+      "empty": "Du hast noch kein Paket gekauft.",
+      "item": "{tier} für „{website}“",
+      "validUntil": "gültig bis {date}",
+      "inactive": "nicht mehr aktiv",
+      "purchasedAt": "gekauft am {date}",
+      "pricing": "Zu den Preisen"
+    },
+    "delete": {
+      "title": "Konto löschen",
+      "body": "Damit löschst du dein Konto, alle Hochzeitswebsites mit ihren Inhalten und alle hochgeladenen Bilder endgültig. Deine Websites sind danach nicht mehr erreichbar. Das lässt sich nicht rückgängig machen.",
+      "confirmLabel": "Gib zur Bestätigung deine E-Mail-Adresse ein",
+      "button": "Konto endgültig löschen",
+      "deleting": "Wird gelöscht …"
+    }
   }
 }

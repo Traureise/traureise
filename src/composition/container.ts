@@ -122,6 +122,7 @@ function build() {
     themes,
     appUrl: deps.appUrl,
     billingEnabled: deps.billing.enabled,
+    sourceCodeUrl: config.SOURCE_CODE_URL,
     /** Null until OPERATOR_NAME, OPERATOR_ADDRESS and OPERATOR_EMAIL are set. */
     operator,
     privacyPolicy: buildPrivacyPolicy({

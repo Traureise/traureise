@@ -20,6 +20,8 @@ const schema = z.object({
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   S3_FORCE_PATH_STYLE: z.stringbool().default(true),
   THEMES_DIR: z.string().default("./themes"),
+  // Linked in the footer (AGPL § 13). Point it at your own source if you run a modified version.
+  SOURCE_CODE_URL: z.url().default("https://github.com/Traureise/traureise"),
 
   // Who runs this instance (Impressum, privacy policy). Name, address and email are required for both pages.
   OPERATOR_NAME: z.string().optional(),

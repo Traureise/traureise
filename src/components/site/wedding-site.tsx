@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 import type { RenderableSection, WebsiteView } from "@/application/views";
 import { renderableSections } from "@/application/views";
@@ -66,7 +67,15 @@ export async function WeddingSite({ view, now, mode }: Props) {
         </section>
       ))}
 
-      <footer className="site-muted px-6 py-12 text-center text-sm">{t("madeWith")}</footer>
+      <footer className="site-muted flex flex-wrap justify-center gap-x-4 gap-y-1 px-6 py-12 text-center text-xs" data-testid="site-footer">
+        <span>{t("madeWith")}</span>
+        <Link href="/impressum" target={mode === "preview" ? "_blank" : undefined} className="underline-offset-4 hover:underline">
+          {t("imprint")}
+        </Link>
+        <Link href="/datenschutz" target={mode === "preview" ? "_blank" : undefined} className="underline-offset-4 hover:underline">
+          {t("privacy")}
+        </Link>
+      </footer>
     </div>
   );
 }
