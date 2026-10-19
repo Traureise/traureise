@@ -10,11 +10,17 @@ backups, themes, architecture and design decisions. The sources are in [`docs/`]
 ## Features
 
 - Passwordless login by email link. An account is created on first login.
-- Dashboard with website cards, a share dialog (QR code and link) and deletion.
+- Everything revolves around the wedding: names and, if planned, the date are all it asks, and it makes
+  the engagement announcement, Save the Date, website, invitation and thank-you card from them. The
+  wedding's home is a timeline of those steps; several weddings per account
+  ([how](https://docs.traureise.de/weddings/)).
+- Versions for different audiences ("Familie", "Freunde") of every card and of the website; the guest
+  list decides which version each household gets.
+- A share dialog with a QR code and the link (and WhatsApp for the engagement announcement).
 - Editor with a live preview: the home section and eight sections (story, schedule, travel,
   recommendations, registry, wedding party, gallery, FAQ). Show, hide and rename sections; add, edit,
   delete and reorder items.
-- Public wedding website with anchor navigation, OpenStreetMap links, calendar export (`.ics`) and
+- Public wedding website (a draft until you publish it) with anchor navigation, OpenStreetMap links, calendar export (`.ics`) and
   Open Graph tags.
 - Themes are data: add a folder to `themes/` ([how](https://docs.traureise.de/themes/)).
 - Privacy by design: no analytics, no CDNs, no third-party requests at runtime; uploaded photos lose
@@ -25,8 +31,7 @@ backups, themes, architecture and design decisions. The sources are in [`docs/`]
   WhatsApp), a themed answer form (attendance, events, meal, allergies, polls, requests to bring someone,
   a message), an overview with a pie chart and counts, email notifications, CSV export, and automatic
   deletion of guest data 12 months after the wedding ([how](https://docs.traureise.de/guests/)).
-- Save the Dates, invitations, thank-you cards and an engagement announcement, with or without a
-  website (start with any of them; the website can follow for the same wedding): card layouts from the
+- Save the Dates, invitations, thank-you cards and an engagement announcement: card layouts from the
   themes, a live-preview editor, an envelope that opens on the household's page, sending by link,
   WhatsApp or email (with one-click unsubscribe), automatic and manual reminders, "opened" per household
   without tracking, and export as PDF (A6, A5) and PNG, rendered on the instance

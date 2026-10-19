@@ -6,6 +6,10 @@ decision-makers: Traureise maintainers
 
 # Entitlements per wedding website and one feature gate
 
+> Since ADR 0023 the entitlements belong to the **wedding** (`entitlements.wedding_id`), not to a website:
+> one wedding has several website versions and card versions, and one package covers all of them. The rest of
+> this decision is unchanged.
+
 ## Context and Problem Statement
 
 Paid tiers are bought once per wedding, not per account and not as a subscription. Later phases add

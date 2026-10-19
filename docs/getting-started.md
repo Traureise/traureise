@@ -29,8 +29,10 @@ Database migrations run automatically every time the app container starts.
 1. Open <http://localhost:3000> and choose **Jetzt anmelden**.
 2. Enter any email address. Traureise sends a login link; with the default settings it lands in
    Mailpit at <http://localhost:8025>.
-3. Open the link. On the first login Traureise asks for your first name, then shows the dashboard.
-4. **Erstellen → Hochzeitswebsite** creates your first website and opens the editor.
+3. Open the link. On the first login Traureise asks for your first name, then for your wedding: your names and,
+   if you have one, the date.
+4. The wedding's home shows its timeline. **Hochzeitswebsite → Öffnen** opens the website editor; the website is
+   online once you click **Veröffentlichen**.
 
 The link is valid for 15 minutes and works once.
 

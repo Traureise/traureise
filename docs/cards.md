@@ -1,33 +1,25 @@
 # Save the Dates, invitations and cards
 
-Each wedding can have four cards: an **engagement announcement** (Verlobungsanzeige), a **Save the
-Date**, an **invitation** (Einladung) and a **thank-you card** (Dankeskarte), one of each. They open like a
+Each wedding has four cards: an **engagement announcement** (Verlobungsanzeige), a **Save the
+Date**, an **invitation** (Einladung) and a **thank-you card** (Dankeskarte), each with one or more versions for
+different audiences (see [Weddings, the timeline and versions](weddings.md)). They open like a
 letter: a sealed envelope addressed to the household, and the card slides out. Couples send them by link,
 WhatsApp or email, and can export every card as PDF and PNG to print at home.
 
 ## For couples
 
-**Creating.** The dashboard's **Erstellen** menu lists everything in the order you need it:
-Verlobungsanzeige, Save the Date, Hochzeitswebsite, Einladung, Dankeskarte. Any of them can come first, and
-you don't need a website for cards. With no wedding yet, a card asks only for your names and an optional
-date; with several weddings you pick one. The card editor opens. **Angaben ändern** next to the names changes
-names, date and place for all cards (and the website, once there is one).
+**Opening.** Every card is generated with the wedding. Its step on the wedding's timeline opens the first
+version; the chips open the others, and **+ Version** adds one. The card editor shows the wedding's names and date
+with **Angaben ändern**, the versions (**Umbenennen**, **Version löschen**), **Vorschau mit Umschlag**,
+**Exportieren**, and for the engagement announcement **Teilen**.
 
-A wedding without a website shows on the **Hochzeitswebsites** tab with **Website erstellen**, **Angaben
-ändern**, **Gäste** and **Löschen**. **Website erstellen** (there or in the menu) creates the website for that
-wedding, keeping its guest list, cards and packages; until then nothing is public at its address, and cards
-don't link to a website. See [ADR 0023](adr/0023-cards-without-a-website.md).
-
-The tabs **Verlobung**, **Save the Dates**, **Einladungen** and **Dankeskarten** list the cards with a preview, how many households opened them ("23 von 31 Haushalten geöffnet"), and **Bearbeiten**,
-**Ansehen**, **Teilen**, **Exportieren** and **Löschen**.
-
-**Designing.** The editor (`/websites/<id>/karten/<art>`) shows the card on the right exactly as guests see
-it, updated as you type. Each card picks its own theme, colours, fonts and layout; by default it takes the
-website's. Then the photo and texts:
+**Designing.** The editor (`/hochzeiten/<id>/karten/<version>`) shows the card on the right exactly as guests see
+it, updated as you type. Each card version picks its own theme, colours, fonts and layout; by default it takes the
+first website version's. Then the photo and texts:
 
 | Card | Content |
 |---|---|
-| Save the Date | photo, names, date, place, a short text ("Einladung folgt"). Guests get **Zum Kalender hinzufügen** (`.ics`, all-day) and **Zur Website**. |
+| Save the Date | photo, the line above the names (default "Haltet euch den Tag frei", editable), names, date ("Datum folgt" while there is none), place, a short text ("Einladung folgt"). Guests get **Zum Kalender hinzufügen** (`.ics`, all-day) and **Zur Website** (the household's website version, once it is online). |
 | Einladung | "Wir heiraten" (editable), names, date, time and venue of a schedule event (each overridable), the reply-by date, a text. The response form follows below the card. |
 | Dankeskarte | photo, a text for everyone, and an optional **personal line per household**, which you enter in the guest list. |
 | Verlobungsanzeige | photo, names, a text. No date and no website link: it usually comes before anything is planned. |
@@ -46,7 +38,9 @@ page.
 Until you send a household a card, its page is the response page from v3. A page that shows only a Save
 the Date has no response form; the invitation brings it.
 
-The engagement announcement is not personal: it has one link for everyone, `/<website>/verlobung`.
+The engagement announcement is not personal: each version has one link for everyone, `/<adresse>/verlobung`
+(further versions `/<adresse>/verlobung/<version>`). Its share dialog has the QR code, **Per WhatsApp teilen** and
+**Text und Link kopieren**; both use the card's **Text für WhatsApp und E-Mail** before the link.
 
 ## Sending
 
