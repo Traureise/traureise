@@ -38,8 +38,8 @@ page.
 Until you send a household a card, its page is the response page from v3. A page that shows only a Save
 the Date has no response form; the invitation brings it.
 
-The engagement announcement is not personal: each version has one link for everyone, `/<adresse>/verlobung`
-(further versions `/<adresse>/verlobung/<version>`). Its share dialog has the QR code, **Per WhatsApp teilen** and
+The engagement announcement goes to households through their link like the other cards, and each version also
+has one public link for everyone else, `/<adresse>/verlobung` (further versions `/<adresse>/verlobung/<version>`). Its share dialog has the QR code, **Per WhatsApp teilen** and
 **Text und Link kopieren**; both use the card's **Text für WhatsApp und E-Mail** before the link.
 
 ## Sending
@@ -50,6 +50,9 @@ was opened, with these buttons:
 - **WhatsApp** opens WhatsApp with your text and the household's link (a `wa.me` link in your own app).
 - **Link kopieren** copies the link.
 - **E-Mail senden** emails the card to the household's address, if it has one.
+- **Als gesendet markieren** records a card you sent yourself outside the app (WhatsApp from your phone, in
+  person, by post); **Alle als gesendet markieren** does it for every household that has not had it yet. Marked
+  cards count as sent and show on the household's page. **Doch nicht gesendet** undoes a mark (not a real send).
 - **Auslassen** leaves a household out of this card (by default every household gets every card).
 
 **Per E-Mail an alle senden** sends the card to every household with an address that has not had it yet,

@@ -39,6 +39,7 @@ import {
   GetHouseholdPage,
   GetUnsubscribe,
   MarkCardsOpened,
+  MarkCardsSent,
   MarkEngagementShared,
   RunMailJobs,
   SaveCard,
@@ -231,6 +232,7 @@ function build() {
     getEngagementPage: new GetEngagementPage(deps),
     shareCard: new ShareCard(deps),
     setCardExcluded: new SetCardExcluded(deps),
+    markCardsSent: new MarkCardsSent(deps),
     sendCardEmails: new SendCardEmails(deps),
     sendReminders: new SendReminders(deps),
     /** A fresh instance per run: it caches contexts and images for that run only. */

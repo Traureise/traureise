@@ -1,5 +1,6 @@
 import {
   buildCardModel,
+  CARD_FEATURES,
   CARD_SLUGS,
   DEFAULT_REMINDER_DAYS,
   defaultCardContent,
@@ -315,14 +316,13 @@ export class GetCardPreview {
       requests: [],
       people: [],
     };
-    const isEngagement = kind === "engagement";
     return {
       state: "page",
       website: pageWebsite(wedding),
       design: householdDesign(this.deps, ctx, first?.id ?? null),
-      greeting: isEngagement ? null : household.name,
+      greeting: household.name,
       envelope: card.envelope,
-      cards: [pageCard(this.deps, ctx, card, isEngagement ? null : household)],
+      cards: [pageCard(this.deps, ctx, card, household)],
       form: kind === "invitation" && household.people.length > 0 ? formFor(this.deps, ctx, household, "preview") : null,
     };
   }
@@ -373,7 +373,8 @@ export class GetEngagementPage {
     const card = versionSlug ? versions.find((c) => c.slug === versionSlug && c.id !== versions[0]?.id) : versions[0];
     if (!card) return null;
     const base = { website: pageWebsite(wedding), design: householdDesign(this.deps, ctx, null) };
-    if (!ctx.cardActive("engagement")) return { ...base, state: "inactive" };
+    // The public link only needs the package; it is not guest data.
+    if (!ctx.can(CARD_FEATURES.engagement)) return { ...base, state: "inactive" };
     return { ...base, state: "active", card: pageCard(this.deps, ctx, card, null) };
   }
 }
@@ -391,7 +392,7 @@ export class MarkEngagementShared {
   async execute(userId: string, cardId: string): Promise<void> {
     const { card, ctx } = await loadOwnedCard(this.deps, userId, cardId);
     if (card.kind !== "engagement") throw new NotFoundError();
-    if (!ctx.cardActive("engagement")) throw new LockedError();
+    if (!ctx.can(CARD_FEATURES.engagement)) throw new LockedError();
     await this.deps.cards.markLinkShared(card.id, ctx.now);
   }
 }
@@ -421,6 +422,39 @@ export class ShareCard {
     if (delivery?.excluded) throw new ValidationError({ _: "excluded" });
     await this.deps.cards.markShared(householdId, loaded.kind, via, ctx.now);
     return { link: linkUrl(this.deps, householdId), message: personalize(cardMessage(this.deps, card), household.name) };
+  }
+}
+
+export class MarkCardsSent {
+  constructor(private deps: Deps) {}
+
+  /**
+   * "Als gesendet markieren": the couple sent a card outside the app (WhatsApp on the phone, in person, by post).
+   * It counts as sent, so the household's page shows it and the timeline moves on. "all" marks every household it
+   * is meant for that has not had it yet. `sent: false` undoes a hand mark, never a real send.
+   */
+  async execute(userId: string, weddingId: string, kind: CardKind, target: SendTarget, sent: boolean): Promise<{ marked: number }> {
+    if (!isHouseholdCardKind(kind)) throw new NotFoundError();
+    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const ctx = await loadGuestContext(this.deps, wedding);
+    const households = await this.deps.guests.listHouseholds(weddingId);
+    const ids = target === "all" ? households.map((h) => h.id) : households.filter((h) => h.id === target.householdId).map((h) => h.id);
+    if (target !== "all" && ids.length === 0) throw new NotFoundError();
+    if (!sent) {
+      if (target === "all") throw new ValidationError({ _: "invalid_option" });
+      if (!(await this.deps.cards.unmarkShared(ids[0]!, kind))) throw new ValidationError({ _: "not_manual" });
+      return { marked: 1 };
+    }
+    if (!ctx.cardActive(kind)) throw new LockedError();
+    assertDate(wedding, kind);
+    const deliveries = (await this.deps.cards.listDeliveries(weddingId)).filter((d) => d.kind === kind);
+    const open = ids.filter((id) => {
+      const d = deliveries.find((x) => x.householdId === id);
+      return !d?.excluded && !sentAt(d ? { ...d, openedAt: null } : null);
+    });
+    if (target !== "all" && open.length === 0) throw new ValidationError({ _: deliveries.find((d) => d.householdId === ids[0])?.excluded ? "excluded" : "already_sent" });
+    for (const id of open) await this.deps.cards.markShared(id, kind, "manual", ctx.now);
+    return { marked: open.length };
   }
 }
 

@@ -237,7 +237,8 @@ export function tintSvg(svg: string, color: string): string {
 
 // ---- deliveries: one card to one household ----
 
-export type SharedVia = "whatsapp" | "link";
+/** How the couple sent a card themselves: WhatsApp or a copied link from the app, or marked by hand (sent elsewhere). */
+export type SharedVia = "whatsapp" | "link" | "manual";
 
 export type Delivery = {
   /** The couple left this household out of this card. */
@@ -296,7 +297,7 @@ export function householdPageContent(input: {
   cards: readonly { kind: HouseholdCardKind; active: boolean; delivery: Delivery | null }[];
   rsvpActive: boolean;
 }): { kinds: HouseholdCardKind[]; form: boolean } {
-  const order: HouseholdCardKind[] = ["thankYou", "invitation", "saveTheDate"];
+  const order: HouseholdCardKind[] = ["thankYou", "invitation", "saveTheDate", "engagement"];
   const shown = input.cards
     .filter((c) => c.active && c.delivery && !c.delivery.excluded && sentAt(c.delivery))
     .sort((a, b) => sentAt(b.delivery)!.getTime() - sentAt(a.delivery)!.getTime() || order.indexOf(a.kind) - order.indexOf(b.kind))

@@ -87,6 +87,12 @@ test("a couple creates their wedding, gets every item, adds versions, chooses wh
       await expect(page.getByTestId("version-chips").getByRole("link")).toHaveText(["Standard", "Familie"]);
       await expect(page.getByTestId("version-chips").getByRole("link", { name: "Familie" })).toHaveAttribute("aria-current", "page");
       await page.getByLabel("Text", { exact: true }).fill("Für die ganze Familie");
+      // "Speichern und schließen" saves and goes back to the wedding.
+      await page.getByRole("button", { name: "Weitere Speicher-Optionen" }).click();
+      await page.getByRole("menuitem", { name: "Speichern und schließen" }).click();
+      await expect(page).toHaveURL(new RegExp(`${homeUrl(weddingId)}$`));
+      await page.goto(familyUrl);
+      await expect(page.getByLabel("Text", { exact: true })).toHaveValue("Für die ganze Familie");
       await saveCard(page);
 
       await page.goto(homeUrl(weddingId));
@@ -172,6 +178,33 @@ test("a couple creates their wedding, gets every item, adds versions, chooses wh
       await page.goto(homeUrl(weddingId));
       await step(page, "Save the Date").getByRole("link", { name: "Öffnen" }).click();
       await expect(page.getByRole("button", { name: "Version löschen" })).toHaveCount(0);
+    });
+
+    await test.step("one person in one go; the engagement goes through the guest list; cards sent elsewhere are marked by hand", async () => {
+      await page.goto(guestsUrl(weddingId));
+      const quick = page.getByRole("form", { name: "Einzelne Person schnell hinzufügen" });
+      await quick.getByPlaceholder("Name, z. B. Tante Erika").fill("Tante Erika");
+      await quick.getByRole("button", { name: "Person hinzufügen" }).click();
+      await expect(household(page, "Tante Erika")).toContainText("1 Person: Tante Erika");
+
+      await chooseCard(page, "Verlobungsanzeige");
+      await expect(page.getByTestId("card-sending-counts")).toHaveText("0 von 3 Haushalten geöffnet · 0 gesendet");
+      const erika = household(page, "Tante Erika");
+      await erika.getByRole("button", { name: "Als gesendet markieren" }).click();
+      await expect(erika.getByTestId("delivery-status")).toHaveText(/^Als gesendet markiert am/);
+      await erika.getByRole("button", { name: "Doch nicht gesendet" }).click();
+      await expect(erika.getByTestId("delivery-status")).toHaveText("Nicht gesendet");
+      await page.getByRole("button", { name: "Alle als gesendet markieren (3)" }).click();
+      await page.getByRole("alertdialog").getByRole("button", { name: "Als gesendet markieren" }).click();
+      await expect(page.getByTestId("card-sending-counts")).toHaveText("0 von 3 Haushalten geöffnet · 3 gesendet");
+      await expect(page.getByRole("button", { name: "Alle als gesendet markieren (0)" })).toBeDisabled();
+
+      // Marked as sent, the card is on the household's own page, and the timeline moves on.
+      await guest.goto(await guestLink(page, "Tante Erika"));
+      await openEnvelope(guest);
+      await expect(guest.getByTestId("page-card-engagement")).toContainText("Wir haben uns verlobt");
+      await page.goto(homeUrl(weddingId));
+      await expect(step(page, "Verlobungsanzeige")).toHaveAttribute("data-state", "done");
     });
 
     await test.step("a second wedding, not planned yet: its Save the Date and invitation wait for a date", async () => {

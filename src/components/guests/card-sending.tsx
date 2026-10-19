@@ -3,9 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { BellRing, Mail, Send } from "lucide-react";
+import { BellRing, CheckCheck, Mail, Send, Undo2 } from "lucide-react";
 import { toast } from "sonner";
-import { sendCardEmailsAction, sendRemindersAction, setCardExcludedAction, shareCardAction } from "@/app/actions/cards";
+import { markCardsSentAction, sendCardEmailsAction, sendRemindersAction, setCardExcludedAction, shareCardAction } from "@/app/actions/cards";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,8 +43,29 @@ function useRun() {
  * Sending one card to one household: WhatsApp (a wa.me link the couple opens), Link kopieren, E-Mail, and
  * leaving the household out. WhatsApp and copied links are recorded as sent.
  */
-export function CardSendButtons({ weddingId, kind, household, message, emailSending, excluded }: { weddingId: string; kind: HouseholdCardKind; household: Household; message: string; emailSending: boolean; excluded: boolean }) {
+export function CardSendButtons({
+  weddingId,
+  kind,
+  household,
+  message,
+  emailSending,
+  excluded,
+  sent,
+  markedByHand,
+}: {
+  weddingId: string;
+  kind: HouseholdCardKind;
+  household: Household;
+  message: string;
+  emailSending: boolean;
+  excluded: boolean;
+  /** The household has this card (any version, any channel). */
+  sent: boolean;
+  /** …because the couple marked it by hand, which can be undone. */
+  markedByHand: boolean;
+}) {
   const t = useTranslations("guests.sending");
+  const tKinds = useTranslations("cardKinds");
   const tList = useTranslations("guests.list");
   const { pending, run } = useRun();
   const share = (via: "whatsapp" | "link") => run(() => shareCardAction(weddingId, kind, household.id, via));
@@ -65,10 +86,59 @@ export function CardSendButtons({ weddingId, kind, household, message, emailSend
           {t("email")}
         </Button>
       )}
-      <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => run(() => setCardExcludedAction(weddingId, kind, household.id, true))}>
-        {t("exclude")}
-      </Button>
+      {!sent && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={pending}
+          onClick={() => run(() => markCardsSentAction(weddingId, kind, { householdId: household.id }, true), () => toast.success(t("markedSent", { kind: tKinds(kind), household: household.name })))}
+        >
+          <CheckCheck aria-hidden />
+          {t("markSent")}
+        </Button>
+      )}
+      {markedByHand && (
+        <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => run(() => markCardsSentAction(weddingId, kind, { householdId: household.id }, false))}>
+          <Undo2 aria-hidden />
+          {t("unmarkSent")}
+        </Button>
+      )}
+      {!sent && (
+        <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => run(() => setCardExcludedAction(weddingId, kind, household.id, true))}>
+          {t("exclude")}
+        </Button>
+      )}
     </>
+  );
+}
+
+/** "Alle als gesendet markieren": for cards the couple sent themselves, outside the app. */
+export function MarkAllSentButton({ weddingId, kind, count }: { weddingId: string; kind: HouseholdCardKind; count: number }) {
+  const t = useTranslations("guests.sending");
+  const tKinds = useTranslations("cardKinds");
+  const { pending, run } = useRun();
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button type="button" variant="outline" disabled={pending || count === 0}>
+          <CheckCheck aria-hidden />
+          {t("markAll", { count })}
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t("markAllTitle", { kind: tKinds(kind), count })}</AlertDialogTitle>
+          <AlertDialogDescription>{t("markAllBody")}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+          <AlertDialogAction onClick={() => run(() => markCardsSentAction(weddingId, kind, "all", true), (data) => toast.success(t("markedAll", { count: data.marked })))}>
+            {t("markAllConfirm")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

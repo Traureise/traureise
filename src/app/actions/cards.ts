@@ -41,6 +41,11 @@ export async function shareCardAction(weddingId: string, kind: CardKind, househo
   return cards(weddingId, (userId) => container().shareCard.execute(userId, weddingId, kind, householdId, via));
 }
 
+/** A card sent outside the app, marked by hand (or the mark undone). */
+export async function markCardsSentAction(weddingId: string, kind: CardKind, target: SendTarget, sent: boolean) {
+  return cards(weddingId, (userId) => container().markCardsSent.execute(userId, weddingId, kind, target, sent));
+}
+
 export async function setCardExcludedAction(weddingId: string, kind: CardKind, householdId: string, excluded: boolean) {
   return cards(weddingId, (userId) => container().setCardExcluded.execute(userId, weddingId, kind, householdId, excluded));
 }

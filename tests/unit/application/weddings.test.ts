@@ -116,6 +116,14 @@ describe("the home timeline", () => {
     expect((await home(wedding.id)).guests).toEqual({ households: 1, coming: 0, open: 1 });
   });
 
+  it("the engagement step is done once every household got it, or once its public link was shared", async () => {
+    const wedding = await create();
+    const weber = await new SaveHousehold(f.deps).execute(anna.id, wedding.id, null, { name: "Weber", people: [{ name: "Eva" }] });
+    expect((await home(wedding.id)).steps[0]).toMatchObject({ state: "now", status: { kind: "household", counts: { households: 1, sent: 0 } } });
+    await new ShareCard(f.deps).execute(anna.id, wedding.id, "engagement", weber.id, "link");
+    expect((await home(wedding.id)).steps[0]).toMatchObject({ state: "done", status: { counts: { households: 1, sent: 1 } } });
+  });
+
   it("without a date the Save the Date and invitation say they wait for one", async () => {
     const wedding = await create({ title: "Anna & Ben", hasDate: false });
     const view = await home(wedding.id);

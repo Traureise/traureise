@@ -1,5 +1,5 @@
 import { activeTier, type Tier } from "@/domain/billing";
-import { cardCounts, CARD_KINDS, followWeddingDetails, isHouseholdCardKind, type CardModel, type HouseholdCardKind } from "@/domain/cards";
+import { cardCounts, CARD_KINDS, followWeddingDetails, type CardModel, type HouseholdCardKind } from "@/domain/cards";
 import { guestOverview } from "@/domain/guests";
 import { SECTION_KINDS } from "@/domain/sections";
 import { slugify } from "@/domain/slug";
@@ -86,8 +86,14 @@ export class GetRecentWedding {
 }
 
 export type StepStatus =
-  | { kind: "engagement"; shared: boolean; active: boolean }
-  | { kind: "household"; counts: { households: number; sent: number; opened: number }; needsDate: boolean; active: boolean }
+  | {
+      kind: "household";
+      counts: { households: number; sent: number; opened: number };
+      needsDate: boolean;
+      active: boolean;
+      /** Engagement announcement: its public link was shared. */
+      shared: boolean;
+    }
   | { kind: "website"; online: number; versions: number };
 
 export type HomeStep = {
@@ -155,12 +161,14 @@ export class GetWeddingHome {
         canAddVersion,
         messages: item === "engagement" ? Object.fromEntries(versions.map((c) => [c.id, c.message ?? this.deps.cardTexts.defaults.engagement.message])) : {},
       };
-      if (!isHouseholdCardKind(item)) {
-        const shared = versions.some((c) => c.sharedAt);
-        return { ...base, done: shared, status: { kind: "engagement", shared, active: ctx.cardActive(item) } };
-      }
       const c = counts(item);
-      return { ...base, done: householdCardDone(c), status: { kind: "household", counts: c, needsDate: needsDate(item) && !wedding.weddingDate, active: ctx.cardActive(item) } };
+      const shared = item === "engagement" && versions.some((v) => v.sharedAt);
+      return {
+        ...base,
+        // The engagement announcement is done once every household got it, or once its public link was shared.
+        done: householdCardDone(c) || shared,
+        status: { kind: "household", counts: c, needsDate: needsDate(item) && !wedding.weddingDate, active: ctx.cardActive(item), shared },
+      };
     });
     const states = timelineStates(Object.fromEntries(steps.map((s) => [s.item, s.done])) as Record<VersionItem, boolean>);
     const overview = guestOverview({ households, events: ctx.events, meal: ctx.meal, polls: ctx.polls });

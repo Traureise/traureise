@@ -690,6 +690,13 @@ export class InMemoryCards implements CardRepository {
     d.sharedAt = at;
     d.sharedVia = via;
   }
+  async unmarkShared(householdId: string, kind: HouseholdCardKind) {
+    const d = this.live().find((x) => x.householdId === householdId && x.kind === kind);
+    if (!d || d.sharedVia !== "manual") return false;
+    d.sharedAt = null;
+    d.sharedVia = null;
+    return true;
+  }
   async listOpens(weddingId: string) {
     this.live();
     return copy(this.opens.filter((o) => this.cards.find((c) => c.id === o.cardId)?.weddingId === weddingId));

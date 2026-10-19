@@ -8,6 +8,7 @@ import {
   GetHouseholdPage,
   GetUnsubscribe,
   MarkCardsOpened,
+  MarkCardsSent,
   MarkEngagementShared,
   RunMailJobs,
   SaveCard,
@@ -257,6 +258,66 @@ describe("the household page", () => {
 
   it("is null for unknown links", async () => {
     expect(await new GetHouseholdPage(f.deps).execute("nope")).toBeNull();
+  });
+});
+
+describe("the engagement announcement in the guest list", () => {
+  it("goes to households like the other cards, through their personal link", async () => {
+    const weber = await household("Weber", "weber@example.org");
+    await share("engagement", weber.id, "whatsapp");
+    const view = await page(weber.id);
+    expect(view).toMatchObject({ state: "page", greeting: "Weber", form: null });
+    expect(view?.state === "page" && view.cards.map((c) => c.kind)).toEqual(["engagement"]);
+    expect(await new MarkCardsOpened(f.deps).execute(token(weber.id), ["engagement"])).toEqual(["engagement"]);
+    const entry = (await new GetGuestPage(f.deps).execute(anna.id, weddingId)).households[0]!;
+    expect(entry.deliveries.engagement).toMatchObject({ sharedVia: "whatsapp" });
+    expect((await new GetGuestPage(f.deps).execute(anna.id, weddingId)).cards.map((c) => c.kind)).toEqual(["engagement", "saveTheDate", "invitation", "thankYou"]);
+    await sendEmails("engagement", "all");
+    expect(await sendEmails("engagement", { householdId: weber.id })).toEqual({ queued: 1 });
+  });
+
+  it("keeps its public link for everyone else", async () => {
+    expect(await new GetEngagementPage(f.deps).execute("anna-und-ben")).toMatchObject({ state: "active" });
+  });
+});
+
+describe("marking cards as sent by hand", () => {
+  const mark = (kind: CardKind, target: { householdId: string } | "all", sent = true) => new MarkCardsSent(f.deps).execute(anna.id, weddingId, kind, target, sent);
+
+  it("records a card sent outside the app, so the flow moves on and the household's page shows it", async () => {
+    const weber = await household("Weber");
+    const kern = await household("Kern");
+    const roth = await household("Roth");
+    await new SetCardExcluded(f.deps).execute(anna.id, weddingId, "saveTheDate", roth.id, true);
+    expect(await mark("saveTheDate", { householdId: weber.id })).toEqual({ marked: 1 });
+    expect((await new GetGuestPage(f.deps).execute(anna.id, weddingId)).households.find((h) => h.id === weber.id)!.deliveries.saveTheDate).toMatchObject({ sharedVia: "manual" });
+    const view = await page(weber.id);
+    expect(view?.state === "page" && view.cards.map((c) => c.kind)).toEqual(["saveTheDate"]);
+    // "All": every household it is meant for that has not had it yet (Roth is left out).
+    expect(await mark("saveTheDate", "all")).toEqual({ marked: 1 });
+    const entries = (await new GetGuestPage(f.deps).execute(anna.id, weddingId)).households;
+    expect(entries.find((h) => h.id === kern.id)!.deliveries.saveTheDate?.sharedVia).toBe("manual");
+    expect(entries.find((h) => h.id === roth.id)!.deliveries.saveTheDate?.sharedAt).toBeNull();
+  });
+
+  it("can be undone for a hand mark, never for a card that really went out", async () => {
+    const weber = await household("Weber", "weber@example.org");
+    await mark("thankYou", { householdId: weber.id });
+    expect(await mark("thankYou", { householdId: weber.id }, false)).toEqual({ marked: 1 });
+    expect((await new GetGuestPage(f.deps).execute(anna.id, weddingId)).households[0]!.deliveries.thankYou?.sharedAt ?? null).toBeNull();
+    await share("invitation", weber.id, "whatsapp");
+    await expect(mark("invitation", { householdId: weber.id }, false)).rejects.toMatchObject({ fieldErrors: { _: "not_manual" } });
+  });
+
+  it("needs the card's package and, for Save the Date and invitation, a date", async () => {
+    const weber = await household("Weber");
+    lockAll();
+    await expect(mark("thankYou", "all")).rejects.toBeInstanceOf(LockedError);
+    f.deps.billing.enabled = false;
+    await new UpdateWeddingDetails(f.deps).execute(anna.id, weddingId, { title: "Anna & Ben", hasDate: false });
+    await expect(mark("invitation", { householdId: weber.id })).rejects.toMatchObject({ fieldErrors: { _: "no_date" } });
+    const eve = await f.users.create("eve@example.org");
+    await expect(new MarkCardsSent(f.deps).execute(eve.id, weddingId, "thankYou", "all", true)).rejects.toBeInstanceOf(NotFoundError);
   });
 });
 

@@ -13,8 +13,8 @@ import { DEFAULT_TIMEZONE, isValidTimeZone } from "./website";
 export const VERSION_ITEMS = ["engagement", "saveTheDate", "website", "invitation", "thankYou"] as const;
 export type VersionItem = (typeof VERSION_ITEMS)[number];
 
-/** Items a household gets exactly one version of. The engagement announcement is a public link for everyone. */
-export const ASSIGNABLE_ITEMS = ["saveTheDate", "website", "invitation", "thankYou"] as const satisfies readonly VersionItem[];
+/** Items a household gets exactly one version of: every card and the website. */
+export const ASSIGNABLE_ITEMS = ["engagement", "saveTheDate", "website", "invitation", "thankYou"] as const satisfies readonly VersionItem[];
 export type AssignableItem = (typeof ASSIGNABLE_ITEMS)[number];
 
 export function isVersionItem(value: string): value is VersionItem {

@@ -138,7 +138,9 @@
     "locked": "Dafür braucht diese Website ein Paket.",
     "answered": "Dieser Haushalt hat schon geantwortet.",
     "last_version": "Die letzte Version lässt sich nicht löschen.",
-    "no_date": "Das geht, sobald eure Hochzeit ein Datum hat."
+    "no_date": "Das geht, sobald eure Hochzeit ein Datum hat.",
+    "not_manual": "Nur von Hand markierte Karten lassen sich zurücksetzen.",
+    "already_sent": "Diese Karte hat der Haushalt schon."
   },
   "editor": {
     "back": "Zur Hochzeit",
@@ -518,7 +520,11 @@
       "emailHint": "Für Karten und Erinnerungen per E-Mail. Ohne Adresse verschickt ihr per Link oder WhatsApp.",
       "emailUnsubscribed": "Dieser Haushalt hat sich von E-Mails abgemeldet. Tragt nur eine Adresse ein, wenn er euch ausdrücklich darum bittet.",
       "personalLine": "Persönliche Zeile für die Dankeskarte (optional)",
-      "personalLinePlaceholder": "z. B. Danke für den wunderbaren Kuchen!"
+      "personalLinePlaceholder": "z. B. Danke für den wunderbaren Kuchen!",
+      "quickLabel": "Einzelne Person schnell hinzufügen",
+      "quickPlaceholder": "Name, z. B. Tante Erika",
+      "quickAdd": "Person hinzufügen",
+      "quickAdded": "{name} hinzugefügt"
     },
     "details": {
       "show": "Antworten ansehen",
@@ -647,12 +653,21 @@
         "sent": {
           "email": "Per E-Mail gesendet am {date}",
           "whatsapp": "Per WhatsApp geteilt am {date}",
-          "link": "Link kopiert am {date}"
+          "link": "Link kopiert am {date}",
+          "manual": "Als gesendet markiert am {date}"
         },
         "opened": "Geöffnet am {date}"
       },
       "waitsForDate": "Versenden geht, sobald eure Hochzeit ein Datum hat.",
-      "setDate": "Datum eintragen"
+      "setDate": "Datum eintragen",
+      "markSent": "Als gesendet markieren",
+      "markedSent": "{kind} für {household} als gesendet markiert",
+      "unmarkSent": "Doch nicht gesendet",
+      "markAll": "Alle als gesendet markieren ({count})",
+      "markAllTitle": "{kind} für {count, plural, one {# Haushalt} other {# Haushalte}} als gesendet markieren?",
+      "markAllBody": "Für Karten, die ihr selbst verschickt habt, etwa per WhatsApp vom Handy, persönlich oder per Post. Die Haushalte sehen die Karte dann auch über ihren persönlichen Link.",
+      "markAllConfirm": "Als gesendet markieren",
+      "markedAll": "{count, plural, one {# Haushalt} other {# Haushalte}} als gesendet markiert"
     },
     "versions": {
       "label": "Versionen",
@@ -814,7 +829,7 @@
     "saving": "Speichert …",
     "saved": "Gespeichert",
     "dateOpen": "Datum noch offen",
-    "messageHintEngagement": "Kommt beim Teilen per WhatsApp und beim Kopieren vor den Link.",
+    "messageHintEngagement": "Für WhatsApp, E-Mail und die Gästeliste; beim öffentlichen Link kommt der Text vor den Link.",
     "offlineWebsites": "Haushalte, deren Website-Version noch nicht veröffentlicht ist, bekommen keinen Link zur Website auf dem Save the Date.",
     "waitsForDate": "Noch kein Datum: Auf der Karte steht „Datum folgt“. Versenden und Exportieren geht, sobald ihr ein Datum eingetragen habt.",
     "setDate": "Datum eintragen",
@@ -824,7 +839,9 @@
       "a6": "PDF (A6)",
       "a5": "PDF (A5)",
       "png": "Bild (PNG)"
-    }
+    },
+    "saveAndClose": "Speichern und schließen",
+    "saveOptions": "Weitere Speicher-Optionen"
   },
   "forms": {
     "messageHint": "'{name}' wird durch den Namen des Haushalts ersetzt.",
@@ -901,8 +918,6 @@
       "done": "Erledigt",
       "status": {
         "engagementShared": "Geteilt · ein Link für alle",
-        "engagementDraft": "Entwurf · noch nicht geteilt",
-        "locked": "Entwurf · Versand mit Paket",
         "household": "{opened} von {households} Haushalten geöffnet · {sent} gesendet",
         "noHouseholds": "Entwurf · noch keine Haushalte in der Gästeliste",
         "waitsForDate": "Entwurf · wartet auf euer Datum",

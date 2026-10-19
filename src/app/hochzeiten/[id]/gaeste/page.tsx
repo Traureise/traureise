@@ -3,9 +3,9 @@ import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { CalendarClock, Download, Lock, Mail, MessageCircle } from "lucide-react";
 import type { GuestListEntry, GuestPage } from "@/application/guests";
-import { CardSendButtons, ReminderButton, RemindAllButton, SendAllButton } from "@/components/guests/card-sending";
+import { CardSendButtons, MarkAllSentButton, ReminderButton, RemindAllButton, SendAllButton } from "@/components/guests/card-sending";
 import { DeleteHouseholdButton, RequestActions } from "@/components/guests/guest-actions";
-import { HouseholdDialog } from "@/components/guests/household-dialog";
+import { HouseholdDialog, QuickAddPerson } from "@/components/guests/household-dialog";
 import { PieChart } from "@/components/guests/pie-chart";
 import { VersionSelects } from "@/components/guests/version-select";
 import { CopyLinkButton } from "@/components/share/copy-link-button";
@@ -243,6 +243,8 @@ export default async function GuestsPage({ params, searchParams }: Props) {
   const remindable = page.replyOpen && (page.sending || page.emailReminders);
   const counts = card ? cardCounts(page.households.map((h) => h.deliveries[card.kind])) : null;
   const recipients = card ? emailRecipients(page.households.map((h) => ({ ...h, delivery: h.deliveries[card.kind] }))).length : 0;
+  // Households the card is meant for that have not had it yet (what "Alle als gesendet markieren" marks).
+  const unsent = card ? page.households.filter((h) => !h.deliveries[card.kind]?.excluded && !sentAt(h.deliveries[card.kind])).length : 0;
 
   return (
     <div className="space-y-10">
@@ -281,6 +283,7 @@ export default async function GuestsPage({ params, searchParams }: Props) {
             <HouseholdDialog weddingId={id} events={page.events} />
           </div>
         </div>
+        <QuickAddPerson weddingId={id} />
 
         {page.cards.length > 0 && (
           <nav aria-label={tSending("choose")} className="flex flex-wrap items-center gap-2 text-sm" data-testid="card-picker">
@@ -319,15 +322,20 @@ export default async function GuestsPage({ params, searchParams }: Props) {
                     {tSending("unlock")}
                   </Link>
                 </Button>
-              ) : page.emailSending ? (
-                <SendAllButton weddingId={id} kind={card.kind} count={recipients} />
               ) : (
-                <Button asChild variant="outline">
-                  <Link href="/preise">
-                    <Lock aria-hidden />
-                    {tSending("emailLocked")}
-                  </Link>
-                </Button>
+                <>
+                  <MarkAllSentButton weddingId={id} kind={card.kind} count={unsent} />
+                  {page.emailSending ? (
+                    <SendAllButton weddingId={id} kind={card.kind} count={recipients} />
+                  ) : (
+                    <Button asChild variant="outline">
+                      <Link href="/preise">
+                        <Lock aria-hidden />
+                        {tSending("emailLocked")}
+                      </Link>
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -401,6 +409,8 @@ export default async function GuestsPage({ params, searchParams }: Props) {
                         message={h.messages[card.kind]}
                         emailSending={page.emailSending}
                         excluded={h.deliveries[card.kind]?.excluded ?? false}
+                        sent={!!sentAt(h.deliveries[card.kind])}
+                        markedByHand={h.deliveries[card.kind]?.sharedVia === "manual" && !h.deliveries[card.kind]?.emailedAt}
                       />
                     ) : !card && h.link ? (
                       <>

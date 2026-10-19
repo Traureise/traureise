@@ -20,18 +20,14 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
   const first = step.versions[0]!;
   const { status } = step;
   const statusText =
-    status.kind === "engagement"
-      ? status.shared
-        ? t("status.engagementShared")
-        : status.active
-          ? t("status.engagementDraft")
-          : t("status.locked")
-      : status.kind === "website"
-        ? status.online > 0
-          ? t("status.websiteOnline", { online: status.online })
-          : t("status.websiteDraft")
-        : status.needsDate
-          ? t("status.waitsForDate")
+    status.kind === "website"
+      ? status.online > 0
+        ? t("status.websiteOnline", { online: status.online })
+        : t("status.websiteDraft")
+      : status.needsDate
+        ? t("status.waitsForDate")
+        : status.counts.sent === 0 && status.shared
+          ? t("status.engagementShared")
           : status.counts.households === 0
             ? t("status.noHouseholds")
             : t("status.household", status.counts);
@@ -78,7 +74,7 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
             <Link href={versionHref(weddingId, step.item, first.id)}>{now ? t("continue") : t("openStep")}</Link>
           </Button>
           {step.item === "engagement" &&
-            status.kind === "engagement" &&
+            status.kind === "household" &&
             status.active &&
             step.versions.map((v) => (
               <ShareDialog

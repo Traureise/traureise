@@ -23,6 +23,9 @@ It has three tabs:
   choice, optionally with a free "Andere" answer, and answered per person or once per household.
 - **Vorschau**: the form exactly as guests see it, in the website's theme. Nothing is saved.
 
+**Person hinzufügen** next to the list adds one person as their own household in one step (just the name);
+**Haushalt hinzufügen** opens the full form.
+
 Each household can have an **email address** (optional, for cards and reminders by email) and a
 **personal line** for the thank-you card. A household that unsubscribed from emails shows "Keine E-Mails
 gewünscht"; its address is gone.

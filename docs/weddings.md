@@ -36,9 +36,9 @@ place, and then the five items as a timeline: finished steps have a tick, the ne
 ("28 von 31 Haushalten geöffnet", "Entwurf · noch nicht veröffentlicht") and its versions. Below, a row
 summarises the guests and leads to the guest list.
 
-What counts as finished: the engagement announcement once you shared its link (copied it or sent it by WhatsApp
-from its share dialog), a household card once every household it is meant for got it, the website once a version
-is online.
+What counts as finished: a card once every household it is meant for got it (the engagement announcement also
+once you shared its public link), the website once a version is online. **Speichern und schließen** (in the arrow
+next to **Speichern** in the card editor) saves and goes back to this page.
 
 Every page of a wedding has a breadcrumb back to the wedding and to the list of weddings.
 
@@ -56,8 +56,9 @@ it; versions can be renamed and deleted, except the last one of an item.
   and the reminders skip it, so nobody gets two versions. Re-assigning sends nothing again: the household's page
   then shows the new version. Deleting a version moves its households to the first remaining version; they keep
   their status.
-- The engagement announcement is not assigned to households: each version is its own public link
-  (`/<adresse>/verlobung`, further versions at `/<adresse>/verlobung/<version>`), with its own share dialog.
+- The engagement announcement goes through the guest list like the other cards. Each version also has a public
+  link for everyone else (`/<adresse>/verlobung`, further versions at `/<adresse>/verlobung/<version>`), with its own
+  share dialog.
 - **Website versions** have their own address and start as drafts. The schedule belongs to the wedding: every
   version shows all events unless you switch some off for that version ("Auf dieser Website zeigen").
 

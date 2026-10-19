@@ -372,6 +372,8 @@ export interface CardRepository {
   setExcluded(householdId: string, kind: HouseholdCardKind, excluded: boolean): Promise<void>;
   /** Records the first share; later shares keep the first time and channel. */
   markShared(householdId: string, kind: HouseholdCardKind, via: SharedVia, at: Date): Promise<void>;
+  /** Undoes a share marked by hand ("manual"); returns false if there was none. */
+  unmarkShared(householdId: string, kind: HouseholdCardKind): Promise<boolean>;
 
   listOpens(weddingId: string): Promise<OpenRecord[]>;
   listOpensOfHousehold(householdId: string): Promise<OpenRecord[]>;

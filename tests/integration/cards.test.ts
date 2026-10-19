@@ -116,6 +116,11 @@ describe("DrizzleCardRepository", () => {
     expect(await repo.listDeliveries(weddingId)).toMatchObject([{ householdId: weber.id, kind: "saveTheDate", sharedVia: "whatsapp", sharedAt: first, excluded: true }]);
     expect(await repo.listOpens(weddingId)).toEqual([{ cardId: card.id, householdId: weber.id, openedAt: first }]);
     expect(await repo.listOpensOfHousehold(weber.id)).toHaveLength(1);
+    // Only a share marked by hand can be undone.
+    expect(await repo.unmarkShared(weber.id, "saveTheDate")).toBe(false);
+    await repo.markShared(weber.id, "thankYou", "manual", first);
+    expect(await repo.unmarkShared(weber.id, "thankYou")).toBe(true);
+    expect((await repo.listDeliveries(weddingId)).find((d) => d.kind === "thankYou")).toMatchObject({ sharedAt: null, sharedVia: null });
   });
 
   it("lets exactly one of several instances claim a queued email", async () => {

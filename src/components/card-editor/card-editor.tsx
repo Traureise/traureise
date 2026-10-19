@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { saveCardAction } from "@/app/actions/cards";
 import type { CardEditor as CardEditorData } from "@/application/cards";
@@ -10,6 +12,7 @@ import { ImageField } from "@/components/editor/image-field";
 import { FieldError } from "@/components/forms/field-error";
 import { MessageField } from "@/components/forms/message-field";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -48,6 +51,7 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
   const [reminderMessage, setReminderMessage] = useState(card.reminderMessage ?? "");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [pending, start] = useTransition();
+  const router = useRouter();
 
   const option = data.themes.find((o) => o.id === themeId) ?? data.themes[0]!;
   const layout = option.layouts.find((l) => l.id === layoutId) ?? option.layouts[0]!;
@@ -78,7 +82,8 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
     setLayoutId(null);
   }
 
-  function save() {
+  /** Saves; with `close`, then goes back to the wedding's home. */
+  function save(close = false) {
     start(async () => {
       const result = await saveCardAction(wedding.id, card.id, {
         themeId: option.id,
@@ -95,6 +100,7 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
       if (result.ok) {
         setErrors({});
         toast.success(t("saved"));
+        if (close) router.push(`/hochzeiten/${wedding.id}`);
       } else {
         setErrors(result.fieldErrors ?? {});
         toast.error(tErrors(result.error ?? (result.fieldErrors ? "invalid_input" : "unknown")));
@@ -222,7 +228,7 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
             onChange={setMessage}
             defaultText={data.defaultMessage}
             max={MESSAGE_MAX}
-            personalized={card.kind !== "engagement"}
+            personalized
             hint={card.kind === "engagement" ? t("messageHintEngagement") : t("messageHint")}
             error={errors.message}
           />
@@ -250,9 +256,21 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
           )}
         </section>
 
-        <Button type="button" className="w-full" disabled={pending} onClick={save}>
-          {pending ? t("saving") : t("save")}
-        </Button>
+        <div className="flex">
+          <Button type="button" className="flex-1 rounded-r-none" disabled={pending} onClick={() => save()}>
+            {pending ? t("saving") : t("save")}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" className="rounded-l-none border-l border-primary-foreground/20 px-2" disabled={pending} aria-label={t("saveOptions")}>
+                <ChevronDown aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => save(true)}>{t("saveAndClose")}</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </aside>
       <section aria-label={t("preview")} className="flex min-h-[70vh] flex-col bg-muted lg:min-h-0">
         <div className="border-b border-border bg-background px-4 py-2 text-sm text-muted-foreground">{t("preview")}</div>

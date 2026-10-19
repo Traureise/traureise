@@ -255,7 +255,7 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
     await test.step("the engagement announcement is one link for everyone, shared with its text by WhatsApp", async () => {
       await page.goto(homeUrl(websiteId));
       const engagement = step(page, "Verlobungsanzeige");
-      await expect(engagement.getByTestId("step-status")).toHaveText("Entwurf · noch nicht geteilt");
+      await expect(engagement.getByTestId("step-status")).toHaveText("0 von 3 Haushalten geöffnet · 0 gesendet");
       await engagement.getByRole("button", { name: "Teilen" }).click();
       const dialog = page.getByRole("dialog", { name: "Verlobungsanzeige teilen" });
       await expect(dialog.getByLabel("Link zur Website")).toHaveValue(`http://localhost:3000/${slug}/verlobung`);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ASSIGNABLE_ITEMS,
   assignedVersion,
   daysUntil,
   firstVersion,
@@ -118,6 +119,10 @@ describe("timeline", () => {
     expect(daysUntil("2026-10-31", "Europe/Berlin", new Date("2026-10-19T10:00:00Z"))).toBe(12);
     expect(daysUntil("2026-10-19", "Europe/Berlin", new Date("2026-10-18T22:30:00Z"))).toBe(0);
     expect(daysUntil("2026-10-01", "Europe/Berlin", new Date("2026-10-19T10:00:00Z"))).toBe(-18);
+  });
+
+  it("every card kind and the website are chosen per household", () => {
+    expect(ASSIGNABLE_ITEMS).toEqual(["engagement", "saveTheDate", "website", "invitation", "thankYou"]);
   });
 
   it("Save the Date and invitation wait for a date; the engagement and thank-you card do not", () => {

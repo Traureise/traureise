@@ -168,3 +168,44 @@ export function HouseholdDialog({ weddingId, events, household }: { weddingId: s
     </Dialog>
   );
 }
+
+/** The quick way for one person: a household named after them, with only them in it. */
+export function QuickAddPerson({ weddingId }: { weddingId: string }) {
+  const t = useTranslations("guests.household");
+  const tErrors = useTranslations("errors");
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string>();
+  const [pending, start] = useTransition();
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    start(async () => {
+      const result = await saveHouseholdAction(weddingId, null, { name, people: [{ name, isChild: false }] });
+      if (!result.ok) {
+        setError(result.fieldErrors?.name ?? result.fieldErrors?.["people.0.name"] ?? result.error ?? "unknown");
+        return;
+      }
+      toast.success(t("quickAdded", { name: name.trim() }));
+      setName("");
+      setError(undefined);
+      router.refresh();
+    });
+  }
+
+  return (
+    <form onSubmit={submit} className="flex min-w-0 flex-wrap items-start gap-2" aria-label={t("quickLabel")}>
+      <div className="min-w-0 flex-1 space-y-1">
+        <Label htmlFor="quick-person" className="sr-only">
+          {t("quickLabel")}
+        </Label>
+        <Input id="quick-person" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("quickPlaceholder")} className="min-w-48" />
+        {error && <p className="text-sm text-destructive">{tErrors(error)}</p>}
+      </div>
+      <Button type="submit" variant="secondary" disabled={pending || !name.trim()}>
+        <Plus aria-hidden />
+        {t("quickAdd")}
+      </Button>
+    </form>
+  );
+}

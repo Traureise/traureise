@@ -43,8 +43,8 @@ export async function loadGuestContext(deps: Deps, wedding: Wedding) {
     assignments,
     sending: guestLinksActive(features, wedding.weddingDate, now),
     deleteAt,
-    /** A card's links, export and sending are unlocked; household cards also stop when the guest data goes. */
-    cardActive: (kind: CardKind) => canUse(CARD_FEATURES[kind], features, now) && (kind === "engagement" || beforeDeletion),
+    /** A card's links, export and sending are unlocked; they stop when the guest data goes. */
+    cardActive: (kind: CardKind) => canUse(CARD_FEATURES[kind], features, now) && beforeDeletion,
     can,
     versionsOf,
     /** The version of a card kind this household gets: its assigned one, else the first. */

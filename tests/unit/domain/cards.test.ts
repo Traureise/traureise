@@ -89,7 +89,17 @@ describe("tintSvg", () => {
 });
 
 describe("householdPageContent", () => {
-  const card = (kind: "saveTheDate" | "invitation" | "thankYou", d: Delivery | null, active = true) => ({ kind, active, delivery: d });
+  const card = (kind: "engagement" | "saveTheDate" | "invitation" | "thankYou", d: Delivery | null, active = true) => ({ kind, active, delivery: d });
+
+  it("shows the engagement announcement on the household's page too, as the oldest step and without the form", () => {
+    const engaged = delivery({ sharedAt: at("2026-01-01") });
+    expect(householdPageContent({ cards: [card("engagement", engaged), card("invitation", null)], rsvpActive: true })).toEqual({ kinds: ["engagement"], form: false });
+    const later = householdPageContent({ cards: [card("engagement", engaged), card("saveTheDate", delivery({ sharedAt: at("2026-03-01") }))], rsvpActive: true });
+    expect(later.kinds).toEqual(["saveTheDate", "engagement"]);
+    // Sent at the same moment: the later step of the wedding comes first.
+    const same = householdPageContent({ cards: [card("engagement", engaged), card("saveTheDate", engaged)], rsvpActive: true });
+    expect(same.kinds).toEqual(["saveTheDate", "engagement"]);
+  });
 
   it("keeps the v3 page (just the form) when no card is active", () => {
     expect(householdPageContent({ cards: [card("saveTheDate", delivery({ sharedAt: at("2026-01-01") }), false)], rsvpActive: true })).toEqual({ kinds: [], form: true });

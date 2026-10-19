@@ -120,6 +120,15 @@ export class DrizzleCardRepository implements CardRepository {
     await this.upsert(householdId, kind, { sharedAt: at, sharedVia: via }, sql`${cardDeliveries.sharedAt} is null`);
   }
 
+  async unmarkShared(householdId: string, kind: HouseholdCardKind): Promise<boolean> {
+    const rows = await this.db
+      .update(cardDeliveries)
+      .set({ sharedAt: null, sharedVia: null })
+      .where(and(this.one(householdId, kind), eq(cardDeliveries.sharedVia, "manual")))
+      .returning({ householdId: cardDeliveries.householdId });
+    return rows.length > 0;
+  }
+
   async listOpens(weddingId: string): Promise<OpenRecord[]> {
     return this.db
       .select({ cardId: cardOpens.cardId, householdId: cardOpens.householdId, openedAt: cardOpens.openedAt })

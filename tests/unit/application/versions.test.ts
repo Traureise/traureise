@@ -172,7 +172,9 @@ describe("who gets what", () => {
     const [invitation] = await cardsOf("invitation");
     const [engagement] = await cardsOf("engagement");
     await expect(new AssignVersion(f.deps).execute(anna.id, weddingId, weber.id, "saveTheDate", invitation!.id)).rejects.toBeInstanceOf(NotFoundError);
-    await expect(new AssignVersion(f.deps).execute(anna.id, weddingId, weber.id, "engagement" as never, engagement!.id)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(new AssignVersion(f.deps).execute(anna.id, weddingId, weber.id, "invitation", engagement!.id)).rejects.toBeInstanceOf(NotFoundError);
+    // The engagement announcement is chosen per household like every other card.
+    await new AssignVersion(f.deps).execute(anna.id, weddingId, weber.id, "engagement", engagement!.id);
     const other = await new CreateWedding(f.deps).execute(anna.id, { title: "Clara & Dana", hasDate: false });
     const [foreign] = await f.websites.listByWedding(other.id);
     await expect(new AssignVersion(f.deps).execute(anna.id, weddingId, weber.id, "website", foreign!.id)).rejects.toBeInstanceOf(NotFoundError);
