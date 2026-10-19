@@ -208,14 +208,16 @@ describe("buildCardModel", () => {
     eyebrow: { saveTheDate: "Save the Date", invitation: "Einladung", thankYou: "Danke", engagement: "Verlobt" },
     replyBy: "Bitte antwortet bis {date}",
     time: "{time} Uhr",
+    dateTbd: "Datum folgt",
   };
   const website = { title: "Anna & Ben", weddingDate: "2027-06-12", location: "Hamburg", url: "http://localhost:3000/anna-ben" };
   const assets = { photoSrc: "/uploads/p.webp", maskSvg: null, ornamentSvg: '<svg xmlns="http://www.w3.org/2000/svg"/>' };
 
-  it("builds a Save the Date from the website", () => {
-    const content = { ...defaultCardContent("saveTheDate", { title: "Anna & Ben", location: "Hamburg" }, { heading: "", text: "Einladung folgt" }) };
+  it("builds a Save the Date from the wedding, with the couple's own line above the names", () => {
+    const content = { ...defaultCardContent("saveTheDate", { title: "Anna & Ben", location: "Hamburg" }, { heading: "Haltet euch den Tag frei", text: "Einladung folgt" }) };
     const model = buildCardModel({ kind: "saveTheDate", content, design, website, event: null, replyBy: null, household: null, labels, assets });
-    expect(model).toMatchObject({ eyebrow: "Save the Date", names: "Anna & Ben", details: ["12. Juni 2027", "Hamburg"], text: "Einladung folgt", footer: null, personalLine: null });
+    expect(model).toMatchObject({ eyebrow: "Haltet euch den Tag frei", heading: "", names: "Anna & Ben", details: ["12. Juni 2027", "Hamburg"], text: "Einladung folgt", footer: null, personalLine: null });
+    expect(buildCardModel({ kind: "saveTheDate", content: { ...content, heading: "Save the Date" }, design, website, event: null, replyBy: null, household: null, labels, assets }).eyebrow).toBe("Save the Date");
     expect(model.colors.onCard).toBe("#ffffff");
     // On a full-bleed photo the ornament is drawn in the text colour, not the accent.
     expect(atob(model.ornamentSrc!.split(",")[1]!)).toContain('fill="#ffffff"');
@@ -230,6 +232,14 @@ describe("buildCardModel", () => {
     const custom = buildCardModel({ kind: "invitation", content: { ...content, time: "ab 14 Uhr", venue: "Im Garten", showReplyBy: false }, design, website, event, replyBy: "2027-05-01", household: null, labels, assets });
     expect(custom.details).toEqual(["12. Juni 2027", "ab 14 Uhr", "Im Garten"]);
     expect(custom.footer).toBeNull();
+  });
+
+  it("says \"Datum folgt\" on a Save the Date or invitation while the wedding has no date", () => {
+    const open = { ...website, weddingDate: null };
+    const std = defaultCardContent("saveTheDate", { title: "Anna & Ben", location: null }, { heading: "Haltet euch den Tag frei", text: "" });
+    expect(buildCardModel({ kind: "saveTheDate", content: std, design, website: open, event: null, replyBy: null, household: null, labels, assets }).details).toEqual(["Datum folgt"]);
+    const invitation = defaultCardContent("invitation", { title: "Anna & Ben", location: null }, { heading: "Wir heiraten", text: "" });
+    expect(buildCardModel({ kind: "invitation", content: invitation, design, website: open, event: null, replyBy: null, household: null, labels, assets }).details).toEqual(["Datum folgt"]);
   });
 
   it("adds the household's personal line to a thank-you card", () => {

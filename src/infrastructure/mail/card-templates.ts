@@ -59,10 +59,11 @@ export function createCardTexts(locale = "de"): CardTexts {
   const t = createTranslator({ locale, messages, namespace: "cards" });
   const byKind = <T,>(fn: (kind: CardKind) => T) => Object.fromEntries(CARD_KINDS.map((k) => [k, fn(k)])) as Record<CardKind, T>;
   return {
-    labels: { locale, eyebrow: byKind((k) => t(`labels.eyebrow.${k}`)), replyBy: t.raw("labels.replyBy") as string, time: t.raw("labels.time") as string },
+    labels: { locale, eyebrow: byKind((k) => t(`labels.eyebrow.${k}`)), replyBy: t.raw("labels.replyBy") as string, time: t.raw("labels.time") as string, dateTbd: t("labels.dateTbd") },
     defaults: byKind((k) => ({ heading: t.raw(`defaults.${k}.heading`) as string, text: t.raw(`defaults.${k}.text`) as string, message: t.raw(`defaults.${k}.message`) as string })),
     reminderMessage: t.raw("reminderMessage") as string,
     sampleHousehold: t("sampleHousehold"),
     calendarTitle: t.raw("calendarTitle") as string,
+    firstVersionLabel: t("firstVersionLabel"),
   };
 }

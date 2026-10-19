@@ -2,33 +2,57 @@ import type { CollectionKind, ItemData, SectionKind } from "@/domain/sections";
 import type { Entitlement, PaidTier, Tier, TierOffer } from "@/domain/billing";
 import type { ThemeManifest } from "@/domain/theme";
 import type { Household, HouseholdInput, HouseholdResponse, Poll, PollInput, RequestStatus, RsvpSettings } from "@/domain/guests";
-import type { CardContent, CardInput, CardKind, CardLabels, CardModel, Delivery, SharedVia } from "@/domain/cards";
+import type { CardContent, CardInput, CardKind, CardLabels, CardModel, Delivery, HouseholdCardKind, SharedVia } from "@/domain/cards";
+import type { AssignableItem, Assignment } from "@/domain/weddings";
 
 export type User = { id: string; email: string; firstName: string | null; createdAt: Date };
 
-export type Website = {
+/** The root of everything a couple makes: names, date, place, and the address of the non-website links. */
+export type Wedding = {
   id: string;
   ownerId: string;
+  /** /<slug>/verlobung, /<slug>/hochzeit.ics; one namespace with the website versions' slugs. */
   slug: string;
+  /** The couple's names, e.g. "Anna & Ben". */
   title: string;
+  /** Null while the wedding is not planned yet. */
   weddingDate: string | null;
   location: string | null;
+  timezone: string;
+  lastOpenedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+export type NewWedding = Pick<Wedding, "ownerId" | "slug" | "title" | "weddingDate" | "timezone">;
+export type WeddingPatch = Partial<Pick<Wedding, "slug" | "title" | "weddingDate" | "location" | "timezone" | "lastOpenedAt">>;
+
+/** A version of the wedding's website, for an audience. A draft (a 404 publicly) until published. */
+export type Website = {
+  id: string;
+  weddingId: string;
+  label: string;
+  /** The first version (lowest position) is the one households get by default. */
+  position: number;
+  slug: string;
+  published: boolean;
+  /** Wedding events this version leaves out of its schedule. */
+  hiddenEventIds: string[];
   welcomeMessage: string;
   hashtag: string;
   showCountdown: boolean;
   coverImageKey: string | null;
-  timezone: string;
   themeId: string;
-  /** False while the couple only has cards: the public website is not created yet (/<slug> is a 404). */
-  siteEnabled: boolean;
   paletteId: string | null;
   fontPairingId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
 
-export type NewWebsite = Pick<Website, "ownerId" | "slug" | "title" | "weddingDate" | "themeId" | "timezone"> & { siteEnabled?: boolean };
-export type WebsitePatch = Partial<Omit<Website, "id" | "ownerId" | "createdAt" | "updatedAt">>;
+export type NewWebsite = Omit<Website, "id" | "createdAt" | "updatedAt">;
+export type WebsitePatch = Partial<Omit<Website, "id" | "weddingId" | "createdAt" | "updatedAt">>;
+
+/** A website version with the wedding's names, date, place and time zone: what the site shows. */
+export type SiteData = Website & Pick<Wedding, "title" | "weddingDate" | "location" | "timezone">;
 
 export type Section = { kind: SectionKind; title: string | null; visible: boolean; body: string };
 export type SectionPatch = Partial<Omit<Section, "kind">>;
@@ -74,12 +98,35 @@ export interface RateLimiter {
   forget(key: string): Promise<void>;
 }
 
+/** Who uses a slug: weddings and website versions share one namespace. */
+export type SlugOwners = { weddingIds: string[]; websites: { id: string; weddingId: string }[] };
+
+export interface WeddingRepository {
+  create(wedding: NewWedding): Promise<Wedding>;
+  findById(id: string): Promise<Wedding | null>;
+  findBySlug(slug: string): Promise<Wedding | null>;
+  listByOwner(ownerId: string): Promise<Wedding[]>;
+  update(id: string, patch: WeddingPatch): Promise<Wedding>;
+  /** Deletes the wedding and, through the cascades, everything in it. */
+  delete(id: string): Promise<void>;
+  slugOwners(slug: string): Promise<SlugOwners>;
+
+  /** The schedule: events belong to the wedding, website versions choose which they show. */
+  listEvents(weddingId: string): Promise<Item<"schedule">[]>;
+  findEvent(weddingId: string, eventId: string): Promise<Item<"schedule"> | null>;
+  /** Appends at the end. */
+  addEvent(weddingId: string, data: ItemData<"schedule">): Promise<Item<"schedule">>;
+  updateEvent(eventId: string, data: ItemData<"schedule">): Promise<void>;
+  deleteEvent(eventId: string): Promise<void>;
+  setEventOrder(weddingId: string, orderedIds: string[]): Promise<void>;
+}
+
 export interface WebsiteRepository {
   create(website: NewWebsite, sections: Section[]): Promise<Website>;
   findById(id: string): Promise<Website | null>;
   findBySlug(slug: string): Promise<Website | null>;
-  listByOwner(ownerId: string): Promise<Website[]>;
-  slugTaken(slug: string, exceptWebsiteId?: string): Promise<boolean>;
+  /** First version first. */
+  listByWedding(weddingId: string): Promise<Website[]>;
   update(id: string, patch: WebsitePatch): Promise<Website>;
   delete(id: string): Promise<void>;
   listSections(websiteId: string): Promise<Section[]>;
@@ -94,12 +141,13 @@ export interface WebsiteRepository {
   setItemOrder(websiteId: string, kind: CollectionKind, orderedIds: string[]): Promise<void>;
 }
 
-export type UploadRecord = { key: string; websiteId: string | null; contentType: string; size: number; createdAt: Date };
+export type UploadRecord = { key: string; weddingId: string | null; contentType: string; size: number; createdAt: Date };
 
+/** Photos belong to the wedding: its website versions and cards share them. */
 export interface UploadRepository {
-  create(input: { key: string; ownerId: string; websiteId: string; contentType: string; size: number }): Promise<void>;
-  belongsToWebsite(key: string, websiteId: string): Promise<boolean>;
-  listKeysByWebsite(websiteId: string): Promise<string[]>;
+  create(input: { key: string; ownerId: string; weddingId: string; contentType: string; size: number }): Promise<void>;
+  belongsToWedding(key: string, weddingId: string): Promise<boolean>;
+  listKeysByWedding(weddingId: string): Promise<string[]>;
   listByOwner(ownerId: string): Promise<UploadRecord[]>;
   delete(key: string): Promise<void>;
 }
@@ -161,10 +209,10 @@ export interface TokenGenerator {
   hash(token: string): string;
 }
 
-export type EntitlementRecord = Entitlement & { id: string; websiteId: string; provider: string; createdAt: Date };
+export type EntitlementRecord = Entitlement & { id: string; weddingId: string; provider: string; createdAt: Date };
 
 export type BillingChange =
-  | { kind: "grant"; websiteId: string; tier: PaidTier; purchaseRef: string; provider: string; validUntil: Date }
+  | { kind: "grant"; weddingId: string; tier: PaidTier; purchaseRef: string; provider: string; validUntil: Date }
   | { kind: "revoke"; purchaseRef: string; at: Date }
   | { kind: "none" };
 
@@ -174,16 +222,16 @@ export interface BillingRepository {
    * A purchase reference is granted at most once, so a replayed payment never undoes a refund.
    */
   applyEvent(eventId: string, change: BillingChange): Promise<"applied" | "duplicate">;
-  listByWebsite(websiteId: string): Promise<EntitlementRecord[]>;
+  listByWedding(weddingId: string): Promise<EntitlementRecord[]>;
   listByOwner(ownerId: string): Promise<EntitlementRecord[]>;
 }
 
 export type PaymentEvent =
-  | { type: "paid"; eventId: string; purchaseRef: string; productId: string; websiteId: string | null }
+  | { type: "paid"; eventId: string; purchaseRef: string; productId: string; weddingId: string | null }
   | { type: "revoked"; eventId: string; purchaseRef: string | null }
   | { type: "ignored"; eventId: string };
 
-export type CheckoutRequest = { productId: string; websiteId: string; tier: PaidTier; customerEmail: string; successUrl: string; requestId: string };
+export type CheckoutRequest = { productId: string; weddingId: string; tier: PaidTier; customerEmail: string; successUrl: string; requestId: string };
 
 export interface PaymentProvider {
   /** Identifies the provider on stored purchases, e.g. "Creem". */
@@ -206,41 +254,46 @@ export type PollRecord = Poll & { position: number };
 export type NewPoll = Omit<PollInput, "options"> & { options: Poll["options"] };
 export type HouseholdData = Omit<HouseholdInput, "people"> & { people: { id: string | null; name: string; isChild: boolean }[] };
 
-/** Guest lists. Everything hangs off the website (ON DELETE CASCADE). */
+/** Guest lists. Everything hangs off the wedding (ON DELETE CASCADE). */
 export interface GuestRepository {
-  getSettings(websiteId: string): Promise<RsvpSettings>;
-  saveSettings(websiteId: string, settings: RsvpSettings): Promise<void>;
-  listPolls(websiteId: string): Promise<PollRecord[]>;
-  createPoll(websiteId: string, poll: NewPoll): Promise<PollRecord>;
-  /** Returns false if the poll does not belong to the website. */
-  updatePoll(websiteId: string, pollId: string, poll: NewPoll): Promise<boolean>;
-  deletePoll(websiteId: string, pollId: string): Promise<void>;
+  getSettings(weddingId: string): Promise<RsvpSettings>;
+  saveSettings(weddingId: string, settings: RsvpSettings): Promise<void>;
+  listPolls(weddingId: string): Promise<PollRecord[]>;
+  createPoll(weddingId: string, poll: NewPoll): Promise<PollRecord>;
+  /** Returns false if the poll does not belong to the wedding. */
+  updatePoll(weddingId: string, pollId: string, poll: NewPoll): Promise<boolean>;
+  deletePoll(weddingId: string, pollId: string): Promise<void>;
 
   /** Households with their people and requests, oldest first. */
-  listHouseholds(websiteId: string): Promise<Household[]>;
-  findHousehold(websiteId: string, householdId: string): Promise<Household | null>;
-  findByTokenHash(tokenHash: string): Promise<{ websiteId: string; household: Household } | null>;
+  listHouseholds(weddingId: string): Promise<Household[]>;
+  findHousehold(weddingId: string, householdId: string): Promise<Household | null>;
+  findByTokenHash(tokenHash: string): Promise<{ weddingId: string; household: Household } | null>;
   /** `tokenHashFor` turns the new household's id into the hash of its personal link. */
-  createHousehold(websiteId: string, data: HouseholdData, tokenHashFor: (householdId: string) => string): Promise<Household>;
+  createHousehold(weddingId: string, data: HouseholdData, tokenHashFor: (householdId: string) => string): Promise<Household>;
   /** People with an id are updated, people without one added, people left out removed. */
-  updateHousehold(websiteId: string, householdId: string, data: HouseholdData): Promise<void>;
-  deleteHousehold(websiteId: string, householdId: string): Promise<void>;
+  updateHousehold(weddingId: string, householdId: string, data: HouseholdData): Promise<void>;
+  deleteHousehold(weddingId: string, householdId: string): Promise<void>;
   /** Stores a household's answer and its new requests in one transaction. */
   saveResponse(householdId: string, response: HouseholdResponse, at: Date): Promise<void>;
   /** Adding puts the requested person into the household. Returns false for unknown or decided requests. */
-  decideRequest(websiteId: string, requestId: string, status: Exclude<RequestStatus, "pending">, at: Date): Promise<boolean>;
+  decideRequest(weddingId: string, requestId: string, status: Exclude<RequestStatus, "pending">, at: Date): Promise<boolean>;
+
+  /** Which version of each item households get (no entry: the first version). */
+  listAssignments(weddingId: string): Promise<Assignment[]>;
+  /** The version must belong to the household's wedding and fit the item; the use case checks both. */
+  assign(householdId: string, item: AssignableItem, target: { cardId: string } | { websiteId: string }): Promise<void>;
 
   /** Clears the household's email address (one-click unsubscribe); false for unknown households. */
   unsubscribe(householdId: string, at: Date): Promise<boolean>;
-  /** Retention: removes households, people, answers and requests of a website; returns how many households. */
-  deleteGuestData(websiteId: string): Promise<number>;
-  listWebsiteIdsWithGuests(): Promise<string[]>;
-  listWebsiteIdsWithDailySummary(): Promise<string[]>;
-  lastSummaryAt(websiteId: string): Promise<Date | null>;
+  /** Retention: removes households, people, answers and requests of a wedding; returns how many households. */
+  deleteGuestData(weddingId: string): Promise<number>;
+  listWeddingIdsWithGuests(): Promise<string[]>;
+  listWeddingIdsWithDailySummary(): Promise<string[]>;
+  lastSummaryAt(weddingId: string): Promise<Date | null>;
   /** Compare-and-set, so only one instance sends a summary. */
-  claimDailySummary(websiteId: string, previous: Date | null, at: Date): Promise<boolean>;
+  claimDailySummary(weddingId: string, previous: Date | null, at: Date): Promise<boolean>;
   /** True once per deletion date, so only one instance warns, and only once. */
-  claimRetentionWarning(websiteId: string, deleteAt: Date): Promise<boolean>;
+  claimRetentionWarning(weddingId: string, deleteAt: Date): Promise<boolean>;
 }
 
 /** Personal links: a token derived from the household id with a server secret. Only its hash is stored. */
@@ -268,8 +321,16 @@ export interface GuestMailTemplates {
 
 export type Card = {
   id: string;
-  websiteId: string;
+  weddingId: string;
   kind: CardKind;
+  /** The version's name ("Standard", "Familie"); several versions per kind for different audiences. */
+  label: string;
+  /** Fixed at creation; the engagement version's link. */
+  slug: string;
+  /** The first version (lowest position) is the one households get by default. */
+  position: number;
+  /** Engagement announcement: when the couple first shared its link. */
+  sharedAt: Date | null;
   themeId: string;
   paletteId: string | null;
   fontPairingId: string | null;
@@ -285,41 +346,48 @@ export type Card = {
   createdAt: Date;
   updatedAt: Date;
 };
-export type NewCard = Omit<Card, "id" | "createdAt" | "updatedAt">;
+export type NewCard = Omit<Card, "id" | "sharedAt" | "createdAt" | "updatedAt">;
 
-export type DeliveryRecord = Delivery & { cardId: string; householdId: string };
+/** What happened with one kind of card for one household, whichever version it got. */
+export type DeliveryRecord = Omit<Delivery, "openedAt"> & { householdId: string; kind: HouseholdCardKind };
+export type OpenRecord = { cardId: string; householdId: string; openedAt: Date };
 export type MailChannel = "card" | "reminder";
-export type QueuedMail = { cardId: string; householdId: string; websiteId: string; channel: MailChannel };
+export type QueuedMail = { householdId: string; kind: HouseholdCardKind; weddingId: string; channel: MailChannel };
 
-/** Cards and their deliveries. Cards hang off the website, deliveries off the card and the household (cascades). */
+/** Cards and their deliveries. Cards hang off the wedding; deliveries, opens off the household (cascades). */
 export interface CardRepository {
-  /** Null when the website already has a card of this kind. */
-  create(card: NewCard): Promise<Card | null>;
-  find(websiteId: string, kind: CardKind): Promise<Card | null>;
-  listByWebsite(websiteId: string): Promise<Card[]>;
-  update(websiteId: string, kind: CardKind, input: CardInput): Promise<void>;
-  delete(websiteId: string, kind: CardKind): Promise<void>;
+  create(card: NewCard): Promise<Card>;
+  findById(cardId: string): Promise<Card | null>;
+  listByWedding(weddingId: string): Promise<Card[]>;
+  update(cardId: string, input: CardInput): Promise<void>;
+  rename(cardId: string, label: string): Promise<void>;
+  delete(cardId: string): Promise<void>;
+  /** Keeps the first time. */
+  markLinkShared(cardId: string, at: Date): Promise<void>;
 
-  listDeliveries(cardId: string): Promise<DeliveryRecord[]>;
+  listDeliveries(weddingId: string): Promise<DeliveryRecord[]>;
   listDeliveriesOfHousehold(householdId: string): Promise<DeliveryRecord[]>;
-  setExcluded(cardId: string, householdId: string, excluded: boolean): Promise<void>;
+  setExcluded(householdId: string, kind: HouseholdCardKind, excluded: boolean): Promise<void>;
   /** Records the first share; later shares keep the first time and channel. */
-  markShared(cardId: string, householdId: string, via: SharedVia, at: Date): Promise<void>;
+  markShared(householdId: string, kind: HouseholdCardKind, via: SharedVia, at: Date): Promise<void>;
+
+  listOpens(weddingId: string): Promise<OpenRecord[]>;
+  listOpensOfHousehold(householdId: string): Promise<OpenRecord[]>;
   /** Only the first visit counts; returns whether this one did. */
   markOpened(cardId: string, householdId: string, at: Date): Promise<boolean>;
 
   /** Queues an email per household, unless one is being sent right now; returns how many were queued. */
-  queueMail(channel: MailChannel, cardId: string, householdIds: string[], at: Date): Promise<number>;
-  listQueuedMail(limit: number, websiteId?: string): Promise<QueuedMail[]>;
+  queueMail(channel: MailChannel, kind: HouseholdCardKind, householdIds: string[], at: Date): Promise<number>;
+  listQueuedMail(limit: number, weddingId?: string): Promise<QueuedMail[]>;
   /** Compare-and-set: true for exactly one caller, so an email is never sent twice. */
-  claimMail(channel: MailChannel, cardId: string, householdId: string, at: Date): Promise<boolean>;
-  finishMail(channel: MailChannel, cardId: string, householdId: string, outcome: { sentAt: Date } | { error: string }): Promise<void>;
+  claimMail(channel: MailChannel, householdId: string, kind: HouseholdCardKind, at: Date): Promise<boolean>;
+  finishMail(channel: MailChannel, householdId: string, kind: HouseholdCardKind, outcome: { sentAt: Date } | { error: string }): Promise<void>;
   /** Claims older than `before` that never finished (a crash mid-send) become failures, never retries. */
   failStaleClaims(before: Date): Promise<number>;
-  /** Compare-and-set on the last automatic reminder's offset. */
-  claimAutomaticReminder(cardId: string, householdId: string, offset: number, at: Date): Promise<boolean>;
-  /** Invitations with automatic reminders configured. */
-  listInvitationsWithReminders(): Promise<{ websiteId: string; cardId: string }[]>;
+  /** Compare-and-set on the last automatic reminder's offset (the invitation). */
+  claimAutomaticReminder(householdId: string, offset: number, at: Date): Promise<boolean>;
+  /** Weddings with an invitation version that has automatic reminders. */
+  listWeddingIdsWithReminders(): Promise<string[]>;
 }
 
 export type PaperFormat = "a6" | "a5";
@@ -338,6 +406,8 @@ export type CardTexts = {
   sampleHousehold: string;
   /** "{couple}" is replaced. */
   calendarTitle: string;
+  /** The name of every item's first version ("Standard"). */
+  firstVersionLabel: string;
 };
 
 export type CardMail = {

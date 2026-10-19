@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { localDay } from "./days";
 import { isValidEmail, normalizeEmail } from "./email";
 import { isoDate, optional, requiredText, text } from "./fields";
 import { parseWith, type FieldErrors, type Parsed } from "./result";
@@ -96,8 +97,6 @@ export function householdStatus(household: Pick<Household, "respondedAt" | "peop
   return household.people.some((p) => p.attending) ? "answered" : "declined";
 }
 
-const localDay = (now: Date, timeZone: string) =>
-  new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 const localHour = (now: Date, timeZone: string) => Number(new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", hourCycle: "h23" }).format(now));
 
 /** Answers can change until the end of the reply-by day in the website's timezone. */

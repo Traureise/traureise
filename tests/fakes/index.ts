@@ -40,16 +40,23 @@ import type {
   ThemeCatalog,
   TokenGenerator,
   UploadRepository,
+  NewWebsite,
+  NewWedding,
+  OpenRecord,
   User,
   UserRepository,
   Website,
   WebsiteRepository,
+  Wedding,
+  WeddingPatch,
+  WeddingRepository,
 } from "@/application/ports";
 import type { Deps } from "@/application/deps";
 import type { CollectionKind } from "@/domain/sections";
 import { DEFAULT_RSVP_SETTINGS, type Household, type HouseholdResponse, type RsvpSettings } from "@/domain/guests";
 import { parseThemeManifest, type ThemeManifest } from "@/domain/theme";
-import type { CardInput, CardKind, Delivery, SharedVia } from "@/domain/cards";
+import type { CardInput, CardKind, Delivery, HouseholdCardKind, SharedVia } from "@/domain/cards";
+import type { AssignableItem, Assignment } from "@/domain/weddings";
 
 export class FakeClock implements Clock {
   constructor(public current = new Date("2026-10-18T10:00:00Z")) {}
@@ -148,6 +155,72 @@ function omit<T extends object, K extends keyof T>(value: T, key: K): Omit<T, K>
   return rest;
 }
 
+export class InMemoryWeddings implements WeddingRepository {
+  weddings: Wedding[] = [];
+  events: (Item<"schedule"> & { weddingId: string })[] = [];
+  /** Stands in for ON DELETE CASCADE from weddings. */
+  cascades: ((weddingId: string) => void)[] = [];
+  constructor(private websites: InMemoryWebsites) {}
+
+  async create(input: NewWedding) {
+    const now = new Date();
+    const wedding: Wedding = { id: randomUUID(), location: null, lastOpenedAt: null, createdAt: now, updatedAt: now, ...input };
+    this.weddings.push(wedding);
+    return copy(wedding);
+  }
+  async findById(id: string) {
+    return copy(this.weddings.find((w) => w.id === id) ?? null);
+  }
+  async findBySlug(slug: string) {
+    return copy(this.weddings.find((w) => w.slug === slug) ?? null);
+  }
+  async listByOwner(ownerId: string) {
+    return copy(this.weddings.filter((w) => w.ownerId === ownerId));
+  }
+  async update(id: string, patch: WeddingPatch) {
+    const wedding = this.weddings.find((w) => w.id === id)!;
+    Object.assign(wedding, patch, { updatedAt: new Date() });
+    return copy(wedding);
+  }
+  async delete(id: string) {
+    this.weddings = this.weddings.filter((w) => w.id !== id);
+    this.events = this.events.filter((e) => e.weddingId !== id);
+    for (const site of this.websites.websites.filter((w) => w.weddingId === id)) await this.websites.delete(site.id);
+    for (const cascade of this.cascades) cascade(id);
+  }
+  async slugOwners(slug: string) {
+    return {
+      weddingIds: this.weddings.filter((w) => w.slug === slug).map((w) => w.id),
+      websites: this.websites.websites.filter((w) => w.slug === slug).map((w) => ({ id: w.id, weddingId: w.weddingId })),
+    };
+  }
+  async listEvents(weddingId: string) {
+    return copy(this.events.filter((e) => e.weddingId === weddingId).sort((a, b) => a.position - b.position)).map((e) => omit(e, "weddingId"));
+  }
+  async findEvent(weddingId: string, eventId: string) {
+    const event = this.events.find((e) => e.weddingId === weddingId && e.id === eventId);
+    return event ? omit(copy(event), "weddingId") : null;
+  }
+  async addEvent(weddingId: string, data: Item<"schedule">["data"]) {
+    const position = Math.max(-1, ...this.events.filter((e) => e.weddingId === weddingId).map((e) => e.position)) + 1;
+    const event = { id: randomUUID(), weddingId, kind: "schedule" as const, position, data: copy(data) };
+    this.events.push(event);
+    return omit(copy(event), "weddingId");
+  }
+  async updateEvent(eventId: string, data: Item<"schedule">["data"]) {
+    this.events.find((e) => e.id === eventId)!.data = copy(data);
+  }
+  async deleteEvent(eventId: string) {
+    this.events = this.events.filter((e) => e.id !== eventId);
+  }
+  async setEventOrder(weddingId: string, orderedIds: string[]) {
+    orderedIds.forEach((id, position) => {
+      const event = this.events.find((e) => e.id === id && e.weddingId === weddingId);
+      if (event) event.position = position;
+    });
+  }
+}
+
 export class InMemoryWebsites implements WebsiteRepository {
   websites: Website[] = [];
   sections = new Map<string, Section[]>();
@@ -155,25 +228,13 @@ export class InMemoryWebsites implements WebsiteRepository {
   /** Stands in for ON DELETE CASCADE from websites. */
   cascades: ((websiteId: string) => void)[] = [];
 
-  async create(input: Parameters<WebsiteRepository["create"]>[0], sections: Section[]) {
+  async create(input: NewWebsite, sections: Section[]) {
+    if (this.websites.some((w) => w.slug === input.slug)) throw new Error("duplicate slug");
     const now = new Date();
-    const website: Website = {
-      id: randomUUID(),
-      location: null,
-      welcomeMessage: "",
-      hashtag: "",
-      showCountdown: false,
-      coverImageKey: null,
-      paletteId: null,
-      fontPairingId: null,
-      createdAt: now,
-      updatedAt: now,
-      ...input,
-      siteEnabled: input.siteEnabled ?? true,
-    };
+    const website: Website = { ...copy(input), id: randomUUID(), createdAt: now, updatedAt: now };
     this.websites.push(website);
     this.sections.set(website.id, sections.map((s) => ({ ...s })));
-    return website;
+    return copy(website);
   }
   async findById(id: string) {
     return copy(this.websites.find((w) => w.id === id) ?? null);
@@ -181,15 +242,12 @@ export class InMemoryWebsites implements WebsiteRepository {
   async findBySlug(slug: string) {
     return copy(this.websites.find((w) => w.slug === slug) ?? null);
   }
-  async listByOwner(ownerId: string) {
-    return copy(this.websites.filter((w) => w.ownerId === ownerId));
-  }
-  async slugTaken(slug: string, exceptWebsiteId?: string) {
-    return this.websites.some((w) => w.slug === slug && w.id !== exceptWebsiteId);
+  async listByWedding(weddingId: string) {
+    return copy(this.websites.filter((w) => w.weddingId === weddingId).sort((a, b) => a.position - b.position));
   }
   async update(id: string, patch: Partial<Website>) {
     const website = this.websites.find((w) => w.id === id)!;
-    Object.assign(website, patch, { updatedAt: new Date() });
+    Object.assign(website, copy(patch), { updatedAt: new Date() });
     return copy(website);
   }
   async delete(id: string) {
@@ -206,19 +264,20 @@ export class InMemoryWebsites implements WebsiteRepository {
     Object.assign(section, patch);
   }
   async listItems(websiteId: string) {
-    return copy(this.items.filter((i) => i.websiteId === websiteId).sort((a, b) => a.position - b.position));
+    return copy(this.items.filter((i) => i.websiteId === websiteId).sort((a, b) => a.position - b.position)).map((i) => omit(i, "websiteId") as Item);
   }
   async findItem(websiteId: string, itemId: string) {
-    return copy(this.items.find((i) => i.websiteId === websiteId && i.id === itemId) ?? null);
+    const item = this.items.find((i) => i.websiteId === websiteId && i.id === itemId);
+    return item ? (omit(copy(item), "websiteId") as Item) : null;
   }
   async addItem<K extends CollectionKind>(websiteId: string, kind: K, data: Item<K>["data"]) {
     const position = Math.max(-1, ...this.items.filter((i) => i.websiteId === websiteId && i.kind === kind).map((i) => i.position)) + 1;
-    const item = { id: randomUUID(), websiteId, kind, position, data } as Item<K> & { websiteId: string };
+    const item = { id: randomUUID(), websiteId, kind, position, data: copy(data) } as Item<K> & { websiteId: string };
     this.items.push(item as never);
-    return item;
+    return omit(copy(item), "websiteId") as Item<K>;
   }
   async updateItem(itemId: string, data: Item["data"]) {
-    this.items.find((i) => i.id === itemId)!.data = data;
+    this.items.find((i) => i.id === itemId)!.data = copy(data);
   }
   async deleteItem(itemId: string) {
     this.items = this.items.filter((i) => i.id !== itemId);
@@ -232,20 +291,20 @@ export class InMemoryWebsites implements WebsiteRepository {
 }
 
 export class InMemoryUploads implements UploadRepository {
-  uploads: { key: string; ownerId: string; websiteId: string; contentType: string; size: number; createdAt: Date }[] = [];
+  uploads: { key: string; ownerId: string; weddingId: string; contentType: string; size: number; createdAt: Date }[] = [];
   async create(input: Omit<InMemoryUploads["uploads"][number], "createdAt">) {
     this.uploads.push({ ...input, createdAt: new Date() });
   }
   async listByOwner(ownerId: string) {
     return this.uploads
       .filter((u) => u.ownerId === ownerId)
-      .map((u) => ({ key: u.key, websiteId: u.websiteId, contentType: u.contentType, size: u.size, createdAt: u.createdAt }));
+      .map((u) => ({ key: u.key, weddingId: u.weddingId, contentType: u.contentType, size: u.size, createdAt: u.createdAt }));
   }
-  async belongsToWebsite(key: string, websiteId: string) {
-    return this.uploads.some((u) => u.key === key && u.websiteId === websiteId);
+  async belongsToWedding(key: string, weddingId: string) {
+    return this.uploads.some((u) => u.key === key && u.weddingId === weddingId);
   }
-  async listKeysByWebsite(websiteId: string) {
-    return this.uploads.filter((u) => u.websiteId === websiteId).map((u) => u.key);
+  async listKeysByWedding(weddingId: string) {
+    return this.uploads.filter((u) => u.weddingId === weddingId).map((u) => u.key);
   }
   async delete(key: string) {
     this.uploads = this.uploads.filter((u) => u.key !== key);
@@ -282,25 +341,25 @@ export class FakeMailer implements Mailer {
 export class InMemoryBilling implements BillingRepository {
   entitlements: EntitlementRecord[] = [];
   events = new Set<string>();
-  constructor(private websites: InMemoryWebsites) {}
+  constructor(private weddings: InMemoryWeddings) {}
   async applyEvent(eventId: string, change: BillingChange) {
     if (this.events.has(eventId)) return "duplicate" as const;
     this.events.add(eventId);
     if (change.kind === "grant" && !this.entitlements.some((e) => e.purchaseRef === change.purchaseRef)) {
-      const { websiteId, tier, purchaseRef, provider, validUntil } = change;
-      this.entitlements.push({ id: randomUUID(), revokedAt: null, createdAt: new Date(), websiteId, tier, purchaseRef, provider, validUntil });
+      const { weddingId, tier, purchaseRef, provider, validUntil } = change;
+      this.entitlements.push({ id: randomUUID(), revokedAt: null, createdAt: new Date(), weddingId, tier, purchaseRef, provider, validUntil });
     }
     if (change.kind === "revoke") {
       for (const e of this.entitlements) if (e.purchaseRef === change.purchaseRef && !e.revokedAt) e.revokedAt = change.at;
     }
     return "applied" as const;
   }
-  async listByWebsite(websiteId: string) {
-    return copy(this.entitlements.filter((e) => e.websiteId === websiteId));
+  async listByWedding(weddingId: string) {
+    return copy(this.entitlements.filter((e) => e.weddingId === weddingId));
   }
   async listByOwner(ownerId: string) {
-    const ids = new Set(this.websites.websites.filter((w) => w.ownerId === ownerId).map((w) => w.id));
-    return copy(this.entitlements.filter((e) => ids.has(e.websiteId)));
+    const ids = new Set(this.weddings.weddings.filter((w) => w.ownerId === ownerId).map((w) => w.id));
+    return copy(this.entitlements.filter((e) => ids.has(e.weddingId)));
   }
 }
 
@@ -329,50 +388,51 @@ export class FakeArchive implements ArchiveWriter {
 
 export class InMemoryGuests implements GuestRepository {
   settings = new Map<string, RsvpSettings & { lastSummaryAt: Date | null; warnedFor: Date | null }>();
-  polls: (PollRecord & { websiteId: string })[] = [];
-  households: (Household & { websiteId: string; tokenHash: string })[] = [];
+  polls: (PollRecord & { weddingId: string })[] = [];
+  households: (Household & { weddingId: string; tokenHash: string })[] = [];
+  assignments: (Assignment & { target: { cardId: string } | { websiteId: string } })[] = [];
   private n = 0;
   private id = (prefix: string) => `${prefix}-${++this.n}`;
 
-  private state(websiteId: string) {
-    if (!this.settings.has(websiteId)) this.settings.set(websiteId, { ...DEFAULT_RSVP_SETTINGS, lastSummaryAt: null, warnedFor: null });
-    return this.settings.get(websiteId)!;
+  private state(weddingId: string) {
+    if (!this.settings.has(weddingId)) this.settings.set(weddingId, { ...DEFAULT_RSVP_SETTINGS, lastSummaryAt: null, warnedFor: null });
+    return this.settings.get(weddingId)!;
   }
-  async getSettings(websiteId: string) {
-    const { replyBy, eventIds, meal, notify, whatsappMessage } = this.state(websiteId);
+  async getSettings(weddingId: string) {
+    const { replyBy, eventIds, meal, notify, whatsappMessage } = this.state(weddingId);
     return copy({ replyBy, eventIds, meal, notify, whatsappMessage });
   }
-  async saveSettings(websiteId: string, settings: RsvpSettings) {
-    Object.assign(this.state(websiteId), copy(settings));
+  async saveSettings(weddingId: string, settings: RsvpSettings) {
+    Object.assign(this.state(weddingId), copy(settings));
   }
-  async listPolls(websiteId: string) {
-    return copy(this.polls.filter((p) => p.websiteId === websiteId)).map((p) => omit(p, "websiteId"));
+  async listPolls(weddingId: string) {
+    return copy(this.polls.filter((p) => p.weddingId === weddingId)).map((p) => omit(p, "weddingId"));
   }
-  async createPoll(websiteId: string, poll: NewPoll) {
-    const record = { ...copy(poll), id: this.id("poll"), position: this.polls.length, websiteId };
+  async createPoll(weddingId: string, poll: NewPoll) {
+    const record = { ...copy(poll), id: this.id("poll"), position: this.polls.length, weddingId };
     this.polls.push(record);
-    return omit(copy(record), "websiteId");
+    return omit(copy(record), "weddingId");
   }
-  async updatePoll(websiteId: string, pollId: string, poll: NewPoll) {
-    const record = this.polls.find((p) => p.id === pollId && p.websiteId === websiteId);
+  async updatePoll(weddingId: string, pollId: string, poll: NewPoll) {
+    const record = this.polls.find((p) => p.id === pollId && p.weddingId === weddingId);
     if (!record) return false;
     Object.assign(record, copy(poll));
     return true;
   }
-  async deletePoll(websiteId: string, pollId: string) {
-    this.polls = this.polls.filter((p) => !(p.id === pollId && p.websiteId === websiteId));
+  async deletePoll(weddingId: string, pollId: string) {
+    this.polls = this.polls.filter((p) => !(p.id === pollId && p.weddingId === weddingId));
   }
-  private strip = (h: InMemoryGuests["households"][number]): Household => omit(omit(copy(h), "websiteId"), "tokenHash");
-  async listHouseholds(websiteId: string) {
-    return this.households.filter((h) => h.websiteId === websiteId).map(this.strip);
+  private strip = (h: InMemoryGuests["households"][number]): Household => omit(omit(copy(h), "weddingId"), "tokenHash");
+  async listHouseholds(weddingId: string) {
+    return this.households.filter((h) => h.weddingId === weddingId).map(this.strip);
   }
-  async findHousehold(websiteId: string, householdId: string) {
-    const h = this.households.find((x) => x.id === householdId && x.websiteId === websiteId);
+  async findHousehold(weddingId: string, householdId: string) {
+    const h = this.households.find((x) => x.id === householdId && x.weddingId === weddingId);
     return h ? this.strip(h) : null;
   }
   async findByTokenHash(tokenHash: string) {
     const h = this.households.find((x) => x.tokenHash === tokenHash);
-    return h ? { websiteId: h.websiteId, household: this.strip(h) } : null;
+    return h ? { weddingId: h.weddingId, household: this.strip(h) } : null;
   }
   private person = (p: HouseholdData["people"][number]) => ({
     id: p.id ?? this.id("guest"),
@@ -385,11 +445,11 @@ export class InMemoryGuests implements GuestRepository {
     pollAnswers: {},
     fromRequest: false,
   });
-  async createHousehold(websiteId: string, data: HouseholdData, tokenHashFor: (id: string) => string) {
+  async createHousehold(weddingId: string, data: HouseholdData, tokenHashFor: (id: string) => string) {
     const id = this.id("household");
     const household = {
       id,
-      websiteId,
+      weddingId,
       tokenHash: tokenHashFor(id),
       name: data.name,
       invitedEventIds: data.invitedEventIds,
@@ -406,8 +466,8 @@ export class InMemoryGuests implements GuestRepository {
     this.households.push(household);
     return this.strip(household);
   }
-  async updateHousehold(websiteId: string, householdId: string, data: HouseholdData) {
-    const h = this.households.find((x) => x.id === householdId && x.websiteId === websiteId)!;
+  async updateHousehold(weddingId: string, householdId: string, data: HouseholdData) {
+    const h = this.households.find((x) => x.id === householdId && x.weddingId === weddingId)!;
     h.name = data.name;
     h.invitedEventIds = data.invitedEventIds;
     if (data.email !== h.email) h.unsubscribedAt = null;
@@ -418,8 +478,8 @@ export class InMemoryGuests implements GuestRepository {
       return existing ? { ...existing, name: p.name, isChild: p.isChild } : this.person({ ...p, id: null });
     });
   }
-  async deleteHousehold(websiteId: string, householdId: string) {
-    this.households = this.households.filter((h) => !(h.id === householdId && h.websiteId === websiteId));
+  async deleteHousehold(weddingId: string, householdId: string) {
+    this.households = this.households.filter((h) => !(h.id === householdId && h.weddingId === weddingId));
   }
   async saveResponse(householdId: string, response: HouseholdResponse, at: Date) {
     const h = this.households.find((x) => x.id === householdId)!;
@@ -432,14 +492,30 @@ export class InMemoryGuests implements GuestRepository {
     h.respondedAt = at;
     for (const name of response.requests) h.requests.push({ id: this.id("request"), name, status: "pending", createdAt: at, decidedAt: null });
   }
-  async decideRequest(websiteId: string, requestId: string, status: "added" | "declined", at: Date) {
-    const h = this.households.find((x) => x.websiteId === websiteId && x.requests.some((r) => r.id === requestId));
+  async decideRequest(weddingId: string, requestId: string, status: "added" | "declined", at: Date) {
+    const h = this.households.find((x) => x.weddingId === weddingId && x.requests.some((r) => r.id === requestId));
     const request = h?.requests.find((r) => r.id === requestId);
     if (!h || !request || request.status !== "pending") return false;
     request.status = status;
     request.decidedAt = at;
     if (status === "added") h.people.push({ ...this.person({ id: null, name: request.name, isChild: false }), fromRequest: true });
     return true;
+  }
+  /** Version choices go with their household and their version (ON DELETE CASCADE). */
+  liveAssignments(versionExists: (id: string) => boolean) {
+    this.assignments = this.assignments.filter((a) => this.households.some((h) => h.id === a.householdId) && versionExists(a.versionId));
+    return this.assignments;
+  }
+  versionExists: (id: string) => boolean = () => true;
+  async listAssignments(weddingId: string) {
+    const ids = new Set(this.households.filter((h) => h.weddingId === weddingId).map((h) => h.id));
+    return this.liveAssignments(this.versionExists)
+      .filter((a) => ids.has(a.householdId))
+      .map(({ householdId, item, versionId }) => ({ householdId, item, versionId }));
+  }
+  async assign(householdId: string, item: AssignableItem, target: { cardId: string } | { websiteId: string }) {
+    this.assignments = this.assignments.filter((a) => !(a.householdId === householdId && a.item === item));
+    this.assignments.push({ householdId, item, versionId: "cardId" in target ? target.cardId : target.websiteId, target });
   }
   async unsubscribe(householdId: string, at: Date) {
     const h = this.households.find((x) => x.id === householdId);
@@ -448,37 +524,37 @@ export class InMemoryGuests implements GuestRepository {
     h.unsubscribedAt ??= at;
     return true;
   }
-  async deleteGuestData(websiteId: string) {
+  async deleteGuestData(weddingId: string) {
     const before = this.households.length;
-    this.households = this.households.filter((h) => h.websiteId !== websiteId);
+    this.households = this.households.filter((h) => h.weddingId !== weddingId);
     return before - this.households.length;
   }
-  async listWebsiteIdsWithGuests() {
-    return [...new Set(this.households.map((h) => h.websiteId))];
+  async listWeddingIdsWithGuests() {
+    return [...new Set(this.households.map((h) => h.weddingId))];
   }
-  async listWebsiteIdsWithDailySummary() {
+  async listWeddingIdsWithDailySummary() {
     return [...this.settings.entries()].filter(([, s]) => s.notify === "daily").map(([id]) => id);
   }
-  async lastSummaryAt(websiteId: string) {
-    return this.state(websiteId).lastSummaryAt;
+  async lastSummaryAt(weddingId: string) {
+    return this.state(weddingId).lastSummaryAt;
   }
-  async claimDailySummary(websiteId: string, previous: Date | null, at: Date) {
-    const state = this.state(websiteId);
+  async claimDailySummary(weddingId: string, previous: Date | null, at: Date) {
+    const state = this.state(weddingId);
     if ((state.lastSummaryAt?.getTime() ?? null) !== (previous?.getTime() ?? null)) return false;
     state.lastSummaryAt = at;
     return true;
   }
-  async claimRetentionWarning(websiteId: string, deleteAt: Date) {
-    const state = this.state(websiteId);
+  async claimRetentionWarning(weddingId: string, deleteAt: Date) {
+    const state = this.state(weddingId);
     if (state.warnedFor?.getTime() === deleteAt.getTime()) return false;
     state.warnedFor = deleteAt;
     return true;
   }
-  /** Stands in for ON DELETE CASCADE from websites. */
-  dropWebsite(websiteId: string) {
-    this.households = this.households.filter((h) => h.websiteId !== websiteId);
-    this.polls = this.polls.filter((p) => p.websiteId !== websiteId);
-    this.settings.delete(websiteId);
+  /** Stands in for ON DELETE CASCADE from weddings. */
+  dropWedding(weddingId: string) {
+    this.households = this.households.filter((h) => h.weddingId !== weddingId);
+    this.polls = this.polls.filter((p) => p.weddingId !== weddingId);
+    this.settings.delete(weddingId);
   }
 }
 
@@ -500,16 +576,18 @@ export const fakeCardTexts: CardTexts = {
     eyebrow: { saveTheDate: "Save the Date", invitation: "Einladung", thankYou: "Danke", engagement: "Verlobung" },
     replyBy: "Bitte antwortet bis {date}",
     time: "{time} Uhr",
+    dateTbd: "Datum folgt",
   },
   defaults: {
-    saveTheDate: { heading: "", text: "Einladung folgt", message: "Hallo {name}, merkt euch den Tag!" },
+    saveTheDate: { heading: "Haltet euch den Tag frei", text: "Einladung folgt", message: "Hallo {name}, merkt euch den Tag!" },
     invitation: { heading: "Wir heiraten", text: "Feiert mit uns", message: "Hallo {name}, hier ist eure Einladung." },
     thankYou: { heading: "Danke", text: "Es war wunderschön.", message: "Hallo {name}, danke!" },
-    engagement: { heading: "Wir haben uns verlobt", text: "", message: "" },
+    engagement: { heading: "Wir haben uns verlobt", text: "", message: "Wir haben uns verlobt!" },
   },
   reminderMessage: "Hallo {name}, denkt an eure Antwort.",
   sampleHousehold: "Familie Beispiel",
   calendarTitle: "Hochzeit von {couple}",
+  firstVersionLabel: "Standard",
 };
 
 /** Records what it was asked to draw; the bytes say which card and format. */
@@ -525,14 +603,13 @@ export class FakeCardRenderer implements CardRenderer {
   }
 }
 
-const emptyDelivery = (): Delivery => ({
+const emptyDelivery = (): Omit<Delivery, "openedAt"> => ({
   excluded: false,
   sharedAt: null,
   sharedVia: null,
   emailQueuedAt: null,
   emailedAt: null,
   emailError: null,
-  openedAt: null,
   reminderOffset: null,
   reminderQueuedAt: null,
   remindedAt: null,
@@ -544,18 +621,22 @@ type FakeDelivery = DeliveryRecord & { emailClaimedAt: Date | null; reminderClai
 export class InMemoryCards implements CardRepository {
   cards: Card[] = [];
   deliveries: FakeDelivery[] = [];
+  opens: OpenRecord[] = [];
   private n = 0;
   constructor(private guests: InMemoryGuests) {}
 
-  /** Deliveries go with their household (ON DELETE CASCADE). */
+  /** Deliveries and opens go with their household and card (ON DELETE CASCADE). */
   private live() {
-    this.deliveries = this.deliveries.filter((d) => this.guests.households.some((h) => h.id === d.householdId) && this.cards.some((c) => c.id === d.cardId));
+    const household = (id: string) => this.guests.households.some((h) => h.id === id);
+    this.deliveries = this.deliveries.filter((d) => household(d.householdId));
+    this.opens = this.opens.filter((o) => household(o.householdId) && this.cards.some((c) => c.id === o.cardId));
     return this.deliveries;
   }
-  private row(cardId: string, householdId: string): FakeDelivery {
-    let d = this.live().find((x) => x.cardId === cardId && x.householdId === householdId);
+  private weddingOf = (householdId: string) => this.guests.households.find((h) => h.id === householdId)?.weddingId;
+  private row(householdId: string, kind: HouseholdCardKind): FakeDelivery {
+    let d = this.live().find((x) => x.householdId === householdId && x.kind === kind);
     if (!d) {
-      d = { ...emptyDelivery(), cardId, householdId, emailClaimedAt: null, reminderClaimedAt: null };
+      d = { ...emptyDelivery(), householdId, kind, emailClaimedAt: null, reminderClaimedAt: null };
       this.deliveries.push(d);
     }
     return d;
@@ -563,44 +644,58 @@ export class InMemoryCards implements CardRepository {
   private plain = (d: FakeDelivery): DeliveryRecord => omit(omit(copy(d), "emailClaimedAt"), "reminderClaimedAt");
 
   async create(card: NewCard) {
-    if (this.cards.some((c) => c.websiteId === card.websiteId && c.kind === card.kind)) return null;
-    const created = { ...copy(card), id: `card-${++this.n}`, createdAt: new Date(), updatedAt: new Date() };
+    const created: Card = { ...copy(card), id: `card-${++this.n}`, sharedAt: null, createdAt: new Date(), updatedAt: new Date() };
     this.cards.push(created);
     return copy(created);
   }
-  async find(websiteId: string, kind: CardKind) {
-    const card = this.cards.find((c) => c.websiteId === websiteId && c.kind === kind);
-    return card ? copy(card) : null;
+  async findById(cardId: string) {
+    return copy(this.cards.find((c) => c.id === cardId) ?? null);
   }
-  async listByWebsite(websiteId: string) {
-    return copy(this.cards.filter((c) => c.websiteId === websiteId));
+  async listByWedding(weddingId: string) {
+    return copy(this.cards.filter((c) => c.weddingId === weddingId).sort((a, b) => a.position - b.position));
   }
-  async update(websiteId: string, kind: CardKind, input: CardInput) {
-    const card = this.cards.find((c) => c.websiteId === websiteId && c.kind === kind);
+  async update(cardId: string, input: CardInput) {
+    const card = this.cards.find((c) => c.id === cardId);
     if (card) Object.assign(card, copy(input), { updatedAt: new Date() });
   }
-  async delete(websiteId: string, kind: CardKind) {
-    this.cards = this.cards.filter((c) => !(c.websiteId === websiteId && c.kind === kind));
+  async rename(cardId: string, label: string) {
+    const card = this.cards.find((c) => c.id === cardId);
+    if (card) card.label = label;
   }
-  async listDeliveries(cardId: string) {
-    return this.live().filter((d) => d.cardId === cardId).map(this.plain);
+  async delete(cardId: string) {
+    this.cards = this.cards.filter((c) => c.id !== cardId);
+  }
+  async markLinkShared(cardId: string, at: Date) {
+    const card = this.cards.find((c) => c.id === cardId);
+    if (card) card.sharedAt ??= at;
+  }
+  async listDeliveries(weddingId: string) {
+    return this.live().filter((d) => this.weddingOf(d.householdId) === weddingId).map(this.plain);
   }
   async listDeliveriesOfHousehold(householdId: string) {
     return this.live().filter((d) => d.householdId === householdId).map(this.plain);
   }
-  async setExcluded(cardId: string, householdId: string, excluded: boolean) {
-    this.row(cardId, householdId).excluded = excluded;
+  async setExcluded(householdId: string, kind: HouseholdCardKind, excluded: boolean) {
+    this.row(householdId, kind).excluded = excluded;
   }
-  async markShared(cardId: string, householdId: string, via: SharedVia, at: Date) {
-    const d = this.row(cardId, householdId);
+  async markShared(householdId: string, kind: HouseholdCardKind, via: SharedVia, at: Date) {
+    const d = this.row(householdId, kind);
     if (d.sharedAt) return;
     d.sharedAt = at;
     d.sharedVia = via;
   }
+  async listOpens(weddingId: string) {
+    this.live();
+    return copy(this.opens.filter((o) => this.cards.find((c) => c.id === o.cardId)?.weddingId === weddingId));
+  }
+  async listOpensOfHousehold(householdId: string) {
+    this.live();
+    return copy(this.opens.filter((o) => o.householdId === householdId));
+  }
   async markOpened(cardId: string, householdId: string, at: Date) {
-    const d = this.row(cardId, householdId);
-    if (d.openedAt) return false;
-    d.openedAt = at;
+    this.live();
+    if (this.opens.some((o) => o.cardId === cardId && o.householdId === householdId)) return false;
+    this.opens.push({ cardId, householdId, openedAt: at });
     return true;
   }
   private fields(channel: MailChannel) {
@@ -608,11 +703,11 @@ export class InMemoryCards implements CardRepository {
       ? ({ queued: "emailQueuedAt", claimed: "emailClaimedAt", sent: "emailedAt", error: "emailError" } as const)
       : ({ queued: "reminderQueuedAt", claimed: "reminderClaimedAt", sent: "remindedAt", error: "reminderError" } as const);
   }
-  async queueMail(channel: MailChannel, cardId: string, householdIds: string[], at: Date) {
+  async queueMail(channel: MailChannel, kind: HouseholdCardKind, householdIds: string[], at: Date) {
     const f = this.fields(channel);
     let queued = 0;
     for (const id of householdIds) {
-      const d = this.row(cardId, id);
+      const d = this.row(id, kind);
       if (d[f.claimed]) continue;
       d[f.queued] = at;
       d[f.error] = null;
@@ -620,26 +715,26 @@ export class InMemoryCards implements CardRepository {
     }
     return queued;
   }
-  async listQueuedMail(limit: number, websiteId?: string): Promise<QueuedMail[]> {
+  async listQueuedMail(limit: number, weddingId?: string): Promise<QueuedMail[]> {
     const result: QueuedMail[] = [];
     for (const d of this.live()) {
-      const card = this.cards.find((c) => c.id === d.cardId)!;
-      if (websiteId && card.websiteId !== websiteId) continue;
-      if (d.emailQueuedAt && !d.emailClaimedAt) result.push({ cardId: d.cardId, householdId: d.householdId, websiteId: card.websiteId, channel: "card" });
-      if (d.reminderQueuedAt && !d.reminderClaimedAt) result.push({ cardId: d.cardId, householdId: d.householdId, websiteId: card.websiteId, channel: "reminder" });
+      const wedding = this.weddingOf(d.householdId)!;
+      if (weddingId && wedding !== weddingId) continue;
+      if (d.emailQueuedAt && !d.emailClaimedAt) result.push({ householdId: d.householdId, kind: d.kind, weddingId: wedding, channel: "card" });
+      if (d.reminderQueuedAt && !d.reminderClaimedAt) result.push({ householdId: d.householdId, kind: d.kind, weddingId: wedding, channel: "reminder" });
     }
     return result.slice(0, limit);
   }
-  async claimMail(channel: MailChannel, cardId: string, householdId: string, at: Date) {
+  async claimMail(channel: MailChannel, householdId: string, kind: HouseholdCardKind, at: Date) {
     const f = this.fields(channel);
-    const d = this.live().find((x) => x.cardId === cardId && x.householdId === householdId);
+    const d = this.live().find((x) => x.householdId === householdId && x.kind === kind);
     if (!d || !d[f.queued] || d[f.claimed]) return false;
     d[f.claimed] = at;
     return true;
   }
-  async finishMail(channel: MailChannel, cardId: string, householdId: string, outcome: { sentAt: Date } | { error: string }) {
+  async finishMail(channel: MailChannel, householdId: string, kind: HouseholdCardKind, outcome: { sentAt: Date } | { error: string }) {
     const f = this.fields(channel);
-    const d = this.live().find((x) => x.cardId === cardId && x.householdId === householdId);
+    const d = this.live().find((x) => x.householdId === householdId && x.kind === kind);
     if (!d) return;
     d[f.queued] = null;
     d[f.claimed] = null;
@@ -664,18 +759,18 @@ export class InMemoryCards implements CardRepository {
     }
     return n;
   }
-  async claimAutomaticReminder(cardId: string, householdId: string, offset: number, at: Date) {
-    const d = this.row(cardId, householdId);
+  async claimAutomaticReminder(householdId: string, offset: number, at: Date) {
+    const d = this.row(householdId, "invitation");
     if (d.reminderOffset !== null && d.reminderOffset <= offset) return false;
     d.reminderOffset = offset;
     d.remindedAt = at;
     return true;
   }
-  async listInvitationsWithReminders() {
-    return this.cards.filter((c) => c.kind === "invitation" && c.reminderDays.length > 0).map((c) => ({ websiteId: c.websiteId, cardId: c.id }));
+  async listWeddingIdsWithReminders() {
+    return [...new Set(this.cards.filter((c) => c.kind === "invitation" && c.reminderDays.length > 0).map((c) => c.weddingId))];
   }
-  dropWebsite(websiteId: string) {
-    this.cards = this.cards.filter((c) => c.websiteId !== websiteId);
+  dropWedding(weddingId: string) {
+    this.cards = this.cards.filter((c) => c.weddingId !== weddingId);
   }
 }
 
@@ -737,17 +832,26 @@ export class FakeThemes implements ThemeCatalog {
 
 export function createFakes() {
   const websites = new InMemoryWebsites();
-  const billingRepo = new InMemoryBilling(websites);
+  const weddings = new InMemoryWeddings(websites);
+  const billingRepo = new InMemoryBilling(weddings);
   const guests = new InMemoryGuests();
   const cards = new InMemoryCards(guests);
-  websites.cascades.push((id) => guests.dropWebsite(id), (id) => cards.dropWebsite(id));
+  const uploads = new InMemoryUploads();
+  guests.versionExists = (id) => cards.cards.some((c) => c.id === id) || websites.websites.some((w) => w.id === id);
+  weddings.cascades.push(
+    (id) => guests.dropWedding(id),
+    (id) => cards.dropWedding(id),
+    (id) => (uploads.uploads = uploads.uploads.filter((u) => u.weddingId !== id)),
+    (id) => (billingRepo.entitlements = billingRepo.entitlements.filter((e) => e.weddingId !== id)),
+  );
   const fakes = {
     users: new InMemoryUsers(),
     magicLinks: new InMemoryMagicLinks(),
     sessions: new InMemorySessions(),
     rateLimiter: new InMemoryRateLimiter(),
+    weddings,
     websites,
-    uploads: new InMemoryUploads(),
+    uploads,
     storage: new InMemoryStorage(),
     images: new FakeImageProcessor(),
     mailer: new FakeMailer(),
@@ -779,11 +883,9 @@ export function createFakes() {
     appUrl: "http://localhost:3000",
   };
   fakes.users.cascades.push((userId) => {
-    const owned = new Set(websites.websites.filter((w) => w.ownerId === userId).map((w) => w.id));
-    for (const id of owned) void websites.delete(id);
+    for (const w of weddings.weddings.filter((x) => x.ownerId === userId)) void weddings.delete(w.id);
     fakes.sessions.sessions = fakes.sessions.sessions.filter((s) => s.userId !== userId);
-    fakes.uploads.uploads = fakes.uploads.uploads.filter((u) => u.ownerId !== userId);
-    billingRepo.entitlements = billingRepo.entitlements.filter((e) => !owned.has(e.websiteId));
+    uploads.uploads = uploads.uploads.filter((u) => u.ownerId !== userId);
   });
   const deps: Deps = fakes;
   return { ...fakes, deps };

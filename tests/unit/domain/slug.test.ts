@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readdirSync } from "node:fs";
+import path from "node:path";
 import { RESERVED_SLUGS, slugify, validateSlug } from "@/domain/slug";
 
 describe("slugify", () => {
@@ -36,13 +38,16 @@ describe("validateSlug", () => {
     ["login", "reserved"],
     ["antwort", "reserved"],
     ["abmelden", "reserved"],
+    ["hochzeiten", "reserved"],
   ])("rejects %s with %s", (slug, error) => {
     expect(validateSlug(slug)).toBe(error);
   });
 
   it("reserves every top-level app route", () => {
-    for (const route of ["dashboard", "websites", "login", "logout", "auth", "uploads", "theme-assets", "willkommen", "impressum", "datenschutz", "preise", "konto", "agb"]) {
-      expect(RESERVED_SLUGS).toContain(route);
-    }
+    const routes = readdirSync(path.resolve("src/app"), { withFileTypes: true })
+      .filter((e) => e.isDirectory() && !e.name.startsWith("[") && !e.name.startsWith("("))
+      .map((e) => e.name);
+    expect(routes).toContain("hochzeiten");
+    for (const route of [...routes, "logout", "favicon.ico"]) expect(RESERVED_SLUGS).toContain(route);
   });
 });

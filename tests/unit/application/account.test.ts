@@ -4,7 +4,10 @@ import { RequestMagicLink, VerifyMagicLink } from "@/application/auth";
 import { ValidationError } from "@/application/errors";
 import { AddItem, UpdateSection } from "@/application/sections";
 import { UploadImage } from "@/application/uploads";
-import { CreateWebsite, SetCoverImage } from "@/application/websites";
+import { AddVersion, AssignVersion } from "@/application/versions";
+import { CreateWedding } from "@/application/weddings";
+import { SaveHousehold } from "@/application/guests";
+import { SetCoverImage } from "@/application/websites";
 import { FakeArchive, JPEG, createFakes } from "../../fakes";
 
 let f: ReturnType<typeof createFakes>;
@@ -18,17 +21,19 @@ beforeEach(async () => {
 });
 
 async function seedWebsite(ownerId = anna) {
-  const website = await new CreateWebsite(f.deps).execute(ownerId, { title: "Anna & Ben", weddingDate: "2027-06-12" });
-  const cover = await new UploadImage(f.deps).execute(ownerId, website.id, { bytes: JPEG, size: JPEG.length, contentType: "image/jpeg" });
-  await new SetCoverImage(f.deps).execute(ownerId, website.id, cover);
-  await new UpdateSection(f.deps).execute(ownerId, website.id, "our-story", { body: "Kennengelernt im Zug." });
-  await new AddItem(f.deps).execute(ownerId, website.id, "faqs", { question: "Dresscode?", answer: "Sommerlich" });
-  return { website, cover };
+  const wedding = await new CreateWedding(f.deps).execute(ownerId, { title: "Anna & Ben", hasDate: true, weddingDate: "2027-06-12" });
+  const [website] = await f.websites.listByWedding(wedding.id);
+  const cover = await new UploadImage(f.deps).execute(ownerId, wedding.id, { bytes: JPEG, size: JPEG.length, contentType: "image/jpeg" });
+  await new SetCoverImage(f.deps).execute(ownerId, website!.id, cover);
+  await new UpdateSection(f.deps).execute(ownerId, website!.id, "our-story", { body: "Kennengelernt im Zug." });
+  await new AddItem(f.deps).execute(ownerId, website!.id, "faqs", { question: "Dresscode?", answer: "Sommerlich" });
+  await new AddItem(f.deps).execute(ownerId, website!.id, "schedule", { eventType: "ceremony", name: "Trauung", startDate: "2027-06-12", startTime: "14:30" });
+  return { wedding, website: website!, cover };
 }
 
 describe("ExportAccount", () => {
-  it("exports account, websites, sections, items and every uploaded image", async () => {
-    const { website, cover } = await seedWebsite();
+  it("exports account, weddings, website versions, sections, items, events and every uploaded image", async () => {
+    const { wedding, website, cover } = await seedWebsite();
     const result = await new ExportAccount(f.deps).execute(anna);
     expect(result.filename).toBe("traureise-export-2026-10-18.zip");
 
@@ -39,25 +44,39 @@ describe("ExportAccount", () => {
     const data = JSON.parse(new TextDecoder().decode(entries[0]!.bytes));
     expect(data.account).toMatchObject({ email: "anna@example.org", firstName: "Anna" });
     expect(data.exportedAt).toBe("2026-10-18T10:00:00.000Z");
-    expect(data.websites).toHaveLength(1);
-    expect(data.websites[0]).toMatchObject({ id: website.id, title: "Anna & Ben", weddingDate: "2027-06-12", coverImage: `images/${cover}` });
-    expect(data.websites[0].sections.find((s: { kind: string }) => s.kind === "our-story").body).toBe("Kennengelernt im Zug.");
-    expect(data.websites[0].items).toEqual([expect.objectContaining({ kind: "faqs", data: expect.objectContaining({ question: "Dresscode?" }) })]);
-    expect(data.files).toEqual([{ path: `images/${cover}`, websiteId: website.id, contentType: "image/webp" }]);
+    expect(data.weddings).toHaveLength(1);
+    expect(data.weddings[0]).toMatchObject({ id: wedding.id, title: "Anna & Ben", weddingDate: "2027-06-12", slug: "anna-und-ben" });
+    expect(data.weddings[0].events).toEqual([expect.objectContaining({ data: expect.objectContaining({ name: "Trauung" }) })]);
+    expect(data.weddings[0].websites[0]).toMatchObject({ id: website.id, label: "Standard", published: false, coverImage: `images/${cover}` });
+    expect(data.weddings[0].websites[0].sections.find((s: { kind: string }) => s.kind === "our-story").body).toBe("Kennengelernt im Zug.");
+    expect(data.weddings[0].websites[0].items).toEqual([expect.objectContaining({ kind: "faqs", data: expect.objectContaining({ question: "Dresscode?" }) })]);
+    expect(data.weddings[0].cards.map((c: { kind: string; label: string }) => c.label)).toEqual(["Standard", "Standard", "Standard", "Standard"]);
+    expect(data.files).toEqual([{ path: `images/${cover}`, weddingId: wedding.id, contentType: "image/webp" }]);
+  });
+
+  it("includes every version and which version each household gets", async () => {
+    const { wedding } = await seedWebsite();
+    f.deps.billing.enabled = false;
+    const family = await new AddVersion(f.deps).execute(anna, wedding.id, "invitation", { label: "Familie", copyFrom: null });
+    const weber = await new SaveHousehold(f.deps).execute(anna, wedding.id, null, { name: "Weber", people: [{ name: "Eva" }] });
+    await new AssignVersion(f.deps).execute(anna, wedding.id, weber.id, "invitation", family.id);
+    const data = JSON.parse(new TextDecoder().decode(FakeArchive.read((await new ExportAccount(f.deps).execute(anna)).bytes)[0]!.bytes));
+    expect(data.weddings[0].cards.filter((c: { kind: string }) => c.kind === "invitation").map((c: { label: string }) => c.label)).toEqual(["Standard", "Familie"]);
+    expect(data.weddings[0].guests.versions).toEqual([{ household: "Weber", householdId: weber.id, item: "invitation", versionId: family.id, version: "Familie" }]);
   });
 
   it("includes purchases", async () => {
-    const { website } = await seedWebsite();
+    const { wedding } = await seedWebsite();
     await f.billingRepo.applyEvent("evt_1", {
       kind: "grant",
-      websiteId: website.id,
+      weddingId: wedding.id,
       tier: "rsvp",
       purchaseRef: "ord_1",
       provider: "creem",
       validUntil: new Date("2028-06-13T00:00:00Z"),
     });
     const data = JSON.parse(new TextDecoder().decode(FakeArchive.read((await new ExportAccount(f.deps).execute(anna)).bytes)[0]!.bytes));
-    expect(data.websites[0].purchases).toEqual([expect.objectContaining({ tier: "rsvp", purchaseRef: "ord_1", revokedAt: null })]);
+    expect(data.weddings[0].purchases).toEqual([expect.objectContaining({ tier: "rsvp", purchaseRef: "ord_1", revokedAt: null })]);
   });
 
   it("skips images whose file is gone instead of failing", async () => {
@@ -71,7 +90,7 @@ describe("ExportAccount", () => {
     const ben = await f.users.create("ben@example.org");
     await seedWebsite(ben.id);
     const entries = FakeArchive.read((await new ExportAccount(f.deps).execute(anna)).bytes);
-    expect(JSON.parse(new TextDecoder().decode(entries[0]!.bytes)).websites).toEqual([]);
+    expect(JSON.parse(new TextDecoder().decode(entries[0]!.bytes)).weddings).toEqual([]);
     expect(entries).toHaveLength(1);
   });
 });
@@ -92,6 +111,9 @@ describe("DeleteAccount", () => {
     await new DeleteAccount(f.deps).execute(anna, "  Anna@Example.org ");
 
     expect(await f.users.findById(anna)).toBeNull();
+    expect(f.weddings.weddings).toEqual([]);
+    expect(f.weddings.events).toEqual([]);
+    expect(f.cards.cards).toEqual([]);
     expect(f.websites.websites).toEqual([]);
     expect(f.websites.items).toEqual([]);
     expect(f.uploads.uploads).toEqual([]);

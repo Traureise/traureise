@@ -10,44 +10,67 @@ export class ExportAccount {
   constructor(private deps: Deps) {}
 
   async execute(userId: string): Promise<{ filename: string; bytes: Uint8Array }> {
-    const { users, websites, uploads, storage, billingRepo, guests, cards, archive, clock } = this.deps;
+    const { users, weddings, websites, uploads, storage, billingRepo, guests, cards, archive, clock } = this.deps;
     const user = await users.findById(userId);
     if (!user) throw new NotFoundError();
     const now = clock.now();
 
     const files: ArchiveEntry[] = [];
-    const fileList: { path: string; websiteId: string | null; contentType: string }[] = [];
+    const fileList: { path: string; weddingId: string | null; contentType: string }[] = [];
     for (const upload of await uploads.listByOwner(userId)) {
       const file = await storage.get(upload.key);
       if (!file) continue;
       files.push({ path: imagePath(upload.key), bytes: file.bytes });
-      fileList.push({ path: imagePath(upload.key), websiteId: upload.websiteId, contentType: upload.contentType });
+      fileList.push({ path: imagePath(upload.key), weddingId: upload.weddingId, contentType: upload.contentType });
     }
 
+    const image = (key: string | null) => (key ? imagePath(key) : null);
     const exported = [];
-    for (const website of await websites.listByOwner(userId)) {
-      const households = await guests.listHouseholds(website.id);
-      const { id, slug, title, weddingDate, location, welcomeMessage, hashtag, showCountdown, timezone, themeId, siteEnabled, paletteId, fontPairingId } = website;
+    for (const wedding of await weddings.listByOwner(userId)) {
+      const [households, weddingCards, sites, deliveries, opens, assignments] = await Promise.all([
+        guests.listHouseholds(wedding.id),
+        cards.listByWedding(wedding.id),
+        websites.listByWedding(wedding.id),
+        cards.listDeliveries(wedding.id),
+        cards.listOpens(wedding.id),
+        guests.listAssignments(wedding.id),
+      ]);
+      const householdName = (id: string) => households.find((h) => h.id === id)?.name ?? null;
+      const versionLabel = (id: string) => weddingCards.find((c) => c.id === id)?.label ?? sites.find((w) => w.id === id)?.label ?? null;
+      const { id, slug, title, weddingDate, location, timezone, lastOpenedAt, createdAt, updatedAt } = wedding;
       exported.push({
         id,
         slug,
         title,
         weddingDate,
         location,
-        welcomeMessage,
-        hashtag,
-        showCountdown,
         timezone,
-        themeId,
-        siteEnabled,
-        paletteId,
-        fontPairingId,
-        createdAt: website.createdAt,
-        updatedAt: website.updatedAt,
-        coverImage: website.coverImageKey ? imagePath(website.coverImageKey) : null,
-        sections: await websites.listSections(website.id),
-        items: (await websites.listItems(website.id)).map(({ id, kind, position, data }) => ({ id, kind, position, data })),
-        purchases: (await billingRepo.listByWebsite(website.id)).map(({ tier, purchaseRef, provider, validUntil, revokedAt, createdAt }) => ({
+        lastOpenedAt,
+        createdAt,
+        updatedAt,
+        events: (await weddings.listEvents(wedding.id)).map(({ id, position, data }) => ({ id, position, data })),
+        websites: await Promise.all(
+          sites.map(async (site) => ({
+            id: site.id,
+            label: site.label,
+            position: site.position,
+            slug: site.slug,
+            published: site.published,
+            hiddenEventIds: site.hiddenEventIds,
+            welcomeMessage: site.welcomeMessage,
+            hashtag: site.hashtag,
+            showCountdown: site.showCountdown,
+            themeId: site.themeId,
+            paletteId: site.paletteId,
+            fontPairingId: site.fontPairingId,
+            coverImage: image(site.coverImageKey),
+            createdAt: site.createdAt,
+            updatedAt: site.updatedAt,
+            sections: await websites.listSections(site.id),
+            items: (await websites.listItems(site.id)).map(({ id, kind, position, data }) => ({ id, kind, position, data })),
+          })),
+        ),
+        purchases: (await billingRepo.listByWedding(wedding.id)).map(({ tier, purchaseRef, provider, validUntil, revokedAt, createdAt }) => ({
           tier,
           purchaseRef,
           provider,
@@ -56,49 +79,55 @@ export class ExportAccount {
           createdAt,
         })),
         guests: {
-          settings: await guests.getSettings(website.id),
-          polls: await guests.listPolls(website.id),
+          settings: await guests.getSettings(wedding.id),
+          polls: await guests.listPolls(wedding.id),
           households,
+          // Which version of each item a household gets (none listed: the first).
+          versions: assignments.map((a) => ({ household: householdName(a.householdId), householdId: a.householdId, item: a.item, versionId: a.versionId, version: versionLabel(a.versionId) })),
         },
-        cards: await Promise.all(
-          (await cards.listByWebsite(website.id)).map(async (card) => ({
-            kind: card.kind,
-            themeId: card.themeId,
-            paletteId: card.paletteId,
-            fontPairingId: card.fontPairingId,
-            layoutId: card.layoutId,
-            envelope: card.envelope,
-            content: card.content,
-            message: card.message,
-            reminderDays: card.reminderDays,
-            reminderMessage: card.reminderMessage,
-            createdAt: card.createdAt,
-            updatedAt: card.updatedAt,
-            photo: card.photoKey ? imagePath(card.photoKey) : null,
-            // Sent and opened status per household (v4); the households themselves are under guests.
-            deliveries: (await cards.listDeliveries(card.id)).map((d) => ({
-              household: households.find((h) => h.id === d.householdId)?.name ?? null,
-              householdId: d.householdId,
-              excluded: d.excluded,
-              sharedAt: d.sharedAt,
-              sharedVia: d.sharedVia,
-              emailedAt: d.emailedAt,
-              emailQueuedAt: d.emailQueuedAt,
-              emailError: d.emailError,
-              openedAt: d.openedAt,
-              remindedAt: d.remindedAt,
-              reminderOffset: d.reminderOffset,
-              reminderError: d.reminderError,
-            })),
-          })),
-        ),
+        cards: weddingCards.map((card) => ({
+          id: card.id,
+          kind: card.kind,
+          label: card.label,
+          slug: card.slug,
+          position: card.position,
+          sharedAt: card.sharedAt,
+          themeId: card.themeId,
+          paletteId: card.paletteId,
+          fontPairingId: card.fontPairingId,
+          layoutId: card.layoutId,
+          envelope: card.envelope,
+          content: card.content,
+          message: card.message,
+          reminderDays: card.reminderDays,
+          reminderMessage: card.reminderMessage,
+          createdAt: card.createdAt,
+          updatedAt: card.updatedAt,
+          photo: image(card.photoKey),
+        })),
+        // Sent status per household and kind of card, and when each household first opened a version (v4).
+        deliveries: deliveries.map((d) => ({
+          household: householdName(d.householdId),
+          householdId: d.householdId,
+          kind: d.kind,
+          excluded: d.excluded,
+          sharedAt: d.sharedAt,
+          sharedVia: d.sharedVia,
+          emailedAt: d.emailedAt,
+          emailQueuedAt: d.emailQueuedAt,
+          emailError: d.emailError,
+          remindedAt: d.remindedAt,
+          reminderOffset: d.reminderOffset,
+          reminderError: d.reminderError,
+        })),
+        opens: opens.map((o) => ({ household: householdName(o.householdId), householdId: o.householdId, cardId: o.cardId, card: versionLabel(o.cardId), openedAt: o.openedAt })),
       });
     }
 
     const data = {
       exportedAt: now.toISOString(),
       account: { email: user.email, firstName: user.firstName, createdAt: user.createdAt },
-      websites: exported,
+      weddings: exported,
       files: fileList,
     };
     const json = new TextEncoder().encode(JSON.stringify(data, null, 2));

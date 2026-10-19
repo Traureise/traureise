@@ -820,11 +820,12 @@
         "engagement": "Wir sind verlobt"
       },
       "replyBy": "Bitte antwortet bis zum {date}",
-      "time": "{time} Uhr"
+      "time": "{time} Uhr",
+      "dateTbd": "Datum folgt"
     },
     "defaults": {
       "saveTheDate": {
-        "heading": "",
+        "heading": "Haltet euch den Tag frei",
         "text": "Einladung folgt",
         "message": "Hallo {name}, merkt euch schon mal den Tag! Hier ist unser Save the Date. Liebe Grüße"
       },
@@ -841,12 +842,13 @@
       "engagement": {
         "heading": "Wir haben uns verlobt",
         "text": "Wir sind überglücklich und wollten es euch als Erste erzählen.",
-        "message": ""
+        "message": "Wir haben uns verlobt! Schaut euch unsere Verlobungsanzeige an."
       }
     },
     "reminderMessage": "Hallo {name}, kleine Erinnerung: Sagt uns bitte über diesen Link, ob ihr zu unserer Hochzeit kommt. Liebe Grüße",
     "sampleHousehold": "Familie Beispiel",
-    "calendarTitle": "Hochzeit von {couple}"
+    "calendarTitle": "Hochzeit von {couple}",
+    "firstVersionLabel": "Standard"
   },
   "letter": {
     "to": "Für {name}",

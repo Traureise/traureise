@@ -8,6 +8,7 @@ export const PAID_TIERS = ["rsvp", "invitations", "complete"] as const satisfies
  * Which tier unlocks a feature. Setting up guests and designing cards is free; the tiers unlock sending:
  * `rsvp` active personal links, sharing them and notifications; `invitations` Save the Dates and invitations
  * (links, export), email sending and email reminders; `complete` thank-you cards and the engagement announcement.
+ * Extra versions of an item need the tier of that item; an extra website needs any paid tier.
  */
 export const FEATURE_TIERS = {
   website: "website",
@@ -23,6 +24,12 @@ export const FEATURE_TIERS = {
   emailReminders: "invitations",
   thankYouCards: "complete",
   engagementCards: "complete",
+  // More than one version of an item, for different audiences (the first of each is free).
+  websiteVersions: "rsvp",
+  saveTheDateVersions: "invitations",
+  invitationVersions: "invitations",
+  thankYouVersions: "complete",
+  engagementVersions: "complete",
 } as const satisfies Record<string, Tier>;
 export type Feature = keyof typeof FEATURE_TIERS;
 

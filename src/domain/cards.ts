@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Feature } from "./billing";
 import { type CardKind, CARD_KINDS, type HouseholdCardKind } from "./card-kinds";
+import { dayNumber, localDay } from "./days";
 import { imageKey, optional, requiredText, text } from "./fields";
 import type { FontPairing } from "./fonts";
 import { parseWith, type Parsed } from "./result";
@@ -49,7 +50,7 @@ export type CardContent = {
 };
 
 export const CARD_FIELDS = {
-  saveTheDate: ["names", "place", "text"],
+  saveTheDate: ["heading", "names", "place", "text"],
   invitation: ["heading", "names", "eventId", "time", "venue", "text", "showReplyBy"],
   thankYou: ["heading", "names", "text"],
   engagement: ["heading", "names", "text"],
@@ -137,6 +138,8 @@ export type CardLabels = {
   replyBy: string;
   /** "{time}" is replaced. */
   time: string;
+  /** Shown instead of the date while the wedding has none ("Datum folgt"). */
+  dateTbd: string;
 };
 
 export type CardDesign = ResolvedDesign & { layout: CardLayout };
@@ -189,7 +192,7 @@ export function buildCardModel(input: {
 }): CardModel {
   const { kind, content, design, website, event, labels, assets } = input;
   const hasPhoto = !!assets.photoSrc && design.layout.photo !== "none";
-  const date = (iso: string | null) => (iso ? formatDate(iso, labels.locale) : null);
+  const date = (iso: string | null) => (iso ? formatDate(iso, labels.locale) : labels.dateTbd);
   const details: (string | null)[] = [];
   let footer: string | null = null;
   if (kind === "saveTheDate") details.push(date(website.weddingDate), content.place || null);
@@ -209,7 +212,8 @@ export function buildCardModel(input: {
     photoSrc,
     maskSrc: design.layout.photo === "masked" && assets.maskSvg ? svgDataUri(assets.maskSvg) : null,
     ornamentSrc: assets.ornamentSvg ? tintSvg(assets.ornamentSvg, cardAccent({ layout: design.layout, colors, photoSrc })) : null,
-    eyebrow: labels.eyebrow[kind],
+    // The Save the Date's line above the names is the couple's own text ("Haltet euch den Tag frei").
+    eyebrow: kind === "saveTheDate" ? content.heading : labels.eyebrow[kind],
     heading: kind === "saveTheDate" ? "" : content.heading,
     names: content.names,
     details: details.filter((d): d is string => !!d),
@@ -303,9 +307,6 @@ export function householdPageContent(input: {
 
 // ---- reminders ----
 
-const localDay = (now: Date, timeZone: string) =>
-  new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
-const dayNumber = (iso: string) => Date.parse(`${iso}T00:00:00Z`) / 86_400_000;
 
 /**
  * The automatic reminder due now, as its offset in days before the reply-by date, or null. Days count in

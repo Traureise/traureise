@@ -2,7 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { BillingChange, BillingRepository, EntitlementRecord } from "@/application/ports";
 import type { PaidTier } from "@/domain/billing";
 import type { Database } from "../db/client";
-import { billingEvents, entitlements, websites } from "../db/schema";
+import { billingEvents, entitlements, weddings } from "../db/schema";
 
 type Row = typeof entitlements.$inferSelect;
 const toRecord = (row: Row): EntitlementRecord => ({ ...row, tier: row.tier as PaidTier });
@@ -16,8 +16,8 @@ export class DrizzleBillingRepository implements BillingRepository {
       const recorded = await tx.insert(billingEvents).values({ id: eventId }).onConflictDoNothing().returning({ id: billingEvents.id });
       if (recorded.length === 0) return "duplicate";
       if (change.kind === "grant") {
-        const { websiteId, tier, purchaseRef, provider, validUntil } = change;
-        await tx.insert(entitlements).values({ websiteId, tier, purchaseRef, provider, validUntil }).onConflictDoNothing({ target: entitlements.purchaseRef });
+        const { weddingId, tier, purchaseRef, provider, validUntil } = change;
+        await tx.insert(entitlements).values({ weddingId, tier, purchaseRef, provider, validUntil }).onConflictDoNothing({ target: entitlements.purchaseRef });
       } else if (change.kind === "revoke") {
         await tx
           .update(entitlements)
@@ -28,8 +28,8 @@ export class DrizzleBillingRepository implements BillingRepository {
     });
   }
 
-  async listByWebsite(websiteId: string): Promise<EntitlementRecord[]> {
-    const rows = await this.db.select().from(entitlements).where(eq(entitlements.websiteId, websiteId)).orderBy(entitlements.createdAt);
+  async listByWedding(weddingId: string): Promise<EntitlementRecord[]> {
+    const rows = await this.db.select().from(entitlements).where(eq(entitlements.weddingId, weddingId)).orderBy(entitlements.createdAt);
     return rows.map(toRecord);
   }
 
@@ -37,8 +37,8 @@ export class DrizzleBillingRepository implements BillingRepository {
     const rows = await this.db
       .select({ entitlement: entitlements })
       .from(entitlements)
-      .innerJoin(websites, eq(websites.id, entitlements.websiteId))
-      .where(eq(websites.ownerId, ownerId))
+      .innerJoin(weddings, eq(weddings.id, entitlements.weddingId))
+      .where(eq(weddings.ownerId, ownerId))
       .orderBy(entitlements.createdAt);
     return rows.map((r) => toRecord(r.entitlement));
   }

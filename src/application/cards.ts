@@ -1,7 +1,5 @@
 import {
   buildCardModel,
-  cardCounts,
-  CARD_KINDS,
   CARD_SLUGS,
   DEFAULT_REMINDER_DAYS,
   defaultCardContent,
@@ -22,13 +20,12 @@ import { findFontPairing } from "@/domain/fonts";
 import { householdStatus, isReplyOpen, whatsappUrl, type Household } from "@/domain/guests";
 import { uploadPath } from "@/domain/images";
 import { cardLayoutsFor, resolveDesign, type CardLayout, type ResolvedDesign, type ThemeManifest } from "@/domain/theme";
+import { firstVersion, needsDate } from "@/domain/weddings";
 import type { Deps } from "./deps";
 import { LockedError, NotFoundError, ValidationError } from "./errors";
-import { formFor, householdContent, linkUrl, loadByToken, loadGuestContext, type GuestContext, type GuestForm } from "./guest-context";
-import { assertOwnImage, loadOwnedWebsite } from "./owned";
-import type { Card, MailMessage, PaperFormat, QueuedMail, Website } from "./ports";
-import { itemsOf } from "./views";
-import { CreateWebsite } from "./websites";
+import { formFor, householdContent, householdDesign, linkUrl, loadByToken, loadGuestContext, type GuestContext, type GuestForm } from "./guest-context";
+import { assertOwnImage, loadOwnedCardVersion, loadOwnedWedding } from "./owned";
+import type { Card, MailMessage, NewCard, PaperFormat, QueuedMail, Website, Wedding } from "./ports";
 
 const PNG_EXPORT_WIDTH = 1748; // A5 width at 300 dpi
 const EMAIL_IMAGE_WIDTH = 900;
@@ -56,21 +53,21 @@ function cardDesign(deps: Deps, choice: DesignChoice, kind: CardKind): CardDesig
   return { ...resolveDesign(theme, choice.paletteId, choice.fontPairingId), layout: layouts.find((l) => l.id === choice.layoutId) ?? layouts[0] ?? FALLBACK_LAYOUT };
 }
 
-/** The public website, or null while the wedding has cards only. */
-const siteUrl = (deps: Deps, website: Website) => (website.siteEnabled ? `${deps.appUrl}/${website.slug}` : null);
+/** The website version's public address, or null while it is not online. */
+export const siteUrl = (deps: Deps, ctx: GuestContext, website: Website | null) => (website && ctx.online(website) ? `${deps.appUrl}/${website.slug}` : null);
 
 /** Builds what CardView draws. `photoSrc` is a URL on the page; for the exporter any non-null marker (the bytes come separately). */
 function modelFor(deps: Deps, ctx: GuestContext, card: Card, household: Pick<Household, "name" | "personalLine"> | null, photoSrc: string | null): CardModel {
   const design = cardDesign(deps, card, card.kind);
-  const website = ctx.view.website;
-  const schedule = itemsOf(ctx.view, "schedule").find((i) => i.id === card.content.eventId);
+  const { wedding } = ctx;
+  const event = ctx.eventItems.find((i) => i.id === card.content.eventId);
   const svg = (file: string | undefined) => (file ? deps.themes.readSvg(design.theme.id, file) : null);
   return buildCardModel({
     kind: card.kind,
     content: card.content,
     design,
-    website: { title: website.title, weddingDate: website.weddingDate, location: website.location, url: siteUrl(deps, website) },
-    event: schedule ? { startDate: schedule.data.startDate, startTime: schedule.data.startTime, venueName: schedule.data.venueName } : null,
+    website: { title: wedding.title, weddingDate: wedding.weddingDate, location: wedding.location, url: null },
+    event: event ? { startDate: event.data.startDate, startTime: event.data.startTime, venueName: event.data.venueName } : null,
     replyBy: ctx.settings.replyBy,
     household,
     labels: deps.cardTexts.labels,
@@ -80,75 +77,67 @@ function modelFor(deps: Deps, ctx: GuestContext, card: Card, household: Pick<Hou
 
 const pagePhoto = (card: Card) => (card.photoKey ? uploadPath(card.photoKey) : null);
 
+/** A card version as the home screen and the guest list show it (no household). */
+export const cardPreview = (deps: Deps, ctx: GuestContext, card: Card): CardModel => modelFor(deps, ctx, card, null, pagePhoto(card));
+
 async function photoBytes(deps: Deps, card: Card): Promise<Uint8Array | null> {
   return card.photoKey ? ((await deps.storage.get(card.photoKey))?.bytes ?? null) : null;
 }
 
-async function loadOwnedCard(deps: Deps, userId: string, websiteId: string, kind: CardKind) {
-  const website = await loadOwnedWebsite(deps, userId, websiteId);
-  const ctx = await loadGuestContext(deps, website);
-  const card = ctx.cards.find((c) => c.kind === kind);
-  if (!card) throw new NotFoundError();
-  return { website, ctx, card };
+async function loadOwnedCard(deps: Deps, userId: string, cardId: string) {
+  const { wedding, card } = await loadOwnedCardVersion(deps, userId, cardId);
+  return { wedding, card, ctx: await loadGuestContext(deps, wedding) };
 }
 
 const cardMessage = (deps: Deps, card: Card) => card.message ?? deps.cardTexts.defaults[card.kind].message;
-const reminderMessage = (deps: Deps, card: Card | undefined) => card?.reminderMessage ?? deps.cardTexts.reminderMessage;
+const reminderMessage = (deps: Deps, card: Card | null) => card?.reminderMessage ?? deps.cardTexts.reminderMessage;
+
+/** Save the Date and invitation are about the day: they wait until the wedding has a date. */
+function assertDate(wedding: Wedding, kind: CardKind) {
+  if (needsDate(kind) && !wedding.weddingDate) throw new ValidationError({ _: "no_date" });
+}
+
+/** The first version of a card kind, made from the wedding's details and the first website's design. */
+export function newCardVersion(deps: Deps, wedding: Wedding, website: Pick<Website, "themeId" | "paletteId" | "fontPairingId" | "coverImageKey"> | null, kind: CardKind, mainEventId: string | null): NewCard {
+  const themeId = website?.themeId ?? deps.themes.defaultThemeId();
+  const theme = cardTheme(deps, themeId, kind);
+  const sameTheme = theme.id === themeId;
+  return {
+    weddingId: wedding.id,
+    kind,
+    label: deps.cardTexts.firstVersionLabel,
+    slug: "standard",
+    position: 0,
+    themeId: theme.id,
+    paletteId: sameTheme ? (website?.paletteId ?? null) : null,
+    fontPairingId: sameTheme ? (website?.fontPairingId ?? null) : null,
+    layoutId: cardLayoutsFor(theme, kind)[0]?.id ?? null,
+    envelope: true,
+    photoKey: website?.coverImageKey ?? null,
+    content: { ...defaultCardContent(kind, wedding, deps.cardTexts.defaults[kind]), eventId: kind === "invitation" ? mainEventId : null },
+    message: null,
+    reminderDays: kind === "invitation" ? [...DEFAULT_REMINDER_DAYS] : [],
+    reminderMessage: null,
+  };
+}
 
 // ---- the couple: creating and designing ----
-
-export class CreateCardForNewWedding {
-  constructor(private deps: Deps) {}
-
-  /** A card as the couple's first step: starts the wedding (names, date) without a website. */
-  async execute(userId: string, kind: CardKind, input: { title: string; weddingDate?: string }): Promise<Card> {
-    const wedding = await new CreateWebsite(this.deps).execute(userId, { title: input.title, weddingDate: input.weddingDate || undefined, siteEnabled: false });
-    return new CreateCard(this.deps).execute(userId, wedding.id, kind);
-  }
-}
-
-export class CreateCard {
-  constructor(private deps: Deps) {}
-
-  /** Creates the website's card of this kind, or returns the existing one (one per kind). */
-  async execute(userId: string, websiteId: string, kind: CardKind): Promise<Card> {
-    const website = await loadOwnedWebsite(this.deps, userId, websiteId);
-    const existing = await this.deps.cards.find(websiteId, kind);
-    if (existing) return existing;
-    const ctx = await loadGuestContext(this.deps, website);
-    const theme = cardTheme(this.deps, website.themeId, kind);
-    const sameTheme = theme.id === website.themeId;
-    const schedule = itemsOf(ctx.view, "schedule");
-    const main = schedule.find((i) => i.data.eventType === "ceremony" || i.data.eventType === "wedding") ?? schedule[0];
-    const created = await this.deps.cards.create({
-      websiteId,
-      kind,
-      themeId: theme.id,
-      paletteId: sameTheme ? website.paletteId : null,
-      fontPairingId: sameTheme ? website.fontPairingId : null,
-      layoutId: cardLayoutsFor(theme, kind)[0]?.id ?? null,
-      envelope: true,
-      photoKey: website.coverImageKey,
-      content: { ...defaultCardContent(kind, website, this.deps.cardTexts.defaults[kind]), eventId: kind === "invitation" ? (main?.id ?? null) : null },
-      message: null,
-      reminderDays: kind === "invitation" ? [...DEFAULT_REMINDER_DAYS] : [],
-      reminderMessage: null,
-    });
-    return created ?? (await this.deps.cards.find(websiteId, kind))!;
-  }
-}
 
 export type CardThemeOption = { id: string; theme: ThemeManifest; layouts: CardLayout[]; /** Mask and ornament markup per file, for the live preview. */ svgs: Record<string, string> };
 
 export type CardEditor = {
-  website: Website;
+  wedding: Wedding;
   card: Card;
+  /** The kind's versions, first first. */
+  versions: { id: string; label: string }[];
   themes: CardThemeOption[];
   /** Schedule items an invitation can show. */
   events: { id: string; name: string; startDate: string; startTime: string; venueName: string }[];
   replyBy: string | null;
-  /** Null while the wedding has no website. */
-  websiteUrl: string | null;
+  /** Save the Date: some households' website versions are not online, so their cards have no website link. */
+  offlineWebsites: boolean;
+  /** Save the Date and invitation without a wedding date: sending waits for one. */
+  waitsForDate: boolean;
   /** Links, export and sending are unlocked. */
   active: boolean;
   billingEnabled: boolean;
@@ -161,8 +150,9 @@ export type CardEditor = {
 export class GetCardEditor {
   constructor(private deps: Deps) {}
 
-  async execute(userId: string, websiteId: string, kind: CardKind): Promise<CardEditor> {
-    const { website, ctx, card } = await loadOwnedCard(this.deps, userId, websiteId, kind);
+  async execute(userId: string, cardId: string): Promise<CardEditor> {
+    const { wedding, ctx, card } = await loadOwnedCard(this.deps, userId, cardId);
+    const { kind } = card;
     const themes = this.deps.themes
       .list()
       .map((theme) => ({ theme, layouts: cardLayoutsFor(theme, kind) }))
@@ -176,12 +166,14 @@ export class GetCardEditor {
         return { id: theme.id, theme, layouts, svgs };
       });
     return {
-      website,
+      wedding,
       card,
+      versions: ctx.versionsOf(kind).map(({ id, label }) => ({ id, label })),
       themes,
-      events: itemsOf(ctx.view, "schedule").map((i) => ({ id: i.id, name: i.data.name, startDate: i.data.startDate, startTime: i.data.startTime, venueName: i.data.venueName })),
+      events: ctx.eventItems.map((i) => ({ id: i.id, name: i.data.name, startDate: i.data.startDate, startTime: i.data.startTime, venueName: i.data.venueName })),
       replyBy: ctx.settings.replyBy,
-      websiteUrl: siteUrl(this.deps, website),
+      offlineWebsites: kind === "saveTheDate" && ctx.websites.some((w) => !ctx.online(w)),
+      waitsForDate: needsDate(kind) && !wedding.weddingDate,
       active: ctx.cardActive(kind),
       billingEnabled: this.deps.billing.enabled,
       defaultMessage: this.deps.cardTexts.defaults[kind].message,
@@ -194,8 +186,9 @@ export class GetCardEditor {
 export class SaveCard {
   constructor(private deps: Deps) {}
 
-  async execute(userId: string, websiteId: string, kind: CardKind, input: unknown): Promise<void> {
-    const { ctx } = await loadOwnedCard(this.deps, userId, websiteId, kind);
+  async execute(userId: string, cardId: string, input: unknown): Promise<void> {
+    const { ctx, card, wedding } = await loadOwnedCard(this.deps, userId, cardId);
+    const { kind } = card;
     const parsed = parseCardInput(input);
     if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
     const value = parsed.value;
@@ -205,60 +198,9 @@ export class SaveCard {
     if (value.layoutId && !layouts.some((l) => l.id === value.layoutId)) throw new ValidationError({ layoutId: "invalid_option" });
     if (value.paletteId && !theme.palettes.some((p) => p.id === value.paletteId)) throw new ValidationError({ paletteId: "invalid_option" });
     if (value.fontPairingId && !findFontPairing(value.fontPairingId)) throw new ValidationError({ fontPairingId: "invalid_option" });
-    if (value.content.eventId && !itemsOf(ctx.view, "schedule").some((i) => i.id === value.content.eventId)) throw new ValidationError({ "content.eventId": "invalid_option" });
-    await assertOwnImage(this.deps, websiteId, value.photoKey, "photoKey");
-    await this.deps.cards.update(websiteId, kind, { ...value, layoutId: value.layoutId ?? layouts[0]!.id, reminderDays: kind === "invitation" ? value.reminderDays : [] });
-  }
-}
-
-export class DeleteCard {
-  constructor(private deps: Deps) {}
-
-  /** Deletes the card with its deliveries. Its photo stays with the website's uploads. */
-  async execute(userId: string, websiteId: string, kind: CardKind): Promise<void> {
-    await loadOwnedCard(this.deps, userId, websiteId, kind);
-    await this.deps.cards.delete(websiteId, kind);
-  }
-}
-
-export type CardSummary = {
-  websiteId: string;
-  websiteTitle: string;
-  kind: CardKind;
-  model: CardModel;
-  /** Households the card is meant for, sent to, opened by; null for the engagement announcement. */
-  counts: { households: number; sent: number; opened: number } | null;
-  active: boolean;
-  /** The engagement announcement's shareable link. */
-  publicUrl: string | null;
-  updatedAt: Date;
-};
-
-export class ListCards {
-  constructor(private deps: Deps) {}
-
-  /** Every card of the user's websites for the dashboard, in kind order. */
-  async execute(userId: string): Promise<CardSummary[]> {
-    const result: CardSummary[] = [];
-    for (const website of await this.deps.websites.listByOwner(userId)) {
-      const ctx = await loadGuestContext(this.deps, website);
-      if (ctx.cards.length === 0) continue;
-      const households = await this.deps.guests.listHouseholds(website.id);
-      for (const card of [...ctx.cards].sort((a, b) => CARD_KINDS.indexOf(a.kind) - CARD_KINDS.indexOf(b.kind))) {
-        const deliveries = isHouseholdCardKind(card.kind) ? await this.deps.cards.listDeliveries(card.id) : [];
-        result.push({
-          websiteId: website.id,
-          websiteTitle: website.title,
-          kind: card.kind,
-          model: modelFor(this.deps, ctx, card, null, pagePhoto(card)),
-          counts: isHouseholdCardKind(card.kind) ? cardCounts(households.map((h) => deliveries.find((d) => d.householdId === h.id) ?? null)) : null,
-          active: ctx.cardActive(card.kind),
-          publicUrl: card.kind === "engagement" ? `${this.deps.appUrl}/${website.slug}/${CARD_SLUGS.engagement}` : null,
-          updatedAt: card.updatedAt,
-        });
-      }
-    }
-    return result;
+    if (value.content.eventId && !ctx.eventItems.some((i) => i.id === value.content.eventId)) throw new ValidationError({ "content.eventId": "invalid_option" });
+    await assertOwnImage(this.deps, wedding.id, value.photoKey, "photoKey");
+    await this.deps.cards.update(cardId, { ...value, layoutId: value.layoutId ?? layouts[0]!.id, reminderDays: kind === "invitation" ? value.reminderDays : [] });
   }
 }
 
@@ -268,12 +210,14 @@ export class ExportCard {
   constructor(private deps: Deps) {}
 
   /** PNG for messengers, PDF in A6 or A5 for printing at home. Needs the card's tier. */
-  async execute(userId: string, websiteId: string, kind: CardKind, format: ExportFormat): Promise<{ filename: string; contentType: string; bytes: Uint8Array }> {
-    const { ctx, card } = await loadOwnedCard(this.deps, userId, websiteId, kind);
+  async execute(userId: string, cardId: string, format: ExportFormat): Promise<{ filename: string; contentType: string; bytes: Uint8Array }> {
+    const { ctx, card, wedding } = await loadOwnedCard(this.deps, userId, cardId);
+    const { kind } = card;
     if (!ctx.cardActive(kind)) throw new LockedError();
+    assertDate(wedding, kind);
     const photo = await photoBytes(this.deps, card);
     const model = modelFor(this.deps, ctx, card, null, photo ? "photo" : null);
-    const name = CARD_SLUGS[kind];
+    const name = card.position === firstVersion(ctx.versionsOf(kind))?.position ? CARD_SLUGS[kind] : `${CARD_SLUGS[kind]}-${card.slug}`;
     if (format === "png") return { filename: `${name}.png`, contentType: "image/png", bytes: await this.deps.cardRenderer.png(model, photo, PNG_EXPORT_WIDTH) };
     return { filename: `${name}-${format}.pdf`, contentType: "application/pdf", bytes: await this.deps.cardRenderer.pdf(model, photo, format) };
   }
@@ -281,8 +225,8 @@ export class ExportCard {
 
 // ---- the guests' side: the household page ----
 
-export type PageCard = { kind: CardKind; model: CardModel; envelope: boolean; icsUrl: string | null; websiteUrl: string | null };
-type PageWebsite = Pick<Website, "title" | "slug" | "weddingDate" | "timezone">;
+export type PageCard = { kind: CardKind; label: string; model: CardModel; envelope: boolean; icsUrl: string | null; websiteUrl: string | null };
+type PageWebsite = Pick<Wedding, "title" | "slug" | "weddingDate" | "timezone">;
 
 export type HouseholdPageView =
   | {
@@ -298,18 +242,19 @@ export type HouseholdPageView =
     }
   | { state: "inactive"; website: PageWebsite; design: ResolvedDesign };
 
-const pageWebsite = ({ title, slug, weddingDate, timezone }: Website): PageWebsite => ({ title, slug, weddingDate, timezone });
+const pageWebsite = ({ title, slug, weddingDate, timezone }: Wedding): PageWebsite => ({ title, slug, weddingDate, timezone });
 
-function pageCard(deps: Deps, ctx: GuestContext, card: Card, household: Pick<Household, "name" | "personalLine"> | null): PageCard {
-  const { slug, weddingDate, siteEnabled } = ctx.view.website;
-  // Only the Save the Date links the website: an engagement comes before any wedding is planned.
-  const linksSite = siteEnabled && card.kind === "saveTheDate";
+/** A card as a page shows it. Only the Save the Date links the website: the household's version, if online. */
+function pageCard(deps: Deps, ctx: GuestContext, card: Card, household: (Pick<Household, "name" | "personalLine"> & { id: string }) | null): PageCard {
+  const { slug, weddingDate } = ctx.wedding;
+  const website = card.kind === "saveTheDate" ? (household ? ctx.websiteFor(household.id) : ctx.firstWebsite()) : null;
   return {
     kind: card.kind,
+    label: card.label,
     model: modelFor(deps, ctx, card, household, pagePhoto(card)),
     envelope: card.envelope,
     icsUrl: card.kind === "saveTheDate" && weddingDate ? `/${slug}/hochzeit.ics` : null,
-    websiteUrl: linksSite ? `/${slug}` : null,
+    websiteUrl: website && ctx.online(website) ? `/${website.slug}` : null,
   };
 }
 
@@ -317,26 +262,26 @@ export class GetHouseholdPage {
   constructor(private deps: Deps) {}
 
   /**
-   * The household's page behind its personal link: the cards sent to it, newest first, and the response form
-   * with the invitation. Without cards it is the v3 response page. Null for unknown links; an inactive link
-   * reveals nothing about the household.
+   * The household's page behind its personal link: the cards sent to it (its assigned versions), newest first,
+   * and the response form with the invitation. Without cards it is the v3 response page. Null for unknown links;
+   * an inactive link reveals nothing about the household.
    */
   async execute(token: string): Promise<HouseholdPageView | null> {
     const found = await loadByToken(this.deps, token);
     if (!found) return null;
-    const { ctx, household, website } = found;
+    const { ctx, household, wedding } = found;
     const content = await householdContent(this.deps, ctx, household);
-    const base = { website: pageWebsite(website), design: ctx.view.design };
+    const base = { website: pageWebsite(wedding), design: householdDesign(this.deps, ctx, household.id) };
     // Nothing to show only without active links (no package, or the guest data is gone).
     if (content.kinds.length === 0 && !content.form) return { ...base, state: "inactive" };
-    const cards = content.kinds.map((kind) => pageCard(this.deps, ctx, ctx.cards.find((c) => c.kind === kind)!, household));
+    const cards = content.kinds.map((kind) => pageCard(this.deps, ctx, ctx.cardFor(household.id, kind)!, household));
     return {
       ...base,
       state: "page",
       greeting: household.name,
       envelope: cards[0]?.envelope ?? false,
       cards,
-      form: content.form ? formFor(ctx, household, isReplyOpen(ctx.settings.replyBy, website.timezone, ctx.now) ? "open" : "closed") : null,
+      form: content.form ? formFor(this.deps, ctx, household, isReplyOpen(ctx.settings.replyBy, wedding.timezone, ctx.now) ? "open" : "closed") : null,
     };
   }
 }
@@ -344,10 +289,12 @@ export class GetHouseholdPage {
 export class GetCardPreview {
   constructor(private deps: Deps) {}
 
-  /** A card as guests see it, for the first household or a sample one. Free; it records nothing. */
-  async execute(userId: string, websiteId: string, kind: CardKind): Promise<Extract<HouseholdPageView, { state: "page" }>> {
-    const { website, ctx, card } = await loadOwnedCard(this.deps, userId, websiteId, kind);
-    const [first] = await this.deps.guests.listHouseholds(websiteId);
+  /** A card version as guests see it, for a household that gets it or a sample one. Free; it records nothing. */
+  async execute(userId: string, cardId: string): Promise<Extract<HouseholdPageView, { state: "page" }>> {
+    const { wedding, ctx, card } = await loadOwnedCard(this.deps, userId, cardId);
+    const { kind } = card;
+    const households = await this.deps.guests.listHouseholds(wedding.id);
+    const first = isHouseholdCardKind(kind) ? households.find((h) => ctx.cardFor(h.id, kind)?.id === card.id) : undefined;
     const household: Household = first ?? {
       id: "preview",
       name: this.deps.cardTexts.sampleHousehold,
@@ -365,12 +312,12 @@ export class GetCardPreview {
     const isEngagement = kind === "engagement";
     return {
       state: "page",
-      website: pageWebsite(website),
-      design: ctx.view.design,
+      website: pageWebsite(wedding),
+      design: householdDesign(this.deps, ctx, first?.id ?? null),
       greeting: isEngagement ? null : household.name,
       envelope: card.envelope,
       cards: [pageCard(this.deps, ctx, card, isEngagement ? null : household)],
-      form: kind === "invitation" && household.people.length > 0 ? formFor(ctx, household, "preview") : null,
+      form: kind === "invitation" && household.people.length > 0 ? formFor(this.deps, ctx, household, "preview") : null,
     };
   }
 }
@@ -380,7 +327,7 @@ export class MarkCardsOpened {
 
   /**
    * Called by the household's page once a card is actually shown (the envelope opened). Only the first time
-   * counts, only for cards the page shows. Returns the kinds recorded now.
+   * counts, only for cards the page shows, per version. Returns the kinds recorded now.
    */
   async execute(token: string, kinds: readonly string[]): Promise<HouseholdCardKind[]> {
     const found = await loadByToken(this.deps, token);
@@ -389,7 +336,7 @@ export class MarkCardsOpened {
     const content = await householdContent(this.deps, ctx, household);
     const recorded: HouseholdCardKind[] = [];
     for (const kind of content.kinds.filter((k) => kinds.includes(k))) {
-      const card = ctx.cards.find((c) => c.kind === kind)!;
+      const card = ctx.cardFor(household.id, kind)!;
       if (await this.deps.cards.markOpened(card.id, household.id, ctx.now)) recorded.push(kind);
     }
     return recorded;
@@ -400,42 +347,73 @@ export type EngagementPage =
   | { state: "active"; website: PageWebsite; design: ResolvedDesign; card: PageCard }
   | { state: "inactive"; website: PageWebsite; design: ResolvedDesign };
 
+/** A wedding by its own slug, or through one of its website versions' slugs. */
+export async function weddingBySlug(deps: Deps, slug: string): Promise<Wedding | null> {
+  const wedding = await deps.weddings.findBySlug(slug);
+  if (wedding) return wedding;
+  const website = await deps.websites.findBySlug(slug);
+  return website ? deps.weddings.findById(website.weddingId) : null;
+}
+
 export class GetEngagementPage {
   constructor(private deps: Deps) {}
 
-  /** The engagement announcement's one shareable link. Null if the website has none. */
-  async execute(slug: string): Promise<EngagementPage | null> {
-    const website = await this.deps.websites.findBySlug(slug);
-    if (!website) return null;
-    const ctx = await loadGuestContext(this.deps, website);
-    const card = ctx.cards.find((c) => c.kind === "engagement");
+  /** An engagement version's shareable link: the first at /<slug>/verlobung, the others at /<slug>/verlobung/<version>. */
+  async execute(slug: string, versionSlug?: string): Promise<EngagementPage | null> {
+    const wedding = await weddingBySlug(this.deps, slug);
+    if (!wedding) return null;
+    const ctx = await loadGuestContext(this.deps, wedding);
+    const versions = ctx.versionsOf("engagement");
+    const card = versionSlug ? versions.find((c) => c.slug === versionSlug && c.id !== versions[0]?.id) : versions[0];
     if (!card) return null;
-    const base = { website: pageWebsite(website), design: ctx.view.design };
+    const base = { website: pageWebsite(wedding), design: householdDesign(this.deps, ctx, null) };
     if (!ctx.cardActive("engagement")) return { ...base, state: "inactive" };
     return { ...base, state: "active", card: pageCard(this.deps, ctx, card, null) };
   }
 }
 
+/** The public link of an engagement version. */
+export function engagementUrl(deps: Deps, wedding: Wedding, card: Card, versions: readonly Card[]): string {
+  const base = `${deps.appUrl}/${wedding.slug}/${CARD_SLUGS.engagement}`;
+  return firstVersion(versions)?.id === card.id ? base : `${base}/${card.slug}`;
+}
+
+export class MarkEngagementShared {
+  constructor(private deps: Deps) {}
+
+  /** The couple copied the engagement link or opened WhatsApp with it: the timeline counts it as shared. */
+  async execute(userId: string, cardId: string): Promise<void> {
+    const { card, ctx } = await loadOwnedCard(this.deps, userId, cardId);
+    if (card.kind !== "engagement") throw new NotFoundError();
+    if (!ctx.cardActive("engagement")) throw new LockedError();
+    await this.deps.cards.markLinkShared(card.id, ctx.now);
+  }
+}
+
 // ---- the couple: sending ----
 
-async function loadHouseholdCard(deps: Deps, userId: string, websiteId: string, kind: CardKind, householdId: string) {
+async function loadHouseholdCard(deps: Deps, userId: string, weddingId: string, kind: CardKind, householdId: string) {
   if (!isHouseholdCardKind(kind)) throw new NotFoundError();
-  const loaded = await loadOwnedCard(deps, userId, websiteId, kind);
-  const household = await deps.guests.findHousehold(websiteId, householdId);
-  if (!household) throw new NotFoundError();
-  const delivery = (await deps.cards.listDeliveries(loaded.card.id)).find((d) => d.householdId === householdId) ?? null;
-  return { ...loaded, household, delivery };
+  const wedding = await loadOwnedWedding(deps, userId, weddingId);
+  const ctx = await loadGuestContext(deps, wedding);
+  const household = await deps.guests.findHousehold(weddingId, householdId);
+  const card = household && ctx.cardFor(household.id, kind);
+  if (!household || !card) throw new NotFoundError();
+  const delivery = (await deps.cards.listDeliveriesOfHousehold(householdId)).find((d) => d.kind === kind) ?? null;
+  return { wedding, ctx, card, household, kind, delivery };
 }
 
 export class ShareCard {
   constructor(private deps: Deps) {}
 
-  /** The couple shares a card by WhatsApp or copied link: records it and returns the link and the text. */
-  async execute(userId: string, websiteId: string, kind: CardKind, householdId: string, via: SharedVia): Promise<{ link: string; message: string }> {
-    const { ctx, card, household, delivery } = await loadHouseholdCard(this.deps, userId, websiteId, kind, householdId);
+  /** The couple shares a card by WhatsApp or copied link: records it and returns the link and the household's version's text. */
+  async execute(userId: string, weddingId: string, kind: CardKind, householdId: string, via: SharedVia): Promise<{ link: string; message: string }> {
+    const loaded = await loadHouseholdCard(this.deps, userId, weddingId, kind, householdId);
+    const { ctx, card, household, delivery, wedding } = loaded;
     if (!ctx.cardActive(kind)) throw new LockedError();
+    assertDate(wedding, kind);
     if (delivery?.excluded) throw new ValidationError({ _: "excluded" });
-    await this.deps.cards.markShared(card.id, householdId, via, ctx.now);
+    await this.deps.cards.markShared(householdId, loaded.kind, via, ctx.now);
     return { link: linkUrl(this.deps, householdId), message: personalize(cardMessage(this.deps, card), household.name) };
   }
 }
@@ -444,9 +422,9 @@ export class SetCardExcluded {
   constructor(private deps: Deps) {}
 
   /** Leaves a household out of a card (or back in). Every household gets every card by default. */
-  async execute(userId: string, websiteId: string, kind: CardKind, householdId: string, excluded: boolean): Promise<void> {
-    const { card } = await loadHouseholdCard(this.deps, userId, websiteId, kind, householdId);
-    await this.deps.cards.setExcluded(card.id, householdId, excluded);
+  async execute(userId: string, weddingId: string, kind: CardKind, householdId: string, excluded: boolean): Promise<void> {
+    const loaded = await loadHouseholdCard(this.deps, userId, weddingId, kind, householdId);
+    await this.deps.cards.setExcluded(householdId, loaded.kind, excluded);
   }
 }
 
@@ -457,16 +435,18 @@ export class SendCardEmails {
 
   /**
    * Queues the card's email for one household (again, if asked) or for every household with an address that
-   * has not had it yet. The background job sends them; the caller kicks it.
+   * has not had any version of it yet. The background job sends each household its assigned version.
    */
-  async execute(userId: string, websiteId: string, kind: CardKind, target: SendTarget): Promise<{ queued: number }> {
+  async execute(userId: string, weddingId: string, kind: CardKind, target: SendTarget): Promise<{ queued: number }> {
     if (!isHouseholdCardKind(kind)) throw new NotFoundError();
-    const { ctx, card } = await loadOwnedCard(this.deps, userId, websiteId, kind);
+    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const ctx = await loadGuestContext(this.deps, wedding);
     if (!ctx.cardActive(kind) || !ctx.can("emailSending")) throw new LockedError();
-    const deliveries = await this.deps.cards.listDeliveries(card.id);
-    const households = (await this.deps.guests.listHouseholds(websiteId)).map((h) => ({ ...h, delivery: deliveries.find((d) => d.householdId === h.id) ?? null }));
+    assertDate(wedding, kind);
+    const deliveries = (await this.deps.cards.listDeliveries(weddingId)).filter((d) => d.kind === kind);
+    const households = (await this.deps.guests.listHouseholds(weddingId)).map((h) => ({ ...h, delivery: deliveries.find((d) => d.householdId === h.id) ?? null }));
     let ids: string[];
-    if (target === "all") ids = emailRecipients(households).map((h) => h.id);
+    if (target === "all") ids = emailRecipients(households.map((h) => ({ ...h, delivery: h.delivery && { ...h.delivery, openedAt: null } }))).map((h) => h.id);
     else {
       const household = households.find((h) => h.id === target.householdId);
       if (!household) throw new NotFoundError();
@@ -474,7 +454,7 @@ export class SendCardEmails {
       if (household.delivery?.excluded) throw new ValidationError({ _: "excluded" });
       ids = [household.id];
     }
-    return { queued: ids.length ? await this.deps.cards.queueMail("card", card.id, ids, ctx.now) : 0 };
+    return { queued: ids.length ? await this.deps.cards.queueMail("card", kind, ids, ctx.now) : 0 };
   }
 }
 
@@ -483,26 +463,27 @@ export class SendReminders {
 
   /**
    * "Erinnerung senden" for one household or every open one: an email where there is an address (Einladungen
-   * tier), otherwise a WhatsApp link for the couple to open (RSVP tier).
+   * tier), otherwise a WhatsApp link for the couple to open (RSVP tier). The text is the household's invitation version's.
    */
-  async execute(userId: string, websiteId: string, target: SendTarget): Promise<{ queued: number; whatsapp: { householdId: string; name: string; url: string }[] }> {
-    const website = await loadOwnedWebsite(this.deps, userId, websiteId);
-    const ctx = await loadGuestContext(this.deps, website);
+  async execute(userId: string, weddingId: string, target: SendTarget): Promise<{ queued: number; whatsapp: { householdId: string; name: string; url: string }[] }> {
+    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const ctx = await loadGuestContext(this.deps, wedding);
     const byEmail = ctx.can("emailReminders");
     if (!ctx.sending && !byEmail) throw new LockedError();
     // Reminders are about answering: they stop at the reply-by date and for households that answered.
-    if (!isReplyOpen(ctx.settings.replyBy, website.timezone, ctx.now)) throw new ValidationError({ _: "closed" });
-    const invitation = ctx.cards.find((c) => c.kind === "invitation");
-    const deliveries = invitation ? await this.deps.cards.listDeliveries(invitation.id) : [];
-    const all = await this.deps.guests.listHouseholds(websiteId);
+    if (!isReplyOpen(ctx.settings.replyBy, wedding.timezone, ctx.now)) throw new ValidationError({ _: "closed" });
+    const deliveries = (await this.deps.cards.listDeliveries(weddingId)).filter((d) => d.kind === "invitation");
+    const all = await this.deps.guests.listHouseholds(weddingId);
     const chosen = target === "all" ? all.filter((h) => householdStatus(h) === "open") : all.filter((h) => h.id === target.householdId);
     if (target !== "all" && chosen.length === 0) throw new NotFoundError();
     if (target !== "all" && householdStatus(chosen[0]!) !== "open") throw new ValidationError({ _: "answered" });
     const households = chosen.filter((h) => !deliveries.find((d) => d.householdId === h.id)?.excluded);
-    const emailIds = byEmail && invitation ? households.filter((h) => h.email).map((h) => h.id) : [];
-    const queued = emailIds.length ? await this.deps.cards.queueMail("reminder", invitation!.id, emailIds, ctx.now) : 0;
+    const emailIds = byEmail && ctx.versionsOf("invitation").length > 0 ? households.filter((h) => h.email).map((h) => h.id) : [];
+    const queued = emailIds.length ? await this.deps.cards.queueMail("reminder", "invitation", emailIds, ctx.now) : 0;
     const whatsapp = ctx.sending
-      ? households.filter((h) => !emailIds.includes(h.id)).map((h) => ({ householdId: h.id, name: h.name, url: whatsappUrl(reminderMessage(this.deps, invitation), h.name, linkUrl(this.deps, h.id)) }))
+      ? households
+          .filter((h) => !emailIds.includes(h.id))
+          .map((h) => ({ householdId: h.id, name: h.name, url: whatsappUrl(reminderMessage(this.deps, ctx.cardFor(h.id, "invitation")), h.name, linkUrl(this.deps, h.id)) }))
       : [];
     return { queued, whatsapp };
   }
@@ -524,7 +505,7 @@ export class RunMailJobs {
   constructor(private deps: Deps) {}
 
   /** `automatic: false` sends only what is queued (the run started right after the couple clicked). */
-  async execute(options: { websiteId?: string; automatic?: boolean } = {}): Promise<MailJobsResult> {
+  async execute(options: { weddingId?: string; automatic?: boolean } = {}): Promise<MailJobsResult> {
     this.contexts.clear();
     this.images.clear();
     const result: MailJobsResult = { sent: 0, failed: 0, reminders: 0 };
@@ -533,15 +514,15 @@ export class RunMailJobs {
 
     let handled = 0;
     while (handled < MAX_MAILS_PER_RUN) {
-      const batch = await this.deps.cards.listQueuedMail(this.deps.mailRate.batchSize, options.websiteId);
+      const batch = await this.deps.cards.listQueuedMail(this.deps.mailRate.batchSize, options.weddingId);
       if (batch.length === 0) break;
       let claimed = 0;
       for (const queued of batch) {
-        if (!(await this.deps.cards.claimMail(queued.channel, queued.cardId, queued.householdId, this.deps.clock.now()))) continue;
+        if (!(await this.deps.cards.claimMail(queued.channel, queued.householdId, queued.kind, this.deps.clock.now()))) continue;
         claimed++;
         handled++;
         const outcome = await this.sendQueued(queued);
-        await this.deps.cards.finishMail(queued.channel, queued.cardId, queued.householdId, outcome === "sent" ? { sentAt: this.deps.clock.now() } : { error: outcome });
+        await this.deps.cards.finishMail(queued.channel, queued.householdId, queued.kind, outcome === "sent" ? { sentAt: this.deps.clock.now() } : { error: outcome });
         if (outcome === "sent") result.sent++;
         else result.failed++;
         await this.pause();
@@ -550,10 +531,10 @@ export class RunMailJobs {
     }
 
     if (options.automatic === false) return result;
-    for (const { websiteId, cardId } of await this.deps.cards.listInvitationsWithReminders()) {
-      if (options.websiteId && websiteId !== options.websiteId) continue;
-      const outcome = await this.automaticReminders(websiteId, cardId).catch((error) => {
-        console.error(`[traureise] automatic reminders failed for ${websiteId}`, error);
+    for (const weddingId of await this.deps.cards.listWeddingIdsWithReminders()) {
+      if (options.weddingId && weddingId !== options.weddingId) continue;
+      const outcome = await this.automaticReminders(weddingId).catch((error) => {
+        console.error(`[traureise] automatic reminders failed for ${weddingId}`, error);
         return { sent: 0, failed: 0 };
       });
       result.reminders += outcome.sent;
@@ -567,24 +548,26 @@ export class RunMailJobs {
     return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
   }
 
-  private context(websiteId: string): Promise<GuestContext | null> {
-    let ctx = this.contexts.get(websiteId);
+  private context(weddingId: string): Promise<GuestContext | null> {
+    let ctx = this.contexts.get(weddingId);
     if (!ctx) {
-      ctx = this.deps.websites.findById(websiteId).then((w) => (w ? loadGuestContext(this.deps, w) : null));
-      this.contexts.set(websiteId, ctx);
+      ctx = this.deps.weddings.findById(weddingId).then((w) => (w ? loadGuestContext(this.deps, w) : null));
+      this.contexts.set(weddingId, ctx);
     }
     return ctx;
   }
 
+  /** Each household gets the version assigned to it when the email goes out. */
   private async sendQueued(queued: QueuedMail): Promise<"sent" | string> {
-    const ctx = await this.context(queued.websiteId);
-    const card = ctx?.cards.find((c) => c.id === queued.cardId);
-    const household = ctx && (await this.deps.guests.findHousehold(queued.websiteId, queued.householdId));
+    const ctx = await this.context(queued.weddingId);
+    const household = ctx && (await this.deps.guests.findHousehold(queued.weddingId, queued.householdId));
+    const card = household && ctx.cardFor(household.id, queued.kind);
     if (!ctx || !card || !household) return "gone";
     if (!household.email) return "no_email";
     if (queued.channel === "card" ? !ctx.cardActive(card.kind) || !ctx.can("emailSending") : !ctx.can("emailReminders")) return "locked";
+    if (queued.channel === "card" && needsDate(card.kind) && !ctx.wedding.weddingDate) return "no_date";
     if (queued.channel === "reminder" && household.respondedAt) return "answered";
-    if (queued.channel === "reminder" && !isReplyOpen(ctx.settings.replyBy, ctx.view.website.timezone, ctx.now)) return "closed";
+    if (queued.channel === "reminder" && !isReplyOpen(ctx.settings.replyBy, ctx.wedding.timezone, ctx.now)) return "closed";
     try {
       if (queued.channel === "reminder") await this.sendReminder(ctx, card, household);
       else await this.sendCard(ctx, card, household);
@@ -610,11 +593,11 @@ export class RunMailJobs {
 
   /** Sender, reply address and unsubscribe headers shared by every email to guests. */
   private async envelope(ctx: GuestContext, household: Household): Promise<Pick<MailMessage, "to" | "fromName" | "replyTo" | "headers">> {
-    const owner = await this.deps.users.findById(ctx.view.website.ownerId);
+    const owner = await this.deps.users.findById(ctx.wedding.ownerId);
     const stop = this.deps.guestLinks.unsubscribeTokenFor(household.id);
     return {
       to: household.email!,
-      fromName: `${ctx.view.website.title} über Traureise`,
+      fromName: `${ctx.wedding.title} über Traureise`,
       replyTo: owner?.email,
       headers: { "List-Unsubscribe": `<${this.deps.appUrl}/api/abmelden/${stop}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
     };
@@ -628,7 +611,7 @@ export class RunMailJobs {
     const image = await this.image(ctx, card, household);
     const mail = this.deps.cardMail.card({
       kind: card.kind,
-      couple: ctx.view.website.title,
+      couple: ctx.wedding.title,
       household: household.name,
       message: personalize(cardMessage(this.deps, card), household.name),
       ...this.links(household),
@@ -644,7 +627,7 @@ export class RunMailJobs {
   private async sendReminder(ctx: GuestContext, card: Card, household: Household) {
     const replyBy = ctx.settings.replyBy;
     const mail = this.deps.cardMail.reminder({
-      couple: ctx.view.website.title,
+      couple: ctx.wedding.title,
       household: household.name,
       message: personalize(reminderMessage(this.deps, card), household.name),
       ...this.links(household),
@@ -653,18 +636,19 @@ export class RunMailJobs {
     await this.deps.mailer.send({ ...(await this.envelope(ctx, household)), ...mail });
   }
 
-  private async automaticReminders(websiteId: string, cardId: string): Promise<{ sent: number; failed: number }> {
+  private async automaticReminders(weddingId: string): Promise<{ sent: number; failed: number }> {
     const outcome = { sent: 0, failed: 0 };
-    const ctx = await this.context(websiteId);
-    const card = ctx?.cards.find((c) => c.id === cardId);
-    if (!ctx || !card || !ctx.can("emailReminders") || !ctx.cardActive("invitation")) return outcome;
-    const deliveries = await this.deps.cards.listDeliveries(cardId);
-    for (const household of await this.deps.guests.listHouseholds(websiteId)) {
+    const ctx = await this.context(weddingId);
+    if (!ctx || !ctx.can("emailReminders") || !ctx.cardActive("invitation")) return outcome;
+    const deliveries = (await this.deps.cards.listDeliveries(weddingId)).filter((d) => d.kind === "invitation");
+    for (const household of await this.deps.guests.listHouseholds(weddingId)) {
       const delivery = deliveries.find((d) => d.householdId === household.id);
-      const sent = sentAt(delivery ?? null);
-      if (!household.email || household.respondedAt || !delivery || delivery.excluded || !sent) continue;
-      const offset = reminderDue({ replyBy: ctx.settings.replyBy, days: card.reminderDays, lastOffset: delivery.reminderOffset, sentAt: sent, timeZone: ctx.view.website.timezone, now: ctx.now });
-      if (offset === null || !(await this.deps.cards.claimAutomaticReminder(cardId, household.id, offset, this.deps.clock.now()))) continue;
+      const sent = sentAt(delivery ? { ...delivery, openedAt: null } : null);
+      // The days come from the household's invitation version.
+      const card = ctx.cardFor(household.id, "invitation");
+      if (!card || !household.email || household.respondedAt || !delivery || delivery.excluded || !sent) continue;
+      const offset = reminderDue({ replyBy: ctx.settings.replyBy, days: card.reminderDays, lastOffset: delivery.reminderOffset, sentAt: sent, timeZone: ctx.wedding.timezone, now: ctx.now });
+      if (offset === null || !(await this.deps.cards.claimAutomaticReminder(household.id, offset, this.deps.clock.now()))) continue;
       try {
         await this.sendReminder(ctx, card, household);
         outcome.sent++;
@@ -684,8 +668,8 @@ async function householdOfUnsubscribe(deps: Deps, token: string) {
   const id = deps.guestLinks.verifyUnsubscribe(token);
   if (!id) return null;
   const found = await deps.guests.findByTokenHash(deps.guestLinks.hash(deps.guestLinks.tokenFor(id)));
-  const website = found && (await deps.websites.findById(found.websiteId));
-  return found && website ? { household: found.household, website } : null;
+  const wedding = found && (await deps.weddings.findById(found.weddingId));
+  return found && wedding ? { household: found.household, wedding } : null;
 }
 
 export class GetUnsubscribe {
@@ -695,7 +679,7 @@ export class GetUnsubscribe {
   async execute(token: string): Promise<{ couple: string; household: string; done: boolean } | null> {
     const found = await householdOfUnsubscribe(this.deps, token);
     if (!found) return null;
-    return { couple: found.website.title, household: found.household.name, done: !found.household.email && !!found.household.unsubscribedAt };
+    return { couple: found.wedding.title, household: found.household.name, done: !found.household.email && !!found.household.unsubscribedAt };
   }
 }
 

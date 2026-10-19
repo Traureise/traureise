@@ -10,7 +10,7 @@ import {
   UpdateProfile,
   VerifyMagicLink,
 } from "@/application/auth";
-import { GetPricing, HandlePaymentWebhook, ListPurchases, ListWebsitePlans, StartCheckout } from "@/application/billing";
+import { GetPricing, HandlePaymentWebhook, ListPurchases, ListWeddingPlans, StartCheckout } from "@/application/billing";
 import type { Deps } from "@/application/deps";
 import type { BillingSettings, FileStorage, PaymentProvider } from "@/application/ports";
 import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
@@ -32,17 +32,14 @@ import {
 } from "@/application/guests";
 import { createGuestMailTemplates } from "@/infrastructure/mail/guest-templates";
 import {
-  CreateCard,
-  CreateCardForNewWedding,
-  DeleteCard,
   ExportCard,
   GetCardEditor,
   GetCardPreview,
   GetEngagementPage,
   GetHouseholdPage,
   GetUnsubscribe,
-  ListCards,
   MarkCardsOpened,
+  MarkEngagementShared,
   RunMailJobs,
   SaveCard,
   SendCardEmails,
@@ -57,19 +54,9 @@ import { DrizzleCardRepository } from "@/infrastructure/repositories/cards";
 import { DrizzleGuestRepository } from "@/infrastructure/repositories/guests";
 import { AddItem, DeleteItem, MoveItem, UpdateItem, UpdateSection } from "@/application/sections";
 import { GetUpload, UploadImage } from "@/application/uploads";
-import {
-  CreateWebsite,
-  DeleteWebsite,
-  EnableSite,
-  GetWebsiteForOwner,
-  ListWebsites,
-  SelectTheme,
-  SetCoverImage,
-  UpdateDesign,
-  UpdateHome,
-  UpdateSlug,
-  UpdateWeddingDetails,
-} from "@/application/websites";
+import { AddVersion, AssignVersion, DeleteVersion, RenameVersion } from "@/application/versions";
+import { CreateWedding, DeleteWedding, GetRecentWedding, GetWeddingHome, ListWeddings, UpdateWeddingDetails, UpdateWeddingSlug } from "@/application/weddings";
+import { GetWebsiteForOwner, SelectTheme, SetCoverImage, SetEventShown, SetPublished, UpdateDesign, UpdateHome, UpdateSlug } from "@/application/websites";
 import { createDatabase } from "@/infrastructure/db/client";
 import { SharpImageProcessor } from "@/infrastructure/images/sharp";
 import { createMagicLinkTemplate } from "@/infrastructure/mail/magic-link-template";
@@ -78,6 +65,7 @@ import { DrizzleMagicLinkRepository, DrizzleSessionRepository, PostgresRateLimit
 import { DrizzleUploadRepository } from "@/infrastructure/repositories/uploads";
 import { DrizzleUserRepository } from "@/infrastructure/repositories/users";
 import { DrizzleWebsiteRepository } from "@/infrastructure/repositories/websites";
+import { DrizzleWeddingRepository } from "@/infrastructure/repositories/weddings";
 import { LocalFileStorage } from "@/infrastructure/storage/local";
 import { S3FileStorage } from "@/infrastructure/storage/s3";
 import { adjustableClock, cryptoTokens, hmacGuestLinks, systemClock } from "@/infrastructure/system";
@@ -130,6 +118,7 @@ function build() {
     magicLinks: new DrizzleMagicLinkRepository(db),
     sessions: new DrizzleSessionRepository(db),
     rateLimiter: new PostgresRateLimiter(db),
+    weddings: new DrizzleWeddingRepository(db),
     websites: new DrizzleWebsiteRepository(db),
     uploads: new DrizzleUploadRepository(db),
     storage: createStorage(config),
@@ -184,17 +173,25 @@ function build() {
     getCurrentUser: new GetCurrentUser(deps),
     logout: new Logout(deps),
     updateProfile: new UpdateProfile(deps),
-    createWebsite: new CreateWebsite(deps),
-    listWebsites: new ListWebsites(deps),
-    enableSite: new EnableSite(deps),
+    createWedding: new CreateWedding(deps),
+    listWeddings: new ListWeddings(deps),
+    getRecentWedding: new GetRecentWedding(deps),
+    getWeddingHome: new GetWeddingHome(deps),
     updateWeddingDetails: new UpdateWeddingDetails(deps),
+    updateWeddingSlug: new UpdateWeddingSlug(deps),
+    deleteWedding: new DeleteWedding(deps),
+    addVersion: new AddVersion(deps),
+    renameVersion: new RenameVersion(deps),
+    deleteVersion: new DeleteVersion(deps),
+    assignVersion: new AssignVersion(deps),
     getWebsiteForOwner: new GetWebsiteForOwner(deps),
     updateHome: new UpdateHome(deps),
     updateSlug: new UpdateSlug(deps),
+    setPublished: new SetPublished(deps),
+    setEventShown: new SetEventShown(deps),
     setCoverImage: new SetCoverImage(deps),
     selectTheme: new SelectTheme(deps),
     updateDesign: new UpdateDesign(deps),
-    deleteWebsite: new DeleteWebsite(deps),
     updateSection: new UpdateSection(deps),
     addItem: new AddItem(deps),
     updateItem: new UpdateItem(deps),
@@ -208,7 +205,7 @@ function build() {
     exportAccount: new ExportAccount(deps),
     deleteAccount: new DeleteAccount(deps),
     getPricing: new GetPricing(deps),
-    listWebsitePlans: new ListWebsitePlans(deps),
+    listWeddingPlans: new ListWeddingPlans(deps),
     listPurchases: new ListPurchases(deps),
     startCheckout: new StartCheckout(deps),
     handlePaymentWebhook: new HandlePaymentWebhook(deps),
@@ -223,13 +220,10 @@ function build() {
     getGuestFormPreview: new GetGuestFormPreview(deps),
     submitGuestResponse: new SubmitGuestResponse(deps),
     runGuestJobs: new RunGuestJobs(deps),
-    createCard: new CreateCard(deps),
-    createCardForNewWedding: new CreateCardForNewWedding(deps),
     getCardEditor: new GetCardEditor(deps),
     saveCard: new SaveCard(deps),
-    deleteCard: new DeleteCard(deps),
-    listCards: new ListCards(deps),
     exportCard: new ExportCard(deps),
+    markEngagementShared: new MarkEngagementShared(deps),
     getHouseholdPage: new GetHouseholdPage(deps),
     getCardPreview: new GetCardPreview(deps),
     markCardsOpened: new MarkCardsOpened(deps),
@@ -239,7 +233,7 @@ function build() {
     sendCardEmails: new SendCardEmails(deps),
     sendReminders: new SendReminders(deps),
     /** A fresh instance per run: it caches contexts and images for that run only. */
-    runMailJobs: (options: { websiteId?: string; automatic?: boolean } = {}) => new RunMailJobs(deps).execute(options),
+    runMailJobs: (options: { weddingId?: string; automatic?: boolean } = {}) => new RunMailJobs(deps).execute(options),
     getUnsubscribe: new GetUnsubscribe(deps),
     unsubscribe: new Unsubscribe(deps),
   };

@@ -34,7 +34,7 @@ export class CreemPaymentProvider implements PaymentProvider {
         request_id: request.requestId,
         success_url: request.successUrl,
         customer: { email: request.customerEmail },
-        metadata: { websiteId: request.websiteId, tier: request.tier },
+        metadata: { weddingId: request.weddingId, tier: request.tier },
       }),
     });
     if (!res.ok) throw new Error(`Creem checkout failed: ${res.status}`);
@@ -57,9 +57,9 @@ export class CreemPaymentProvider implements PaymentProvider {
     switch (eventType) {
       case "checkout.completed": {
         const productId = object.product?.id;
-        const websiteId = object.metadata?.websiteId;
+        const weddingId = object.metadata?.weddingId;
         if (!orderId || !productId) return { type: "ignored", eventId };
-        return { type: "paid", eventId, purchaseRef: orderId, productId, websiteId: typeof websiteId === "string" ? websiteId : null };
+        return { type: "paid", eventId, purchaseRef: orderId, productId, weddingId: typeof weddingId === "string" ? weddingId : null };
       }
       case "refund.created":
       case "dispute.created":

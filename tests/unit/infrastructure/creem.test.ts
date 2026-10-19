@@ -22,7 +22,7 @@ const checkoutCompleted = {
     product: { id: "prod_rsvp", name: "RSVP", price: 4900, currency: "EUR", billing_type: "onetime" },
     customer: { id: "cust_1", object: "customer", email: "anna@example.org", name: "Anna" },
     status: "completed",
-    metadata: { websiteId: "6a1f0c62-2b0e-4b8e-9b4d-2b6a8c1f0e11", tier: "rsvp" },
+    metadata: { weddingId: "6a1f0c62-2b0e-4b8e-9b4d-2b6a8c1f0e11", tier: "rsvp" },
     mode: "test",
   },
 };
@@ -38,7 +38,7 @@ const refundCreated = {
     refund_currency: "EUR",
     reason: "requested_by_customer",
     transaction: { id: "tran_1", order: "ord_4aDwWXjMLpes4Kj4XqNnUA" },
-    checkout: { id: "ch_4l0N34kxo16AhRKUHFUuXr", request_id: "req_1", metadata: { websiteId: "x" } },
+    checkout: { id: "ch_4l0N34kxo16AhRKUHFUuXr", request_id: "req_1", metadata: { weddingId: "x" } },
     order: { id: "ord_4aDwWXjMLpes4Kj4XqNnUA", status: "refunded" },
     customer: { id: "cust_1", email: "anna@example.org" },
   },
@@ -59,7 +59,7 @@ describe("CreemPaymentProvider.createCheckout", () => {
     });
     const result = await creem.createCheckout({
       productId: "prod_rsvp",
-      websiteId: "w1",
+      weddingId: "w1",
       tier: "rsvp",
       customerEmail: "anna@example.org",
       successUrl: "https://traureise.example/dashboard?kauf=danke",
@@ -74,14 +74,14 @@ describe("CreemPaymentProvider.createCheckout", () => {
       request_id: "req_1",
       success_url: "https://traureise.example/dashboard?kauf=danke",
       customer: { email: "anna@example.org" },
-      metadata: { websiteId: "w1", tier: "rsvp" },
+      metadata: { weddingId: "w1", tier: "rsvp" },
     });
   });
 
   it("fails on API errors", async () => {
     const creem = provider(async () => new Response("nope", { status: 401 }));
     await expect(
-      creem.createCheckout({ productId: "p", websiteId: "w", tier: "rsvp", customerEmail: "a@b.de", successUrl: "https://x", requestId: "r" }),
+      creem.createCheckout({ productId: "p", weddingId: "w", tier: "rsvp", customerEmail: "a@b.de", successUrl: "https://x", requestId: "r" }),
     ).rejects.toThrow(/401/);
   });
 });
@@ -95,14 +95,14 @@ describe("CreemPaymentProvider.parseWebhook", () => {
     expect(provider().parseWebhook(body + " ", sign(body))).toBeNull();
   });
 
-  it("turns a completed checkout into a payment for the website in the metadata", () => {
+  it("turns a completed checkout into a payment for the wedding in the metadata", () => {
     const body = JSON.stringify(checkoutCompleted);
     expect(provider().parseWebhook(body, sign(body))).toEqual({
       type: "paid",
       eventId: "evt_5WHHcZPv7VS0YUsberIuOz",
       purchaseRef: "ord_4aDwWXjMLpes4Kj4XqNnUA",
       productId: "prod_rsvp",
-      websiteId: "6a1f0c62-2b0e-4b8e-9b4d-2b6a8c1f0e11",
+      weddingId: "6a1f0c62-2b0e-4b8e-9b4d-2b6a8c1f0e11",
     });
   });
 

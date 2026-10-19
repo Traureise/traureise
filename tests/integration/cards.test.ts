@@ -4,15 +4,16 @@ import sharp from "sharp";
 import { PDFDocument } from "pdf-lib";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ExportAccount } from "@/application/account";
-import { CreateCard, ExportCard, RunMailJobs, SendCardEmails, ShareCard, Unsubscribe } from "@/application/cards";
+import { ExportCard, MarkCardsOpened, RunMailJobs, SendCardEmails, ShareCard, Unsubscribe } from "@/application/cards";
 import type { Deps } from "@/application/deps";
-import type { Section } from "@/application/ports";
-import { buildCardModel, CARD_KINDS, defaultCardContent } from "@/domain/cards";
+import type { Card } from "@/application/ports";
+import { AddVersion, AssignVersion } from "@/application/versions";
+import { CreateWedding } from "@/application/weddings";
+import { buildCardModel, defaultCardContent, type CardKind } from "@/domain/cards";
 import { cardLayoutsFor, resolveDesign } from "@/domain/theme";
-import { SECTION_KINDS } from "@/domain/sections";
 import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
 import { SatoriCardRenderer } from "@/infrastructure/cards/renderer";
-import { cardDeliveries, cards, households } from "@/infrastructure/db/schema";
+import { cardDeliveries, cardOpens, cards, householdVersions, households } from "@/infrastructure/db/schema";
 import { createCardMailTemplates, createCardTexts } from "@/infrastructure/mail/card-templates";
 import { SmtpMailer } from "@/infrastructure/mail/smtp";
 import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing";
@@ -21,6 +22,7 @@ import { DrizzleGuestRepository } from "@/infrastructure/repositories/guests";
 import { DrizzleUploadRepository } from "@/infrastructure/repositories/uploads";
 import { DrizzleUserRepository } from "@/infrastructure/repositories/users";
 import { DrizzleWebsiteRepository } from "@/infrastructure/repositories/websites";
+import { DrizzleWeddingRepository } from "@/infrastructure/repositories/weddings";
 import { cryptoTokens, hmacGuestLinks } from "@/infrastructure/system";
 import { FsThemeCatalog } from "@/infrastructure/themes/fs-catalog";
 import { FakeArchive, FakeClock, FakeMailer, InMemoryStorage } from "../fakes";
@@ -28,23 +30,23 @@ import { setupTestDatabase } from "./db";
 import { testEnv } from "./env";
 
 const db = setupTestDatabase();
-const sections: Section[] = SECTION_KINDS.map((kind) => ({ kind, title: null, visible: true, body: "" }));
 const repo = new DrizzleCardRepository(db);
 const guests = new DrizzleGuestRepository(db);
 const users = new DrizzleUserRepository(db);
 const websites = new DrizzleWebsiteRepository(db);
+const weddings = new DrizzleWeddingRepository(db);
 const themes = new FsThemeCatalog(path.resolve("themes"));
 const renderer = new SatoriCardRenderer(path.resolve("node_modules/@fontsource"));
 const guestLinks = hmacGuestLinks("integration-secret-integration-secret");
 
-let websiteId: string;
+let weddingId: string;
 let ownerId: string;
 let email: string;
 
 beforeEach(async () => {
   email = `anna-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.org`;
   ownerId = (await users.create(email)).id;
-  websiteId = (await websites.create({ ownerId, slug: `anna-${Date.now()}`, title: "Anna & Łukasz", weddingDate: "2027-06-12", themeId: "salbei", timezone: "Europe/Berlin" }, sections)).id;
+  weddingId = (await new CreateWedding(deps()).execute(ownerId, { title: "Anna & Łukasz", hasDate: true, weddingDate: "2027-06-12" })).id;
 });
 
 /** Real repositories, renderer and templates; the mailer is real SMTP (Mailpit) when asked. */
@@ -53,6 +55,7 @@ function deps(options: { smtp?: boolean } = {}) {
   const mailer = options.smtp ? new SmtpMailer({ host: "localhost", port: smtpPort, secure: false, from: "Traureise <no-reply@traureise.localhost>" }) : new FakeMailer();
   return {
     users,
+    weddings,
     websites,
     uploads: new DrizzleUploadRepository(db),
     storage: new InMemoryStorage(),
@@ -76,71 +79,100 @@ function deps(options: { smtp?: boolean } = {}) {
 }
 
 const household = (name: string, email: string | null = null) =>
-  guests.createHousehold(websiteId, { name, invitedEventIds: null, email, personalLine: "", people: [{ id: null, name: "Clara", isChild: false }] }, (id) => guestLinks.hash(guestLinks.tokenFor(id)));
+  guests.createHousehold(weddingId, { name, invitedEventIds: null, email, personalLine: "", people: [{ id: null, name: "Clara", isChild: false }] }, (id) => guestLinks.hash(guestLinks.tokenFor(id)));
 
-async function newCard(d = deps(), kind: (typeof CARD_KINDS)[number] = "saveTheDate") {
-  return new CreateCard(d).execute(ownerId, websiteId, kind);
+/** The first version of a kind, generated with the wedding. */
+async function firstCard(kind: CardKind = "saveTheDate"): Promise<Card> {
+  return (await repo.listByWedding(weddingId)).find((c) => c.kind === kind && c.position === 0)!;
 }
 
 describe("DrizzleCardRepository", () => {
-  it("keeps one card per website and kind, and updates and deletes it", async () => {
-    const card = await newCard();
-    expect(await repo.create({ ...card, id: undefined } as never)).toBeNull();
-    await repo.update(websiteId, "saveTheDate", { ...card, content: { ...card.content, text: "Neu" } });
-    expect((await repo.find(websiteId, "saveTheDate"))?.content.text).toBe("Neu");
-    await repo.delete(websiteId, "saveTheDate");
-    expect(await repo.listByWebsite(websiteId)).toEqual([]);
+  it("keeps several versions per wedding and kind, first first, and updates, renames and deletes them", async () => {
+    const card = await firstCard();
+    const { id: _id, sharedAt: _s, createdAt: _c, updatedAt: _u, ...copy } = card;
+    const family = await repo.create({ ...copy, label: "Familie", slug: "familie", position: 1 });
+    await expect(repo.create({ ...copy, label: "Doppelt", position: 2 })).rejects.toThrow();
+    expect((await repo.listByWedding(weddingId)).filter((c) => c.kind === "saveTheDate").map((c) => c.label)).toEqual(["Standard", "Familie"]);
+    await repo.update(family.id, { ...family, content: { ...family.content, text: "Neu" } });
+    await repo.rename(family.id, "Verwandte");
+    expect(await repo.findById(family.id)).toMatchObject({ label: "Verwandte", slug: "familie", content: { text: "Neu" } });
+    await repo.markLinkShared(card.id, new Date("2026-10-18T10:00:00Z"));
+    await repo.markLinkShared(card.id, new Date("2026-10-19T10:00:00Z"));
+    expect((await repo.findById(card.id))?.sharedAt).toEqual(new Date("2026-10-18T10:00:00Z"));
+    await repo.delete(family.id);
+    expect(await repo.findById(family.id)).toBeNull();
+    expect(await repo.findById("not-a-uuid")).toBeNull();
   });
 
-  it("records the first share and the first opening only", async () => {
-    const card = await newCard();
+  it("records the first share per household and kind, and the first opening per version", async () => {
+    const card = await firstCard();
     const weber = await household("Weber");
     const first = new Date("2026-10-18T10:00:00Z");
-    await repo.markShared(card.id, weber.id, "whatsapp", first);
-    await repo.markShared(card.id, weber.id, "link", new Date("2026-10-19T10:00:00Z"));
+    await repo.markShared(weber.id, "saveTheDate", "whatsapp", first);
+    await repo.markShared(weber.id, "saveTheDate", "link", new Date("2026-10-19T10:00:00Z"));
     expect(await repo.markOpened(card.id, weber.id, first)).toBe(true);
     expect(await repo.markOpened(card.id, weber.id, new Date())).toBe(false);
-    await repo.setExcluded(card.id, weber.id, true);
-    expect(await repo.listDeliveries(card.id)).toMatchObject([{ householdId: weber.id, sharedVia: "whatsapp", sharedAt: first, openedAt: first, excluded: true }]);
+    await repo.setExcluded(weber.id, "saveTheDate", true);
+    expect(await repo.listDeliveries(weddingId)).toMatchObject([{ householdId: weber.id, kind: "saveTheDate", sharedVia: "whatsapp", sharedAt: first, excluded: true }]);
+    expect(await repo.listOpens(weddingId)).toEqual([{ cardId: card.id, householdId: weber.id, openedAt: first }]);
+    expect(await repo.listOpensOfHousehold(weber.id)).toHaveLength(1);
   });
 
   it("lets exactly one of several instances claim a queued email", async () => {
-    const card = await newCard();
     const weber = await household("Weber", "weber@example.org");
     const at = new Date();
-    expect(await repo.queueMail("card", card.id, [weber.id], at)).toBe(1);
-    expect(await repo.listQueuedMail(10, websiteId)).toEqual([{ cardId: card.id, householdId: weber.id, websiteId, channel: "card" }]);
-    const claims = await Promise.all([1, 2, 3, 4].map(() => repo.claimMail("card", card.id, weber.id, at)));
+    expect(await repo.queueMail("card", "saveTheDate", [weber.id], at)).toBe(1);
+    expect(await repo.listQueuedMail(10, weddingId)).toEqual([{ householdId: weber.id, kind: "saveTheDate", weddingId, channel: "card" }]);
+    const claims = await Promise.all([1, 2, 3, 4].map(() => repo.claimMail("card", weber.id, "saveTheDate", at)));
     expect(claims.filter(Boolean)).toHaveLength(1);
-    expect(await repo.queueMail("card", card.id, [weber.id], at)).toBe(0);
-    expect(await repo.listQueuedMail(10, websiteId)).toEqual([]);
-    await repo.finishMail("card", card.id, weber.id, { sentAt: at });
-    expect(await repo.listDeliveries(card.id)).toMatchObject([{ emailedAt: at, emailQueuedAt: null, emailError: null }]);
+    expect(await repo.queueMail("card", "saveTheDate", [weber.id], at)).toBe(0);
+    expect(await repo.listQueuedMail(10, weddingId)).toEqual([]);
+    await repo.finishMail("card", weber.id, "saveTheDate", { sentAt: at });
+    expect(await repo.listDeliveries(weddingId)).toMatchObject([{ emailedAt: at, emailQueuedAt: null, emailError: null }]);
   });
 
   it("turns stale claims into failures and claims each automatic reminder once", async () => {
-    const card = await newCard(deps(), "invitation");
     const weber = await household("Weber", "weber@example.org");
     const at = new Date("2026-10-18T10:00:00Z");
-    await repo.queueMail("reminder", card.id, [weber.id], at);
-    await repo.claimMail("reminder", card.id, weber.id, at);
+    await repo.queueMail("reminder", "invitation", [weber.id], at);
+    await repo.claimMail("reminder", weber.id, "invitation", at);
     expect(await repo.failStaleClaims(new Date("2026-10-18T10:20:00Z"))).toBe(1);
-    expect(await repo.listDeliveries(card.id)).toMatchObject([{ reminderError: "interrupted", reminderQueuedAt: null, remindedAt: null }]);
+    expect(await repo.listDeliveries(weddingId)).toMatchObject([{ reminderError: "interrupted", reminderQueuedAt: null, remindedAt: null }]);
 
-    expect(await repo.claimAutomaticReminder(card.id, weber.id, 14, at)).toBe(true);
-    expect(await repo.claimAutomaticReminder(card.id, weber.id, 14, at)).toBe(false);
-    expect(await repo.claimAutomaticReminder(card.id, weber.id, 3, at)).toBe(true);
-    expect(await repo.listInvitationsWithReminders()).toEqual([{ websiteId, cardId: card.id }]);
+    expect(await repo.claimAutomaticReminder(weber.id, 14, at)).toBe(true);
+    expect(await repo.claimAutomaticReminder(weber.id, 14, at)).toBe(false);
+    expect(await repo.claimAutomaticReminder(weber.id, 3, at)).toBe(true);
+    expect(await repo.listWeddingIdsWithReminders()).toEqual([weddingId]);
   });
 
-  it("drops deliveries with the household (retention) and cards with the website", async () => {
-    const card = await newCard();
+  it("stores one version choice per household and item; deleting the version drops the choice", async () => {
+    const d = deps();
     const weber = await household("Weber");
-    await repo.markShared(card.id, weber.id, "link", new Date());
-    await guests.deleteGuestData(websiteId);
-    expect(await db.select().from(cardDeliveries).where(eq(cardDeliveries.cardId, card.id))).toEqual([]);
-    await websites.delete(websiteId);
-    expect(await db.select().from(cards).where(eq(cards.websiteId, websiteId))).toEqual([]);
+    const family = await new AddVersion(d).execute(ownerId, weddingId, "invitation", { label: "Familie", copyFrom: null });
+    const [site] = await websites.listByWedding(weddingId);
+    await new AssignVersion(d).execute(ownerId, weddingId, weber.id, "invitation", family.id);
+    await new AssignVersion(d).execute(ownerId, weddingId, weber.id, "website", site!.id);
+    await guests.assign(weber.id, "invitation", { cardId: family.id });
+    expect((await guests.listAssignments(weddingId)).sort((a, b) => a.item.localeCompare(b.item))).toEqual([
+      { householdId: weber.id, item: "invitation", versionId: family.id },
+      { householdId: weber.id, item: "website", versionId: site!.id },
+    ]);
+    await repo.delete(family.id);
+    expect(await guests.listAssignments(weddingId)).toEqual([{ householdId: weber.id, item: "website", versionId: site!.id }]);
+  });
+
+  it("drops deliveries, opens and choices with the household (retention), and everything with the wedding", async () => {
+    const card = await firstCard();
+    const weber = await household("Weber");
+    await repo.markShared(weber.id, "saveTheDate", "link", new Date());
+    await repo.markOpened(card.id, weber.id, new Date());
+    await guests.assign(weber.id, "saveTheDate", { cardId: card.id });
+    await guests.deleteGuestData(weddingId);
+    expect(await db.select().from(cardDeliveries).where(eq(cardDeliveries.householdId, weber.id))).toEqual([]);
+    expect(await db.select().from(cardOpens).where(eq(cardOpens.householdId, weber.id))).toEqual([]);
+    expect(await db.select().from(householdVersions).where(eq(householdVersions.householdId, weber.id))).toEqual([]);
+    await weddings.delete(weddingId);
+    expect(await db.select().from(cards).where(eq(cards.weddingId, weddingId))).toEqual([]);
   });
 
   it("clears the address on unsubscribe, and a new address ends it", async () => {
@@ -149,8 +181,8 @@ describe("DrizzleCardRepository", () => {
     const [row] = await db.select().from(households).where(eq(households.id, weber.id));
     expect(row).toMatchObject({ email: null });
     expect(row!.unsubscribedAt).toBeInstanceOf(Date);
-    await guests.updateHousehold(websiteId, weber.id, { name: "Weber", invitedEventIds: null, email: "neu@example.org", personalLine: "", people: [] });
-    expect((await guests.findHousehold(websiteId, weber.id))?.unsubscribedAt).toBeNull();
+    await guests.updateHousehold(weddingId, weber.id, { name: "Weber", invitedEventIds: null, email: "neu@example.org", personalLine: "", people: [] });
+    expect((await guests.findHousehold(weddingId, weber.id))?.unsubscribedAt).toBeNull();
   });
 });
 
@@ -196,8 +228,7 @@ describe("SatoriCardRenderer", () => {
 
   it("exports through the use case without a photo", async () => {
     const d = deps();
-    await newCard(d);
-    const file = await new ExportCard(d).execute(ownerId, websiteId, "saveTheDate", "png");
+    const file = await new ExportCard(d).execute(ownerId, (await firstCard()).id, "png");
     expect((await sharp(file.bytes).metadata()).width).toBe(1748);
   });
 });
@@ -207,10 +238,9 @@ describe("sending cards by email", () => {
     const d = deps({ smtp: true });
     const to = `weber-${Date.now()}@example.org`;
     const weber = await household("Weber", to);
-    await newCard(d);
-    expect(await new SendCardEmails(d).execute(ownerId, websiteId, "saveTheDate", "all")).toEqual({ queued: 1 });
+    expect(await new SendCardEmails(d).execute(ownerId, weddingId, "saveTheDate", "all")).toEqual({ queued: 1 });
     // Two instances run the job at the same time: the claim lets only one send.
-    const runs = await Promise.all([new RunMailJobs(d).execute({ websiteId }), new RunMailJobs(d).execute({ websiteId })]);
+    const runs = await Promise.all([new RunMailJobs(d).execute({ weddingId }), new RunMailJobs(d).execute({ weddingId })]);
     expect(runs.map((r) => r.sent).sort()).toEqual([0, 1]);
 
     const { mailpitUrl } = testEnv();
@@ -235,15 +265,20 @@ describe("sending cards by email", () => {
 });
 
 describe("account export", () => {
-  it("contains cards, addresses and statuses", async () => {
+  it("contains card versions, addresses, statuses, opens and version choices", async () => {
     const d = deps();
     d.archive = new FakeArchive();
     const weber = await household("Weber", "weber@example.org");
-    await newCard(d);
-    await new ShareCard(d).execute(ownerId, websiteId, "saveTheDate", weber.id, "link");
+    await new ShareCard(d).execute(ownerId, weddingId, "saveTheDate", weber.id, "link");
+    await new MarkCardsOpened(d).execute(guestLinks.tokenFor(weber.id), ["saveTheDate"]);
+    await guests.assign(weber.id, "saveTheDate", { cardId: (await firstCard()).id });
     const entries = FakeArchive.read((await new ExportAccount(d).execute(ownerId)).bytes);
     const data = JSON.parse(new TextDecoder().decode(entries.find((e) => e.path === "data.json")!.bytes));
-    expect(data.websites[0].cards[0]).toMatchObject({ kind: "saveTheDate", deliveries: [{ household: "Weber", sharedVia: "link" }] });
-    expect(data.websites[0].guests.households[0]).toMatchObject({ email: "weber@example.org" });
+    const [wedding] = data.weddings;
+    expect(wedding.cards).toHaveLength(4);
+    expect(wedding.deliveries).toMatchObject([{ household: "Weber", kind: "saveTheDate", sharedVia: "link" }]);
+    expect(wedding.opens).toMatchObject([{ household: "Weber", card: "Standard" }]);
+    expect(wedding.guests.versions).toMatchObject([{ household: "Weber", item: "saveTheDate", version: "Standard" }]);
+    expect(wedding.guests.households[0]).toMatchObject({ email: "weber@example.org" });
   });
 });

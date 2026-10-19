@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isoDate, optional, requiredText, text } from "./fields";
+import { text } from "./fields";
 import { parseWith, type Parsed } from "./result";
 
 export const DEFAULT_TIMEZONE = "Europe/Berlin";
@@ -13,10 +13,8 @@ export function isValidTimeZone(tz: string): boolean {
   }
 }
 
+/** The home section of a website version. Names, date, place and time zone belong to the wedding. */
 const homeSchema = z.object({
-  title: requiredText(120),
-  weddingDate: optional(isoDate).default(null),
-  location: optional(z.string().trim().max(200, "too_long")).default(null),
   welcomeMessage: text(5000),
   hashtag: z
     .string()
@@ -25,7 +23,6 @@ const homeSchema = z.object({
     .pipe(z.string().max(60, "too_long").regex(/^[\p{L}\p{N}_]*$/u, "invalid_hashtag"))
     .default(""),
   showCountdown: z.boolean().default(false),
-  timezone: z.string().refine(isValidTimeZone, "invalid_timezone").default(DEFAULT_TIMEZONE),
 });
 
 export type HomeInput = z.infer<typeof homeSchema>;

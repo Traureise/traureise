@@ -1,125 +1,40 @@
-import { z } from "zod";
-import { followWeddingDetails } from "@/domain/cards";
 import { findFontPairing } from "@/domain/fonts";
-import { isoDate, optional, requiredText } from "@/domain/fields";
-import { parseWith } from "@/domain/result";
-import { SECTION_KINDS } from "@/domain/sections";
-import { slugify, validateSlug } from "@/domain/slug";
-import { DEFAULT_TIMEZONE, parseHome } from "@/domain/website";
+import { parseHome } from "@/domain/website";
 import type { Deps } from "./deps";
-import { ValidationError } from "./errors";
-import { assertOwnImage, deleteImage, loadOwnedWebsite } from "./owned";
+import { NotFoundError, ValidationError } from "./errors";
+import { loadGuestContext } from "./guest-context";
+import { assertOwnImage, loadOwnedWebsite, releaseImages } from "./owned";
 import type { Website } from "./ports";
+import { assertSlugAvailable } from "./slugs";
 import { loadView, type WebsiteView } from "./views";
 
-const createSchema = z.object({
-  title: requiredText(120),
-  weddingDate: optional(isoDate).default(null),
-  slug: optional(z.string().trim()).default(null),
-  themeId: optional(z.string()).default(null),
-});
-
-const detailsSchema = z.object({
-  title: requiredText(120),
-  weddingDate: optional(isoDate).default(null),
-  location: optional(z.string().trim().max(200, "too_long")).default(null),
-});
-
-async function assertSlugAvailable(deps: Deps, slug: string, exceptWebsiteId?: string) {
-  const error = validateSlug(slug);
-  if (error) throw new ValidationError({ slug: error });
-  if (await deps.websites.slugTaken(slug, exceptWebsiteId)) throw new ValidationError({ slug: "taken" });
-}
-
-async function uniqueSlug(deps: Deps, base: string): Promise<string> {
-  for (let n = 1; ; n++) {
-    const suffix = n === 1 ? "" : `-${n}`;
-    const candidate = base.slice(0, 60 - suffix.length).replace(/-+$/, "") + suffix;
-    if (!validateSlug(candidate) && !(await deps.websites.slugTaken(candidate))) return candidate;
-  }
-}
-
-export class CreateWebsite {
-  constructor(private deps: Deps) {}
-
-  /** `siteEnabled: false` starts a wedding with cards only; its website is switched on later (EnableSite). */
-  async execute(ownerId: string, input: { title: string; weddingDate?: string; slug?: string; themeId?: string; siteEnabled?: boolean }): Promise<Website> {
-    const parsed = parseWith(createSchema, input);
-    if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
-    const { title, weddingDate, slug, themeId } = parsed.value;
-
-    if (themeId && !this.deps.themes.get(themeId)) throw new ValidationError({ themeId: "unknown_theme" });
-    if (slug) await assertSlugAvailable(this.deps, slug);
-
-    return this.deps.websites.create(
-      {
-        ownerId,
-        title,
-        weddingDate,
-        slug: slug ?? (await uniqueSlug(this.deps, slugify(title))),
-        themeId: themeId ?? this.deps.themes.defaultThemeId(),
-        timezone: DEFAULT_TIMEZONE,
-        siteEnabled: input.siteEnabled ?? true,
-      },
-      SECTION_KINDS.map((kind) => ({ kind, title: null, visible: true, body: "" })),
-    );
-  }
-}
-
-export class EnableSite {
-  constructor(private deps: Deps) {}
-
-  /** Creates the website of a wedding that so far only had cards: same guests, cards and packages. */
-  async execute(userId: string, websiteId: string, input: { title: string; weddingDate?: string; slug?: string; themeId?: string }): Promise<Website> {
-    const website = await loadOwnedWebsite(this.deps, userId, websiteId);
-    const parsed = parseWith(createSchema, input);
-    if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
-    const { title, weddingDate, slug, themeId } = parsed.value;
-    if (themeId && !this.deps.themes.get(themeId)) throw new ValidationError({ themeId: "unknown_theme" });
-    if (slug && slug !== website.slug) await assertSlugAvailable(this.deps, slug, websiteId);
-    const theme = themeId && themeId !== website.themeId ? { themeId, paletteId: null, fontPairingId: null } : {};
-    return this.deps.websites.update(websiteId, { title, weddingDate, slug: slug ?? website.slug, ...theme, siteEnabled: true });
-  }
-}
-
-export class UpdateWeddingDetails {
-  constructor(private deps: Deps) {}
-
-  /** Names, date and place, which cards and website share; cards follow unless their text was changed. */
-  async execute(userId: string, websiteId: string, input: unknown): Promise<Website> {
-    const before = await loadOwnedWebsite(this.deps, userId, websiteId);
-    const parsed = parseWith(detailsSchema, input);
-    if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
-    const after = await this.deps.websites.update(websiteId, parsed.value);
-    for (const card of await this.deps.cards.listByWebsite(websiteId)) {
-      const content = followWeddingDetails(card.kind, card.content, before, after);
-      if (!content) continue;
-      const { themeId, paletteId, fontPairingId, layoutId, envelope, photoKey, message, reminderDays, reminderMessage } = card;
-      await this.deps.cards.update(websiteId, card.kind, { themeId, paletteId, fontPairingId, layoutId, envelope, photoKey, content, message, reminderDays, reminderMessage });
-    }
-    return after;
-  }
-}
-
-export class ListWebsites {
-  constructor(private deps: Deps) {}
-
-  execute(ownerId: string): Promise<Website[]> {
-    return this.deps.websites.listByOwner(ownerId);
-  }
-}
+export type WebsiteEditorView = WebsiteView & {
+  /** The wedding's website versions, first first, for the switcher. */
+  versions: { id: string; label: string }[];
+  /** Published and allowed (an extra version without a paid package is offline). */
+  online: boolean;
+  publicUrl: string;
+};
 
 export class GetWebsiteForOwner {
   constructor(private deps: Deps) {}
 
-  async execute(userId: string, websiteId: string): Promise<WebsiteView> {
-    return loadView(this.deps, await loadOwnedWebsite(this.deps, userId, websiteId));
+  async execute(userId: string, websiteId: string): Promise<WebsiteEditorView> {
+    const { wedding, website } = await loadOwnedWebsite(this.deps, userId, websiteId);
+    const ctx = await loadGuestContext(this.deps, wedding);
+    return {
+      ...(await loadView(this.deps, wedding, website)),
+      versions: ctx.websites.map(({ id, label }) => ({ id, label })),
+      online: ctx.online(website),
+      publicUrl: `${this.deps.appUrl}/${website.slug}`,
+    };
   }
 }
 
 export class UpdateHome {
   constructor(private deps: Deps) {}
 
+  /** Welcome text, hashtag and countdown of one website version. */
   async execute(userId: string, websiteId: string, input: unknown): Promise<Website> {
     await loadOwnedWebsite(this.deps, userId, websiteId);
     const parsed = parseHome(input);
@@ -131,12 +46,35 @@ export class UpdateHome {
 export class UpdateSlug {
   constructor(private deps: Deps) {}
 
+  /** A website version's own address; the wedding's links and the other versions keep theirs. */
   async execute(userId: string, websiteId: string, slug: string): Promise<Website> {
-    const website = await loadOwnedWebsite(this.deps, userId, websiteId);
+    const { website, wedding } = await loadOwnedWebsite(this.deps, userId, websiteId);
     const normalized = slug.trim();
     if (normalized === website.slug) return website;
-    await assertSlugAvailable(this.deps, normalized, websiteId);
+    await assertSlugAvailable(this.deps, normalized, { wedding: wedding.id, website: websiteId });
     return this.deps.websites.update(websiteId, { slug: normalized });
+  }
+}
+
+export class SetPublished {
+  constructor(private deps: Deps) {}
+
+  /** A version is a draft (a 404 publicly) until the couple publishes it; it can be taken offline again. */
+  async execute(userId: string, websiteId: string, published: boolean): Promise<void> {
+    await loadOwnedWebsite(this.deps, userId, websiteId);
+    await this.deps.websites.update(websiteId, { published });
+  }
+}
+
+export class SetEventShown {
+  constructor(private deps: Deps) {}
+
+  /** Events belong to the wedding; each website version shows all of them unless the couple hides some. */
+  async execute(userId: string, websiteId: string, eventId: string, shown: boolean): Promise<void> {
+    const { website, wedding } = await loadOwnedWebsite(this.deps, userId, websiteId);
+    if (!(await this.deps.weddings.findEvent(wedding.id, eventId))) throw new NotFoundError();
+    const hidden = website.hiddenEventIds.filter((id) => id !== eventId);
+    await this.deps.websites.update(websiteId, { hiddenEventIds: shown ? hidden : [...hidden, eventId] });
   }
 }
 
@@ -144,10 +82,10 @@ export class SetCoverImage {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, websiteId: string, imageKey: string | null): Promise<void> {
-    const website = await loadOwnedWebsite(this.deps, userId, websiteId);
-    await assertOwnImage(this.deps, websiteId, imageKey, "coverImageKey");
+    const { website, wedding } = await loadOwnedWebsite(this.deps, userId, websiteId);
+    await assertOwnImage(this.deps, wedding.id, imageKey, "coverImageKey");
     await this.deps.websites.update(websiteId, { coverImageKey: imageKey });
-    if (website.coverImageKey && website.coverImageKey !== imageKey) await deleteImage(this.deps, website.coverImageKey);
+    if (website.coverImageKey !== imageKey) await releaseImages(this.deps, wedding.id, [website.coverImageKey]);
   }
 }
 
@@ -165,7 +103,7 @@ export class UpdateDesign {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, websiteId: string, input: { paletteId: string | null; fontPairingId: string | null }): Promise<void> {
-    const website = await loadOwnedWebsite(this.deps, userId, websiteId);
+    const { website } = await loadOwnedWebsite(this.deps, userId, websiteId);
     const theme = this.deps.themes.get(website.themeId);
     if (input.paletteId && !theme?.palettes.some((p) => p.id === input.paletteId)) {
       throw new ValidationError({ paletteId: "unknown_palette" });
@@ -174,16 +112,5 @@ export class UpdateDesign {
       throw new ValidationError({ fontPairingId: "unknown_font_pairing" });
     }
     await this.deps.websites.update(websiteId, { paletteId: input.paletteId, fontPairingId: input.fontPairingId });
-  }
-}
-
-export class DeleteWebsite {
-  constructor(private deps: Deps) {}
-
-  async execute(userId: string, websiteId: string): Promise<void> {
-    await loadOwnedWebsite(this.deps, userId, websiteId);
-    const keys = await this.deps.uploads.listKeysByWebsite(websiteId);
-    await this.deps.websites.delete(websiteId);
-    for (const key of keys) await deleteImage(this.deps, key);
   }
 }

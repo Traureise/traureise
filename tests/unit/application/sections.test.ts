@@ -2,22 +2,24 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { NotFoundError, ValidationError } from "@/application/errors";
 import { AddItem, DeleteItem, MoveItem, UpdateItem, UpdateSection } from "@/application/sections";
 import { UploadImage } from "@/application/uploads";
-import { CreateWebsite } from "@/application/websites";
 import { JPEG, createFakes } from "../../fakes";
+import { newWedding } from "../../fakes/wedding";
 
 let f: ReturnType<typeof createFakes>;
 let anna: string;
 let ben: string;
 let websiteId: string;
+let weddingId: string;
 
 beforeEach(async () => {
   f = createFakes();
   anna = (await f.users.create("anna@example.org")).id;
   ben = (await f.users.create("ben@example.org")).id;
-  websiteId = (await new CreateWebsite(f.deps).execute(anna, { title: "Anna & Ben" })).id;
+  ({ websiteId, weddingId } = await newWedding(f.deps, anna));
 });
 
 const faq = (question: string) => ({ question, answer: "Antwort" });
+const event = (name: string) => ({ eventType: "ceremony", name, startDate: "2027-06-12", startTime: "14:00" });
 const titles = async () => (await f.websites.listItems(websiteId)).map((i) => (i.data as { question: string }).question);
 
 describe("UpdateSection", () => {
@@ -82,14 +84,14 @@ describe("items", () => {
 
   it("protects items of other websites", async () => {
     const item = await new AddItem(f.deps).execute(anna, websiteId, "faqs", faq("A"));
-    const other = await new CreateWebsite(f.deps).execute(ben, { title: "Ben & Cleo" });
-    await expect(new UpdateItem(f.deps).execute(ben, other.id, item.id, faq("X"))).rejects.toBeInstanceOf(NotFoundError);
+    const other = await newWedding(f.deps, ben, { title: "Ben & Cleo" });
+    await expect(new UpdateItem(f.deps).execute(ben, other.websiteId, item.id, faq("X"))).rejects.toBeInstanceOf(NotFoundError);
     await expect(new DeleteItem(f.deps).execute(ben, websiteId, item.id)).rejects.toBeInstanceOf(NotFoundError);
     await expect(new MoveItem(f.deps).execute(ben, websiteId, item.id, "up")).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("checks image ownership and cleans up replaced and deleted images", async () => {
-    const upload = () => new UploadImage(f.deps).execute(anna, websiteId, { bytes: JPEG, size: JPEG.length, contentType: "image/jpeg" });
+    const upload = () => new UploadImage(f.deps).execute(anna, weddingId, { bytes: JPEG, size: JPEG.length, contentType: "image/jpeg" });
     const k1 = await upload();
     const item = await new AddItem(f.deps).execute(anna, websiteId, "gallery", { imageKey: k1, caption: "Antrag" });
     const k2 = await upload();
@@ -98,5 +100,21 @@ describe("items", () => {
     await new DeleteItem(f.deps).execute(anna, websiteId, item.id);
     expect(f.storage.files.has(k2)).toBe(false);
     await expect(new AddItem(f.deps).execute(anna, websiteId, "gallery", { imageKey: "someone-else.webp" })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("stores schedule items as the wedding's events, shared by every website version", async () => {
+    const a = await new AddItem(f.deps).execute(anna, websiteId, "schedule", event("Trauung"));
+    await new AddItem(f.deps).execute(anna, websiteId, "schedule", event("Feier"));
+    expect(await f.websites.listItems(websiteId)).toEqual([]);
+    const names = async () => (await f.weddings.listEvents(weddingId)).map((e) => e.data.name);
+    expect(await names()).toEqual(["Trauung", "Feier"]);
+    await new UpdateItem(f.deps).execute(anna, websiteId, a.id, event("Standesamt"));
+    await new MoveItem(f.deps).execute(anna, websiteId, a.id, "down");
+    expect(await names()).toEqual(["Feier", "Standesamt"]);
+    await new DeleteItem(f.deps).execute(anna, websiteId, a.id);
+    expect(await names()).toEqual(["Feier"]);
+    const other = await newWedding(f.deps, ben, { title: "Ben & Cleo" });
+    const [feier] = await f.weddings.listEvents(weddingId);
+    await expect(new DeleteItem(f.deps).execute(ben, other.websiteId, feier!.id)).rejects.toBeInstanceOf(NotFoundError);
   });
 });

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   date,
   index,
   integer,
@@ -16,7 +17,7 @@ import {
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 
 // Every piece of user data hangs off users.id with ON DELETE CASCADE, so deleting an
-// account (next iteration) is a single delete.
+// account is a single delete.
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
@@ -61,25 +62,50 @@ export const rateLimitHits = pgTable(
   (t) => [index("rate_limit_hits_key_idx").on(t.key, t.createdAt)],
 );
 
-export const websites = pgTable(
-  "websites",
+// The wedding owns everything a couple makes: website versions, cards, guests, packages and uploads.
+export const weddings = pgTable(
+  "weddings",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    // Carries the links that are not a website (/<slug>/verlobung, /<slug>/hochzeit.ics). Shares one namespace with
+    // the website versions' slugs, checked by the application.
     slug: text("slug").notNull().unique(),
     title: text("title").notNull(),
     weddingDate: date("wedding_date", { mode: "string" }),
     location: text("location"),
+    timezone: text("timezone").notNull().default("Europe/Berlin"),
+    lastOpenedAt: timestamp("last_opened_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => sql`now()`),
+  },
+  (t) => [index("weddings_owner_idx").on(t.ownerId)],
+);
+
+// A version of the wedding's website, for an audience. A draft until published.
+export const websites = pgTable(
+  "websites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    weddingId: uuid("wedding_id")
+      .notNull()
+      .references(() => weddings.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    position: integer("position").notNull(),
+    slug: text("slug").notNull().unique(),
+    published: boolean("published").notNull().default(false),
+    // Wedding events this version leaves out of its schedule (new events show on every version).
+    hiddenEventIds: jsonb("hidden_event_ids").$type<string[]>().notNull().default([]),
     welcomeMessage: text("welcome_message").notNull().default(""),
     hashtag: text("hashtag").notNull().default(""),
     showCountdown: boolean("show_countdown").notNull().default(false),
     coverImageKey: text("cover_image_key"),
-    timezone: text("timezone").notNull().default("Europe/Berlin"),
     themeId: text("theme_id").notNull(),
-    // false = a wedding with cards only: the public website at /<slug> is not created yet.
-    siteEnabled: boolean("site_enabled").notNull().default(true),
     paletteId: text("palette_id"),
     fontPairingId: text("font_pairing_id"),
     createdAt: createdAt(),
@@ -88,7 +114,7 @@ export const websites = pgTable(
       .defaultNow()
       .$onUpdate(() => sql`now()`),
   },
-  (t) => [index("websites_owner_idx").on(t.ownerId)],
+  (t) => [index("websites_wedding_idx").on(t.weddingId, t.position)],
 );
 
 export const websiteSections = pgTable(
@@ -106,6 +132,7 @@ export const websiteSections = pgTable(
   (t) => [primaryKey({ columns: [t.websiteId, t.kind] })],
 );
 
+// Items of a website version's sections. The schedule is not here: its events belong to the wedding.
 export const sectionItems = pgTable(
   "section_items",
   {
@@ -120,16 +147,34 @@ export const sectionItems = pgTable(
   (t) => [index("section_items_website_kind_idx").on(t.websiteId, t.kind, t.position)],
 );
 
-export const uploads = pgTable("uploads", {
-  key: text("key").primaryKey(),
-  ownerId: uuid("owner_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  websiteId: uuid("website_id").references(() => websites.id, { onDelete: "cascade" }),
-  contentType: text("content_type").notNull(),
-  size: integer("size").notNull(),
-  createdAt: createdAt(),
-});
+// The schedule: shared by the website versions, the invitations and the response form.
+export const weddingEvents = pgTable(
+  "wedding_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    weddingId: uuid("wedding_id")
+      .notNull()
+      .references(() => weddings.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    data: jsonb("data").notNull(),
+  },
+  (t) => [index("wedding_events_wedding_idx").on(t.weddingId, t.position)],
+);
+
+export const uploads = pgTable(
+  "uploads",
+  {
+    key: text("key").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    weddingId: uuid("wedding_id").references(() => weddings.id, { onDelete: "cascade" }),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("uploads_wedding_idx").on(t.weddingId)],
+);
 
 // One row per purchase. purchase_ref is the provider's order id and stays unique after a refund,
 // so a replayed payment event can never grant the same purchase twice.
@@ -137,9 +182,9 @@ export const entitlements = pgTable(
   "entitlements",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    websiteId: uuid("website_id")
+    weddingId: uuid("wedding_id")
       .notNull()
-      .references(() => websites.id, { onDelete: "cascade" }),
+      .references(() => weddings.id, { onDelete: "cascade" }),
     tier: text("tier").notNull(),
     provider: text("provider").notNull(),
     purchaseRef: text("purchase_ref").notNull().unique(),
@@ -147,7 +192,7 @@ export const entitlements = pgTable(
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
-  (t) => [index("entitlements_website_idx").on(t.websiteId)],
+  (t) => [index("entitlements_wedding_idx").on(t.weddingId)],
 );
 
 /** Ids of payment-provider events already handled (webhook idempotency). No personal data. */
@@ -156,12 +201,13 @@ export const billingEvents = pgTable("billing_events", {
   receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// Guests and RSVP. Everything hangs off the website (ON DELETE CASCADE), so deleting a website or an
-// account removes the guest list; retention deletes the households, which takes people, answers and requests along.
+// Guests and RSVP. Everything hangs off the wedding (ON DELETE CASCADE), so deleting a wedding or an
+// account removes the guest list; retention deletes the households, which takes people, answers, requests,
+// deliveries, opens and version choices along.
 export const rsvpSettings = pgTable("rsvp_settings", {
-  websiteId: uuid("website_id")
+  weddingId: uuid("wedding_id")
     .primaryKey()
-    .references(() => websites.id, { onDelete: "cascade" }),
+    .references(() => weddings.id, { onDelete: "cascade" }),
   replyBy: date("reply_by", { mode: "string" }),
   // null = every schedule item.
   eventIds: jsonb("event_ids").$type<string[] | null>(),
@@ -176,9 +222,9 @@ export const rsvpPolls = pgTable(
   "rsvp_polls",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    websiteId: uuid("website_id")
+    weddingId: uuid("wedding_id")
       .notNull()
-      .references(() => websites.id, { onDelete: "cascade" }),
+      .references(() => weddings.id, { onDelete: "cascade" }),
     position: integer("position").notNull(),
     question: text("question").notNull(),
     multiple: boolean("multiple").notNull().default(false),
@@ -187,7 +233,7 @@ export const rsvpPolls = pgTable(
     options: jsonb("options").$type<{ id: string; label: string }[]>().notNull(),
     createdAt: createdAt(),
   },
-  (t) => [index("rsvp_polls_website_idx").on(t.websiteId, t.position)],
+  (t) => [index("rsvp_polls_wedding_idx").on(t.weddingId, t.position)],
 );
 
 type PollAnswersJson = Record<string, { optionIds: string[]; other: string | null }>;
@@ -196,9 +242,9 @@ export const households = pgTable(
   "households",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    websiteId: uuid("website_id")
+    weddingId: uuid("wedding_id")
       .notNull()
-      .references(() => websites.id, { onDelete: "cascade" }),
+      .references(() => weddings.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     // Hash of the personal link's token; the token itself is derived from the id and never stored.
     tokenHash: text("token_hash").notNull().unique(),
@@ -213,7 +259,7 @@ export const households = pgTable(
     unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
-  (t) => [index("households_website_idx").on(t.websiteId, t.createdAt)],
+  (t) => [index("households_wedding_idx").on(t.weddingId, t.createdAt)],
 );
 
 export const guests = pgTable(
@@ -251,16 +297,22 @@ export const guestRequests = pgTable(
   (t) => [index("guest_requests_household_idx").on(t.householdId)],
 );
 
-// Cards (v4): one per website and kind. The design stays with the website; deliveries are guest data and go
-// with the household (retention deletes households) or the card.
+// Cards (v4): several versions per wedding and kind, each with a label. The design stays with the wedding;
+// deliveries, opens and version choices are guest data and go with the household (retention deletes households).
 export const cards = pgTable(
   "cards",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    websiteId: uuid("website_id")
+    weddingId: uuid("wedding_id")
       .notNull()
-      .references(() => websites.id, { onDelete: "cascade" }),
+      .references(() => weddings.id, { onDelete: "cascade" }),
     kind: text("kind").notNull(),
+    label: text("label").notNull(),
+    // Fixed at creation: the engagement version's link (/<wedding>/verlobung/<slug>) survives renaming it.
+    slug: text("slug").notNull(),
+    position: integer("position").notNull(),
+    // The engagement announcement: when the couple first shared its link (copied or by WhatsApp).
+    sharedAt: timestamp("shared_at", { withTimezone: true }),
     themeId: text("theme_id").notNull(),
     paletteId: text("palette_id"),
     fontPairingId: text("font_pairing_id"),
@@ -277,7 +329,7 @@ export const cards = pgTable(
       .defaultNow()
       .$onUpdate(() => sql`now()`),
   },
-  (t) => [uniqueIndex("cards_website_kind_idx").on(t.websiteId, t.kind)],
+  (t) => [index("cards_wedding_kind_idx").on(t.weddingId, t.kind, t.position), uniqueIndex("cards_wedding_kind_slug_idx").on(t.weddingId, t.kind, t.slug)],
 );
 
 type CardContentJson = {
@@ -291,18 +343,17 @@ type CardContentJson = {
   showReplyBy: boolean;
 };
 
-// What happened with one card for one household. Emails are claimed (email_claimed_at) before they are sent,
-// so two instances never send the same one; the same for reminders. reminder_offset is the last automatic
-// reminder handled, in days before the reply-by date.
+// What happened with one kind of card for one household, whichever version it got: "sent" counts per household
+// and kind, so a household never gets two versions of one card. Emails are claimed (email_claimed_at) before they
+// are sent, so two instances never send the same one; the same for reminders. reminder_offset is the last
+// automatic reminder handled, in days before the reply-by date.
 export const cardDeliveries = pgTable(
   "card_deliveries",
   {
-    cardId: uuid("card_id")
-      .notNull()
-      .references(() => cards.id, { onDelete: "cascade" }),
     householdId: uuid("household_id")
       .notNull()
       .references(() => households.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
     excluded: boolean("excluded").notNull().default(false),
     sharedAt: timestamp("shared_at", { withTimezone: true }),
     sharedVia: text("shared_via"),
@@ -310,12 +361,41 @@ export const cardDeliveries = pgTable(
     emailClaimedAt: timestamp("email_claimed_at", { withTimezone: true }),
     emailedAt: timestamp("emailed_at", { withTimezone: true }),
     emailError: text("email_error"),
-    openedAt: timestamp("opened_at", { withTimezone: true }),
     reminderOffset: integer("reminder_offset"),
     reminderQueuedAt: timestamp("reminder_queued_at", { withTimezone: true }),
     reminderClaimedAt: timestamp("reminder_claimed_at", { withTimezone: true }),
     remindedAt: timestamp("reminded_at", { withTimezone: true }),
     reminderError: text("reminder_error"),
   },
-  (t) => [primaryKey({ columns: [t.cardId, t.householdId] }), index("card_deliveries_household_idx").on(t.householdId)],
+  (t) => [primaryKey({ columns: [t.householdId, t.kind] })],
+);
+
+// The first time a household's page showed a card version (opened status is kept per version).
+export const cardOpens = pgTable(
+  "card_opens",
+  {
+    cardId: uuid("card_id")
+      .notNull()
+      .references(() => cards.id, { onDelete: "cascade" }),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id, { onDelete: "cascade" }),
+    openedAt: timestamp("opened_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.cardId, t.householdId] }), index("card_opens_household_idx").on(t.householdId)],
+);
+
+// Which version of an item a household gets. No row: the first version. Deleting a version deletes its rows,
+// so its households fall back to the first remaining version.
+export const householdVersions = pgTable(
+  "household_versions",
+  {
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id, { onDelete: "cascade" }),
+    item: text("item").notNull(),
+    cardId: uuid("card_id").references(() => cards.id, { onDelete: "cascade" }),
+    websiteId: uuid("website_id").references(() => websites.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.householdId, t.item] }), check("household_versions_one_target", sql`num_nonnulls(${t.cardId}, ${t.websiteId}) = 1`)],
 );
