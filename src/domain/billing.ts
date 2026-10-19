@@ -81,7 +81,28 @@ export function isTierReleased(tier: Tier, unlocked: readonly Tier[] = []): bool
   return RELEASED_TIERS.includes(tier) || unlocked.includes(tier);
 }
 
-/** Tiers a website can buy now: released, with a product, and above what it already has. */
+/**
+ * What a wedding has already paid counts towards a higher tier: the listed price of the highest tier it still
+ * holds (that price already covers the lower tiers bought before it). Revoked and expired purchases count nothing.
+ */
+export function upgradeCreditCents(offers: readonly TierOffer[], entitlements: readonly Entitlement[], now: Date): number {
+  const held = activeTier(entitlements, now);
+  return offers.find((o) => o.tier === held)?.priceCents ?? 0;
+}
+
+export type CheckoutPrice = { dueCents: number; creditCents: number };
+
+/** The price of `tier` for a wedding: the listed price minus its upgrade credit. */
+export function checkoutPrice(tier: PaidTier, offers: readonly TierOffer[], entitlements: readonly Entitlement[], now: Date): CheckoutPrice {
+  const creditCents = upgradeCreditCents(offers, entitlements, now);
+  const listed = offers.find((o) => o.tier === tier)?.priceCents ?? 0;
+  return { dueCents: Math.max(0, listed - creditCents), creditCents };
+}
+
+/** The payment provider takes no reduced price below one whole euro. */
+export const MIN_UPGRADE_CENTS = 100;
+
+/** Tiers a website can buy now: released, with a product, above what it already has, and an upgrade worth at least a euro. */
 export function sellableTiers(
   offers: readonly TierOffer[],
   unlocked: readonly Tier[],
@@ -89,7 +110,13 @@ export function sellableTiers(
   now = new Date(),
 ): PaidTier[] {
   const current = rank(activeTier(entitlements, now));
-  return offers.filter((o) => o.productId && isTierReleased(o.tier, unlocked) && rank(o.tier) > current).map((o) => o.tier);
+  return offers
+    .filter((o) => o.productId && isTierReleased(o.tier, unlocked) && rank(o.tier) > current)
+    .filter((o) => {
+      const price = checkoutPrice(o.tier, offers, entitlements, now);
+      return price.creditCents === 0 || price.dueCents >= MIN_UPGRADE_CENTS;
+    })
+    .map((o) => o.tier);
 }
 
 export type PricingRow = { tier: Tier; priceCents: number; status: "included" | "available" | "comingSoon" };

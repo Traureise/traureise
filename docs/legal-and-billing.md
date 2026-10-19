@@ -63,11 +63,18 @@ prices, plans or locks appear anywhere.
    `CREEM_API_URL=https://test-api.creem.io` with a test key first.
 4. Keep `PRICE_*_EUR` equal to the product prices; they are what `/preise` shows.
 
-A purchase attaches to one wedding website and lasts until 12 months after the wedding date (or after the
+A purchase attaches to one wedding and lasts until 12 months after the wedding date (or after the
 purchase if no date is set). Refunds and chargebacks revoke it. The RSVP tier unlocks sending guest links
 ([Guests and RSVP](guests.md)); Einladungen unlocks Save the Dates, invitations, email sending and
 reminders, and Komplett the thank-you card and the engagement announcement ([cards](cards.md)). A tier
-without a product id is shown as "bald verfügbar" and cannot be bought. Creem is the merchant of record and issues the
+without a product id is shown as "bald verfügbar" and cannot be bought.
+
+**Upgrades pay the difference.** A wedding that already has a tier and buys a higher one is credited the
+current `PRICE_*_EUR` of the tier it holds (that price covers the lower tiers bought before it), so RSVP → Komplett
+costs 149 − 49 = 100 €. The checkout uses the higher tier's usual product with Creem's `custom_price` (cents,
+one-time products only); nothing else needs setting up. Upgrades that would cost less than 1 € are not offered.
+`/preise` shows each wedding its own price. Each purchase stays its own entitlement: refunding an upgrade revokes
+only the upgrade, and the wedding keeps the tier it had. Try an upgrade once in Creem's test mode before going live. Creem is the merchant of record and issues the
 invoices ([ADR 0013](adr/0013-creem-as-merchant-of-record.md),
 [ADR 0014](adr/0014-entitlements-per-website.md)).
 

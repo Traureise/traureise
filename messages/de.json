@@ -175,6 +175,7 @@
       "countdownLabel": "Countdown bis zur Hochzeit anzeigen",
       "slugLabel": "Webadresse dieser Version",
       "slugHint": "Nur Kleinbuchstaben, Ziffern und Bindestriche.",
+      "slugChangeHint": "Mit einer neuen Adresse funktionieren Links und QR-Codes zu dieser Version, die ihr schon geteilt oder gedruckt habt, nicht mehr – es gibt keine Weiterleitung. Die persönlichen Links eurer Gäste bleiben gültig.",
       "wedding": "Namen, Datum und Ort gelten für die ganze Hochzeit."
     },
     "theme": {
@@ -353,7 +354,7 @@
   "pricing": {
     "title": "Preise",
     "lead": "Die Hochzeitswebsite ist kostenlos. Für mehr bezahlt ihr einmal pro Hochzeit – kein Abo, keine versteckten Kosten.",
-    "note": "Einmalpreise pro Hochzeit, inkl. MwSt. Ein Paket gilt bis 12 Monate nach eurem Hochzeitstag. Verkauf und Rechnung über unseren Zahlungsdienstleister.",
+    "note": "Einmalpreise pro Hochzeit, inkl. MwSt. Ein Paket gilt bis 12 Monate nach eurem Hochzeitstag. Wechselt ihr später in ein größeres Paket, zahlt ihr nur die Differenz: Was ihr für die Hochzeit schon bezahlt habt, wird angerechnet. Verkauf und Rechnung über unseren Zahlungsdienstleister.",
     "free": "kostenlos",
     "price": "{price, number, ::currency/EUR precision-integer}",
     "once": "einmalig",
@@ -361,6 +362,8 @@
     "comingSoon": "bald verfügbar",
     "buy": "Jetzt kaufen",
     "websiteLabel": "Für welche Hochzeit?",
+    "planOption": "{title} · {price, number, ::currency/EUR precision-integer}",
+    "planOptionCredit": "{title} · {price, number, ::currency/EUR precision-integer} ({credit, number, ::currency/EUR precision-integer} angerechnet)",
     "loginToBuy": "Anmelden, um zu kaufen",
     "createWebsiteFirst": "Legt zuerst eure Hochzeit an.",
     "owned": "Eure Hochzeiten haben dieses Paket schon.",
@@ -889,7 +892,8 @@
       "locationLabel": "Ort (optional)",
       "timezoneLabel": "Zeitzone",
       "slugLabel": "Adresse eurer Hochzeit",
-      "slugHint": "Für den Link der Verlobungsanzeige und den Kalendereintrag. Eure Website-Versionen haben eigene Adressen."
+      "slugHint": "Für den Link der Verlobungsanzeige und den Kalendereintrag. Eure Website-Versionen haben eigene Adressen.",
+      "slugChangeHint": "Mit einer neuen Adresse funktionieren Links zur Verlobungsanzeige und zum Kalendereintrag, die ihr schon geteilt habt, nicht mehr – es gibt keine Weiterleitung. Die persönlichen Links eurer Gäste bleiben gültig."
     },
     "details": {
       "open": "Angaben ändern",

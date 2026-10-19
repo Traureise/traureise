@@ -6,6 +6,7 @@ import { PencilLine } from "lucide-react";
 import { toast } from "sonner";
 import { updateWeddingDetailsAction } from "@/app/actions/weddings";
 import { FieldError } from "@/components/forms/field-error";
+import { SlugChangeHint } from "@/components/forms/slug-change-hint";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -54,6 +55,7 @@ function DetailsDialog({ wedding, appUrl, timeZones, onClose }: { wedding: Weddi
     return result;
   }, null);
   const errors = state && !state.ok ? (state.fieldErrors ?? {}) : {};
+  const [slug, setSlug] = useState(wedding.slug);
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
@@ -67,11 +69,19 @@ function DetailsDialog({ wedding, appUrl, timeZones, onClose }: { wedding: Weddi
             <Label htmlFor="details-slug">{tFields("slugLabel")}</Label>
             <div className="flex min-w-0 items-center rounded-lg border border-input focus-within:ring-3 focus-within:ring-ring/50">
               <span className="truncate pl-3 text-sm whitespace-nowrap text-muted-foreground">{appUrl.replace(/^https?:\/\//, "")}/</span>
-              <Input id="details-slug" name="slug" defaultValue={wedding.slug} className="min-w-0 border-0 pl-0.5 focus-visible:ring-0" aria-describedby="details-slug-hint" />
+              <Input
+                id="details-slug"
+                name="slug"
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                className="min-w-0 border-0 pl-0.5 focus-visible:ring-0"
+                aria-describedby="details-slug-hint details-slug-change"
+              />
             </div>
             <p id="details-slug-hint" className="text-xs text-muted-foreground">
               {tFields("slugHint")}
             </p>
+            <SlugChangeHint id="details-slug-change" saved={wedding.slug} value={slug} message={tFields("slugChangeHint")} />
             <FieldError code={errors.slug} />
           </div>
           {state && !state.ok && state.error && (

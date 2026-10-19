@@ -1,4 +1,15 @@
-import { activeTier, entitlementValidUntil, isActive, pricingTable, sellableTiers, type PaidTier, type PricingRow, type Tier } from "@/domain/billing";
+import {
+  activeTier,
+  checkoutPrice,
+  entitlementValidUntil,
+  isActive,
+  pricingTable,
+  sellableTiers,
+  type CheckoutPrice,
+  type PaidTier,
+  type PricingRow,
+  type Tier,
+} from "@/domain/billing";
 import type { Deps } from "./deps";
 import { InvalidSignatureError, NotFoundError, ValidationError } from "./errors";
 import { loadOwnedWedding } from "./owned";
@@ -19,7 +30,8 @@ export class GetPricing {
   }
 }
 
-export type WeddingPlan = { weddingId: string; title: string; tier: Tier; sellable: PaidTier[] };
+/** `prices`: what each sellable tier costs this wedding, after the credit for what it already paid. */
+export type WeddingPlan = { weddingId: string; title: string; tier: Tier; sellable: PaidTier[]; prices: Partial<Record<PaidTier, CheckoutPrice>> };
 
 /** Packages belong to the wedding: everything in it (every version, card and the guest list) shares them. */
 export class ListWeddingPlans {
@@ -32,11 +44,13 @@ export class ListWeddingPlans {
     const plans: WeddingPlan[] = [];
     for (const wedding of await weddings.listByOwner(userId)) {
       const entitlements = await billingRepo.listByWedding(wedding.id);
+      const sellable = sellableTiers(billing.offers, billing.unlockedTiers, entitlements, now);
       plans.push({
         weddingId: wedding.id,
         title: wedding.title,
         tier: activeTier(entitlements, now),
-        sellable: sellableTiers(billing.offers, billing.unlockedTiers, entitlements, now),
+        sellable,
+        prices: Object.fromEntries(sellable.map((tier) => [tier, checkoutPrice(tier, billing.offers, entitlements, now)])),
       });
     }
     return plans;
@@ -73,10 +87,14 @@ export class StartCheckout {
     await loadOwnedWedding(this.deps, user.id, weddingId);
     const entitlements = await billingRepo.listByWedding(weddingId);
     const offer = billing.offers.find((o) => o.tier === tier);
-    if (!offer?.productId || !sellableTiers(billing.offers, billing.unlockedTiers, entitlements, clock.now()).includes(tier)) {
+    const now = clock.now();
+    if (!offer?.productId || !sellableTiers(billing.offers, billing.unlockedTiers, entitlements, now).includes(tier)) {
       throw new ValidationError({ tier: "not_available" });
     }
+    // An upgrade pays only the difference; the webhook then grants the tier as for any purchase of the product.
+    const { dueCents, creditCents } = checkoutPrice(tier, billing.offers, entitlements, now);
     return provider.createCheckout({
+      ...(creditCents > 0 && { priceCents: dueCents }),
       productId: offer.productId,
       weddingId,
       tier,

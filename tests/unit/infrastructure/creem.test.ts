@@ -78,6 +78,16 @@ describe("CreemPaymentProvider.createCheckout", () => {
     });
   });
 
+  it("sends an upgrade's reduced price as custom_price in cents", async () => {
+    let body: Record<string, unknown> = {};
+    const creem = provider(async (_url, init) => {
+      body = JSON.parse(String(init!.body));
+      return Response.json({ id: "ch_2", checkout_url: "https://checkout.creem.io/ch_2", status: "pending" });
+    });
+    await creem.createCheckout({ productId: "prod_all", weddingId: "w1", tier: "complete", customerEmail: "a@b.de", successUrl: "https://x", requestId: "r", priceCents: 10000 });
+    expect(body.custom_price).toBe(10000);
+  });
+
   it("fails on API errors", async () => {
     const creem = provider(async () => new Response("nope", { status: 401 }));
     await expect(

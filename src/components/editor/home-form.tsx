@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { saveHomeAction, setCoverImageAction } from "@/app/actions/editor";
 import type { Website } from "@/application/ports";
 import { FieldError } from "@/components/forms/field-error";
+import { SlugChangeHint } from "@/components/forms/slug-change-hint";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +21,7 @@ export function HomeForm({ website, appUrl, details }: { website: Website; appUr
   const tErrors = useTranslations("errors");
   const { pending, errors, save } = useSave();
   const [countdown, setCountdown] = useState(website.showCountdown);
+  const [slug, setSlug] = useState(website.slug);
   const [, startCover] = useTransition();
 
   function setCover(key: string | null) {
@@ -64,11 +66,19 @@ export function HomeForm({ website, appUrl, details }: { website: Website; appUr
           <Label htmlFor="slug">{t("home.slugLabel")}</Label>
           <div className="flex min-w-0 items-center rounded-lg border border-input focus-within:ring-3 focus-within:ring-ring/50">
             <span className="truncate pl-3 text-sm whitespace-nowrap text-muted-foreground">{appUrl.replace(/^https?:\/\//, "")}/</span>
-            <Input id="slug" name="slug" defaultValue={website.slug} className="min-w-0 border-0 pl-0.5 focus-visible:ring-0" aria-describedby="slug-hint" />
+            <Input
+              id="slug"
+              name="slug"
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+              className="min-w-0 border-0 pl-0.5 focus-visible:ring-0"
+              aria-describedby="slug-hint slug-change"
+            />
           </div>
           <p id="slug-hint" className="text-xs text-muted-foreground">
             {t("home.slugHint")}
           </p>
+          <SlugChangeHint id="slug-change" saved={website.slug} value={slug} message={t("home.slugChangeHint")} />
           <FieldError code={errors.slug} />
         </div>
 

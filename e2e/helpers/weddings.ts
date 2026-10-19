@@ -45,7 +45,10 @@ export async function setWeddingSlug(page: Page, weddingId: string, slug: string
   await page.goto(homeUrl(weddingId));
   await page.getByRole("button", { name: "Angaben ändern" }).click();
   const dialog = page.getByRole("dialog", { name: "Eure Hochzeit" });
+  // A new address breaks links already shared: the dialog says so before saving.
+  await expect(dialog.getByTestId("slug-change-hint")).toHaveCount(0);
   await dialog.getByLabel("Adresse eurer Hochzeit").fill(slug);
+  await expect(dialog.getByTestId("slug-change-hint")).toContainText("keine Weiterleitung");
   await dialog.getByRole("button", { name: "Speichern" }).click();
   await expect(dialog).toBeHidden();
 }
@@ -53,7 +56,9 @@ export async function setWeddingSlug(page: Page, weddingId: string, slug: string
 /** A website version's own address, from its home section. */
 export async function setWebsiteSlug(page: Page, editorUrl: string, slug: string) {
   await page.goto(`${editorUrl}/home`);
+  await expect(page.getByTestId("slug-change-hint")).toHaveCount(0);
   await page.getByLabel("Webadresse dieser Version").fill(slug);
+  await expect(page.getByTestId("slug-change-hint")).toContainText("keine Weiterleitung");
   await page.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Gespeichert").first()).toBeVisible();
 }

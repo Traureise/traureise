@@ -41,6 +41,15 @@ describe("StartCheckout", () => {
     ]);
   });
 
+  it("charges an upgrade only the difference: what the wedding paid counts as credit", async () => {
+    expect((f.payments as FakePayments).checkouts).toEqual([]);
+    await new StartCheckout(f.deps).execute(anna, weddingId, "rsvp");
+    expect((f.payments as FakePayments).checkouts[0]!.priceCents).toBeUndefined();
+    await webhook(paid());
+    await new StartCheckout(f.deps).execute(anna, weddingId, "complete");
+    expect((f.payments as FakePayments).checkouts[1]).toEqual(expect.objectContaining({ productId: "prod_all", tier: "complete", priceCents: 10000 }));
+  });
+
   it("refuses tiers without a product, unknown or already owned", async () => {
     const checkout = new StartCheckout(f.deps);
     await expect(checkout.execute(anna, weddingId, "invitations")).rejects.toMatchObject({ fieldErrors: { tier: "not_available" } });
@@ -118,9 +127,19 @@ describe("pricing and plans", () => {
   });
 
   it("lists each website's current tier and what it can buy", async () => {
-    expect(await new ListWeddingPlans(f.deps).execute(anna.id)).toEqual([{ weddingId, title: "Anna & Ben", tier: "website", sellable: ["rsvp", "complete"] }]);
+    expect(await new ListWeddingPlans(f.deps).execute(anna.id)).toEqual([
+      {
+        weddingId,
+        title: "Anna & Ben",
+        tier: "website",
+        sellable: ["rsvp", "complete"],
+        prices: { rsvp: { dueCents: 4900, creditCents: 0 }, complete: { dueCents: 14900, creditCents: 0 } },
+      },
+    ]);
     await webhook(paid());
-    expect(await new ListWeddingPlans(f.deps).execute(anna.id)).toEqual([{ weddingId, title: "Anna & Ben", tier: "rsvp", sellable: ["complete"] }]);
+    expect(await new ListWeddingPlans(f.deps).execute(anna.id)).toEqual([
+      { weddingId, title: "Anna & Ben", tier: "rsvp", sellable: ["complete"], prices: { complete: { dueCents: 10000, creditCents: 4900 } } },
+    ]);
   });
 
   it("lists a user's purchases", async () => {

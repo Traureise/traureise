@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   activeTier,
   canUse,
+  checkoutPrice,
   entitlementValidUntil,
   isTierReleased,
   pricingTable,
   sellableTiers,
   type Entitlement,
   type TierOffer,
+  upgradeCreditCents,
 } from "@/domain/billing";
 
 const now = new Date("2026-10-18T10:00:00Z");
@@ -125,5 +127,26 @@ describe("pricingTable", () => {
 
   it("shows a tier without a product as coming soon", () => {
     expect(pricingTable([{ tier: "complete", priceCents: 14900, productId: null }], []).at(-1)).toEqual({ tier: "complete", priceCents: 14900, status: "comingSoon" });
+  });
+});
+
+describe("upgrade credit", () => {
+  it("counts the price of the highest tier the wedding still holds", () => {
+    expect(upgradeCreditCents(offers, [], now)).toBe(0);
+    expect(upgradeCreditCents(offers, [entitlement({ tier: "rsvp" })], now)).toBe(4900);
+    // RSVP then Einladungen: the Einladungen price already includes what RSVP cost.
+    expect(upgradeCreditCents(offers, [entitlement({ tier: "rsvp" }), entitlement({ tier: "invitations", purchaseRef: "ord_2" })], now)).toBe(13900);
+    expect(upgradeCreditCents(offers, [entitlement({ tier: "rsvp", revokedAt: now })], now)).toBe(0);
+  });
+
+  it("charges the difference to the tier bought", () => {
+    expect(checkoutPrice("rsvp", offers, [], now)).toEqual({ dueCents: 4900, creditCents: 0 });
+    expect(checkoutPrice("complete", offers, [entitlement({ tier: "rsvp" })], now)).toEqual({ dueCents: 10000, creditCents: 4900 });
+    expect(checkoutPrice("complete", offers, [entitlement({ tier: "invitations" })], now)).toEqual({ dueCents: 1000, creditCents: 13900 });
+  });
+
+  it("does not sell an upgrade that would cost less than one euro", () => {
+    const flat: TierOffer[] = offers.map((o) => (o.tier === "invitations" ? { ...o, priceCents: 4950 } : o));
+    expect(sellableTiers(flat, [], [entitlement({ tier: "rsvp" })], now)).toEqual(["complete"]);
   });
 });

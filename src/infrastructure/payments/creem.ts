@@ -35,6 +35,8 @@ export class CreemPaymentProvider implements PaymentProvider {
         success_url: request.successUrl,
         customer: { email: request.customerEmail },
         metadata: { weddingId: request.weddingId, tier: request.tier },
+        // An upgrade: Creem's per-checkout price override for one-time products, in cents.
+        ...(request.priceCents === undefined ? {} : { custom_price: request.priceCents }),
       }),
     });
     if (!res.ok) throw new Error(`Creem checkout failed: ${res.status}`);

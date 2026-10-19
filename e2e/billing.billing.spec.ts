@@ -71,6 +71,17 @@ test.describe("checkout", () => {
       await expect(page.getByTestId("tier-rsvp")).toContainText("Eure Hochzeiten haben dieses Paket schon.");
     });
 
+    await test.step("an upgrade pays only the difference: the RSVP price is credited", async () => {
+      const complete = page.getByTestId("tier-complete");
+      await expect(complete.getByLabel("Für welche Hochzeit?")).toContainText(/Anna & Ben · 100\s€ \(49\s€ angerechnet\)/);
+      await complete.getByRole("button", { name: "Jetzt kaufen" }).click();
+      await expect(page).toHaveURL(new RegExp(`^${STUB_URL}/checkout/ch_`));
+      const latest = (await (await request.get(`${STUB_URL}/test/checkouts/latest`)).json()) as { product_id: string; custom_price?: number };
+      expect(latest).toMatchObject({ product_id: "prod_e2e_complete", custom_price: 10000 });
+      // Not paid: the rest of this test goes on with RSVP only.
+      await page.goto("/konto");
+    });
+
     await test.step("a replayed webhook is ignored", async () => {
       const replay = await stub(request, `/test/checkouts/${checkoutId}/replay`);
       expect(replay).toEqual({ status: 200, body: { ok: true, outcome: "duplicate" } });

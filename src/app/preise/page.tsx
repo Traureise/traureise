@@ -81,11 +81,17 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
                     <label className="block space-y-1 text-sm">
                       <span>{t("websiteLabel")}</span>
                       <select name="weddingId" className="block h-10 w-full rounded-md border border-input bg-background px-2">
-                        {buyable.map((plan) => (
-                          <option key={plan.weddingId} value={plan.weddingId}>
-                            {plan.title}
-                          </option>
-                        ))}
+                        {buyable.map((plan) => {
+                          // What this wedding pays: an upgrade is reduced by what it already paid.
+                          const price = plan.prices[row.tier as PaidTier] ?? { dueCents: row.priceCents, creditCents: 0 };
+                          return (
+                            <option key={plan.weddingId} value={plan.weddingId}>
+                              {price.creditCents > 0
+                                ? t("planOptionCredit", { title: plan.title, price: price.dueCents / 100, credit: price.creditCents / 100 })
+                                : t("planOption", { title: plan.title, price: price.dueCents / 100 })}
+                            </option>
+                          );
+                        })}
                       </select>
                     </label>
                     <Button type="submit" className="w-full">

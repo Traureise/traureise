@@ -233,7 +233,16 @@ export type PaymentEvent =
   | { type: "revoked"; eventId: string; purchaseRef: string | null }
   | { type: "ignored"; eventId: string };
 
-export type CheckoutRequest = { productId: string; weddingId: string; tier: PaidTier; customerEmail: string; successUrl: string; requestId: string };
+/** `priceCents` is set only for an upgrade: the product's price minus what the wedding already paid. */
+export type CheckoutRequest = {
+  productId: string;
+  weddingId: string;
+  tier: PaidTier;
+  customerEmail: string;
+  successUrl: string;
+  requestId: string;
+  priceCents?: number;
+};
 
 export interface PaymentProvider {
   /** Identifies the provider on stored purchases, e.g. "Creem". */
