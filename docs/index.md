@@ -10,8 +10,11 @@ instance.
 ## What it does
 
 - **Passwordless login.** Enter your email, click the link, done. An account is created on first login.
-- **Dashboard** with your websites, a share dialog (QR code to download or copy, link to copy) and
-  deletion. Save the Dates, invitations and cards have placeholder tabs for now.
+- **Everything revolves around the wedding.** Names and, if planned, the date are all it asks; from that it
+  makes the engagement announcement, Save the Date, website, invitation and thank-you card. Its home is a
+  timeline of those steps, each with versions for different audiences; the guest list decides who gets which.
+  See [Weddings, the timeline and versions](weddings.md) and [Save the Dates, invitations and cards](cards.md).
+- **Share dialog** with a QR code to download or copy and the link to copy (and WhatsApp for the engagement link).
 - **Editor with live preview** for the home section (cover photo, date, location, welcome text,
   hashtag, countdown, web address, time zone) and eight sections: Unsere Geschichte, Tagesablauf,
   Anreise, Empfehlungen, Geschenkideen, Hochzeitsgesellschaft, Galerie and Häufige Fragen. Each section can be
@@ -25,7 +28,7 @@ instance.
 
 <div class="grid" markdown>
 
-![Dashboard with a website card](assets/dashboard.png){ .screenshot }
+![A wedding's home: the timeline of its items, each with its versions](assets/dashboard.png){ .screenshot }
 
 ![A public wedding website in the Salbei theme](assets/public-site.png){ .screenshot }
 

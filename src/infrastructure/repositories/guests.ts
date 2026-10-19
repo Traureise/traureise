@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { GuestRepository, HouseholdData, NewPoll, PollRecord } from "@/application/ports";
+import type { AssignableItem, Assignment } from "@/domain/weddings";
 import {
   DEFAULT_RSVP_SETTINGS,
   type Guest,
@@ -12,7 +13,7 @@ import {
   type RsvpSettings,
 } from "@/domain/guests";
 import type { Database } from "../db/client";
-import { guestRequests, guests, households, rsvpPolls, rsvpSettings } from "../db/schema";
+import { guestRequests, guests, householdVersions, households, rsvpPolls, rsvpSettings } from "../db/schema";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -48,38 +49,38 @@ type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 export class DrizzleGuestRepository implements GuestRepository {
   constructor(private db: Database) {}
 
-  async getSettings(websiteId: string): Promise<RsvpSettings> {
-    const [row] = await this.db.select().from(rsvpSettings).where(eq(rsvpSettings.websiteId, websiteId));
+  async getSettings(weddingId: string): Promise<RsvpSettings> {
+    const [row] = await this.db.select().from(rsvpSettings).where(eq(rsvpSettings.weddingId, weddingId));
     if (!row) return { ...DEFAULT_RSVP_SETTINGS };
     return { replyBy: row.replyBy, eventIds: row.eventIds ?? null, meal: row.meal ?? null, notify: row.notify as NotifyMode, whatsappMessage: row.whatsappMessage };
   }
 
-  async saveSettings(websiteId: string, settings: RsvpSettings): Promise<void> {
-    await this.db.insert(rsvpSettings).values({ websiteId, ...settings }).onConflictDoUpdate({ target: rsvpSettings.websiteId, set: settings });
+  async saveSettings(weddingId: string, settings: RsvpSettings): Promise<void> {
+    await this.db.insert(rsvpSettings).values({ weddingId, ...settings }).onConflictDoUpdate({ target: rsvpSettings.weddingId, set: settings });
   }
 
-  async listPolls(websiteId: string): Promise<PollRecord[]> {
-    const rows = await this.db.select().from(rsvpPolls).where(eq(rsvpPolls.websiteId, websiteId)).orderBy(asc(rsvpPolls.position), asc(rsvpPolls.createdAt));
+  async listPolls(weddingId: string): Promise<PollRecord[]> {
+    const rows = await this.db.select().from(rsvpPolls).where(eq(rsvpPolls.weddingId, weddingId)).orderBy(asc(rsvpPolls.position), asc(rsvpPolls.createdAt));
     return rows.map(toPoll);
   }
 
-  async createPoll(websiteId: string, poll: NewPoll): Promise<PollRecord> {
+  async createPoll(weddingId: string, poll: NewPoll): Promise<PollRecord> {
     const [row] = await this.db
       .insert(rsvpPolls)
-      .values({ websiteId, ...poll, position: sql`(select coalesce(max(${rsvpPolls.position}), -1) + 1 from ${rsvpPolls} where ${rsvpPolls.websiteId} = ${websiteId})` })
+      .values({ weddingId, ...poll, position: sql`(select coalesce(max(${rsvpPolls.position}), -1) + 1 from ${rsvpPolls} where ${rsvpPolls.weddingId} = ${weddingId})` })
       .returning();
     return toPoll(row!);
   }
 
-  async updatePoll(websiteId: string, pollId: string, poll: NewPoll): Promise<boolean> {
+  async updatePoll(weddingId: string, pollId: string, poll: NewPoll): Promise<boolean> {
     if (!UUID.test(pollId)) return false;
-    const rows = await this.db.update(rsvpPolls).set(poll).where(and(eq(rsvpPolls.id, pollId), eq(rsvpPolls.websiteId, websiteId))).returning({ id: rsvpPolls.id });
+    const rows = await this.db.update(rsvpPolls).set(poll).where(and(eq(rsvpPolls.id, pollId), eq(rsvpPolls.weddingId, weddingId))).returning({ id: rsvpPolls.id });
     return rows.length > 0;
   }
 
-  async deletePoll(websiteId: string, pollId: string): Promise<void> {
+  async deletePoll(weddingId: string, pollId: string): Promise<void> {
     if (!UUID.test(pollId)) return;
-    await this.db.delete(rsvpPolls).where(and(eq(rsvpPolls.id, pollId), eq(rsvpPolls.websiteId, websiteId)));
+    await this.db.delete(rsvpPolls).where(and(eq(rsvpPolls.id, pollId), eq(rsvpPolls.weddingId, weddingId)));
   }
 
   /** Loads households with their people and requests in three queries. */
@@ -98,42 +99,54 @@ export class DrizzleGuestRepository implements GuestRepository {
       pollAnswers: r.pollAnswers,
       respondedAt: r.respondedAt,
       createdAt: r.createdAt,
+      email: r.email,
+      personalLine: r.personalLine,
+      unsubscribedAt: r.unsubscribedAt,
       people: people.filter((p) => p.householdId === r.id).map(toGuest),
       requests: requests.filter((q) => q.householdId === r.id).map(toRequest),
     }));
   }
 
-  async listHouseholds(websiteId: string): Promise<Household[]> {
-    return this.assemble(await this.db.select().from(households).where(eq(households.websiteId, websiteId)).orderBy(asc(households.createdAt), asc(households.id)));
+  async listHouseholds(weddingId: string): Promise<Household[]> {
+    return this.assemble(await this.db.select().from(households).where(eq(households.weddingId, weddingId)).orderBy(asc(households.createdAt), asc(households.id)));
   }
 
-  async findHousehold(websiteId: string, householdId: string): Promise<Household | null> {
+  async findHousehold(weddingId: string, householdId: string): Promise<Household | null> {
     if (!UUID.test(householdId)) return null;
-    const rows = await this.db.select().from(households).where(and(eq(households.id, householdId), eq(households.websiteId, websiteId)));
+    const rows = await this.db.select().from(households).where(and(eq(households.id, householdId), eq(households.weddingId, weddingId)));
     return (await this.assemble(rows))[0] ?? null;
   }
 
-  async findByTokenHash(tokenHash: string): Promise<{ websiteId: string; household: Household } | null> {
+  async findByTokenHash(tokenHash: string): Promise<{ weddingId: string; household: Household } | null> {
     const rows = await this.db.select().from(households).where(eq(households.tokenHash, tokenHash));
     const [household] = await this.assemble(rows);
-    return household ? { websiteId: rows[0]!.websiteId, household } : null;
+    return household ? { weddingId: rows[0]!.weddingId, household } : null;
   }
 
-  async createHousehold(websiteId: string, data: HouseholdData, tokenHashFor: (householdId: string) => string): Promise<Household> {
+  async createHousehold(weddingId: string, data: HouseholdData, tokenHashFor: (householdId: string) => string): Promise<Household> {
     const id = crypto.randomUUID();
     await this.db.transaction(async (tx) => {
-      await tx.insert(households).values({ id, websiteId, name: data.name, invitedEventIds: data.invitedEventIds, tokenHash: tokenHashFor(id) });
+      await tx
+        .insert(households)
+        .values({ id, weddingId, name: data.name, invitedEventIds: data.invitedEventIds, email: data.email, personalLine: data.personalLine, tokenHash: tokenHashFor(id) });
       await tx.insert(guests).values(data.people.map((p, position) => ({ householdId: id, position, name: p.name, isChild: p.isChild })));
     });
-    return (await this.findHousehold(websiteId, id))!;
+    return (await this.findHousehold(weddingId, id))!;
   }
 
-  async updateHousehold(websiteId: string, householdId: string, data: HouseholdData): Promise<void> {
+  async updateHousehold(weddingId: string, householdId: string, data: HouseholdData): Promise<void> {
     await this.db.transaction(async (tx) => {
       const updated = await tx
         .update(households)
-        .set({ name: data.name, invitedEventIds: data.invitedEventIds })
-        .where(and(eq(households.id, householdId), eq(households.websiteId, websiteId)))
+        // A new address (entered by the couple) ends an earlier unsubscribe.
+        .set({
+          name: data.name,
+          invitedEventIds: data.invitedEventIds,
+          email: data.email,
+          personalLine: data.personalLine,
+          unsubscribedAt: sql`case when ${households.email} is not distinct from ${data.email} then ${households.unsubscribedAt} else null end`,
+        })
+        .where(and(eq(households.id, householdId), eq(households.weddingId, weddingId)))
         .returning({ id: households.id });
       if (updated.length === 0) return;
       const existing = await tx.select({ id: guests.id }).from(guests).where(eq(guests.householdId, householdId));
@@ -150,9 +163,9 @@ export class DrizzleGuestRepository implements GuestRepository {
     });
   }
 
-  async deleteHousehold(websiteId: string, householdId: string): Promise<void> {
+  async deleteHousehold(weddingId: string, householdId: string): Promise<void> {
     if (!UUID.test(householdId)) return;
-    await this.db.delete(households).where(and(eq(households.id, householdId), eq(households.websiteId, websiteId)));
+    await this.db.delete(households).where(and(eq(households.id, householdId), eq(households.weddingId, weddingId)));
   }
 
   async saveResponse(householdId: string, response: HouseholdResponse, at: Date): Promise<void> {
@@ -167,7 +180,7 @@ export class DrizzleGuestRepository implements GuestRepository {
     });
   }
 
-  async decideRequest(websiteId: string, requestId: string, status: "added" | "declined", at: Date): Promise<boolean> {
+  async decideRequest(weddingId: string, requestId: string, status: "added" | "declined", at: Date): Promise<boolean> {
     if (!UUID.test(requestId)) return false;
     return this.db.transaction(async (tx: Tx) => {
       const [request] = await tx
@@ -177,7 +190,7 @@ export class DrizzleGuestRepository implements GuestRepository {
           and(
             eq(guestRequests.id, requestId),
             eq(guestRequests.status, "pending"),
-            inArray(guestRequests.householdId, tx.select({ id: households.id }).from(households).where(eq(households.websiteId, websiteId))),
+            inArray(guestRequests.householdId, tx.select({ id: households.id }).from(households).where(eq(households.weddingId, weddingId))),
           ),
         )
         .returning();
@@ -194,46 +207,70 @@ export class DrizzleGuestRepository implements GuestRepository {
     });
   }
 
-  async deleteGuestData(websiteId: string): Promise<number> {
-    const rows = await this.db.delete(households).where(eq(households.websiteId, websiteId)).returning({ id: households.id });
+  async listAssignments(weddingId: string): Promise<Assignment[]> {
+    const rows = await this.db
+      .select({ householdId: householdVersions.householdId, item: householdVersions.item, cardId: householdVersions.cardId, websiteId: householdVersions.websiteId })
+      .from(householdVersions)
+      .innerJoin(households, eq(households.id, householdVersions.householdId))
+      .where(eq(households.weddingId, weddingId));
+    return rows.map((r) => ({ householdId: r.householdId, item: r.item as AssignableItem, versionId: (r.cardId ?? r.websiteId)! }));
+  }
+
+  async assign(householdId: string, item: AssignableItem, target: { cardId: string } | { websiteId: string }): Promise<void> {
+    const set = "cardId" in target ? { cardId: target.cardId, websiteId: null } : { cardId: null, websiteId: target.websiteId };
+    await this.db.insert(householdVersions).values({ householdId, item, ...set }).onConflictDoUpdate({ target: [householdVersions.householdId, householdVersions.item], set });
+  }
+
+  async unsubscribe(householdId: string, at: Date): Promise<boolean> {
+    if (!UUID.test(householdId)) return false;
+    const rows = await this.db
+      .update(households)
+      .set({ email: null, unsubscribedAt: sql`coalesce(${households.unsubscribedAt}, ${at.toISOString()}::timestamptz)` })
+      .where(eq(households.id, householdId))
+      .returning({ id: households.id });
+    return rows.length > 0;
+  }
+
+  async deleteGuestData(weddingId: string): Promise<number> {
+    const rows = await this.db.delete(households).where(eq(households.weddingId, weddingId)).returning({ id: households.id });
     return rows.length;
   }
 
-  async listWebsiteIdsWithGuests(): Promise<string[]> {
-    const rows = await this.db.selectDistinct({ id: households.websiteId }).from(households);
+  async listWeddingIdsWithGuests(): Promise<string[]> {
+    const rows = await this.db.selectDistinct({ id: households.weddingId }).from(households);
     return rows.map((r) => r.id);
   }
 
-  async listWebsiteIdsWithDailySummary(): Promise<string[]> {
-    const rows = await this.db.select({ id: rsvpSettings.websiteId }).from(rsvpSettings).where(eq(rsvpSettings.notify, "daily"));
+  async listWeddingIdsWithDailySummary(): Promise<string[]> {
+    const rows = await this.db.select({ id: rsvpSettings.weddingId }).from(rsvpSettings).where(eq(rsvpSettings.notify, "daily"));
     return rows.map((r) => r.id);
   }
 
-  async lastSummaryAt(websiteId: string): Promise<Date | null> {
-    const [row] = await this.db.select({ at: rsvpSettings.lastSummaryAt }).from(rsvpSettings).where(eq(rsvpSettings.websiteId, websiteId));
+  async lastSummaryAt(weddingId: string): Promise<Date | null> {
+    const [row] = await this.db.select({ at: rsvpSettings.lastSummaryAt }).from(rsvpSettings).where(eq(rsvpSettings.weddingId, weddingId));
     return row?.at ?? null;
   }
 
-  async claimDailySummary(websiteId: string, previous: Date | null, at: Date): Promise<boolean> {
+  async claimDailySummary(weddingId: string, previous: Date | null, at: Date): Promise<boolean> {
     const unchanged = previous ? eq(rsvpSettings.lastSummaryAt, previous) : sql`${rsvpSettings.lastSummaryAt} is null`;
     const rows = await this.db
       .update(rsvpSettings)
       .set({ lastSummaryAt: at })
-      .where(and(eq(rsvpSettings.websiteId, websiteId), unchanged))
-      .returning({ id: rsvpSettings.websiteId });
+      .where(and(eq(rsvpSettings.weddingId, weddingId), unchanged))
+      .returning({ id: rsvpSettings.weddingId });
     return rows.length > 0;
   }
 
-  async claimRetentionWarning(websiteId: string, deleteAt: Date): Promise<boolean> {
+  async claimRetentionWarning(weddingId: string, deleteAt: Date): Promise<boolean> {
     const rows = await this.db
       .insert(rsvpSettings)
-      .values({ websiteId, retentionWarnedFor: deleteAt })
+      .values({ weddingId, retentionWarnedFor: deleteAt })
       .onConflictDoUpdate({
-        target: rsvpSettings.websiteId,
+        target: rsvpSettings.weddingId,
         set: { retentionWarnedFor: deleteAt },
         setWhere: sql`${rsvpSettings.retentionWarnedFor} is distinct from ${deleteAt.toISOString()}::timestamptz`,
       })
-      .returning({ id: rsvpSettings.websiteId });
+      .returning({ id: rsvpSettings.weddingId });
     return rows.length > 0;
   }
 }

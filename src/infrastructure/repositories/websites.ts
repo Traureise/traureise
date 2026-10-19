@@ -1,4 +1,4 @@
-import { and, asc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { Item, NewWebsite, Section, SectionPatch, Website, WebsitePatch, WebsiteRepository } from "@/application/ports";
 import type { CollectionKind, ItemData, SectionKind } from "@/domain/sections";
 import type { Database } from "../db/client";
@@ -21,7 +21,7 @@ export class DrizzleWebsiteRepository implements WebsiteRepository {
   async create(input: NewWebsite, sections: Section[]): Promise<Website> {
     return this.db.transaction(async (tx) => {
       const [website] = await tx.insert(websites).values(input).returning();
-      await tx.insert(websiteSections).values(sections.map((s) => ({ ...s, websiteId: website!.id })));
+      if (sections.length > 0) await tx.insert(websiteSections).values(sections.map((s) => ({ ...s, websiteId: website!.id })));
       return website!;
     });
   }
@@ -35,13 +35,8 @@ export class DrizzleWebsiteRepository implements WebsiteRepository {
     return (await this.db.query.websites.findFirst({ where: eq(websites.slug, slug) })) ?? null;
   }
 
-  listByOwner(ownerId: string): Promise<Website[]> {
-    return this.db.query.websites.findMany({ where: eq(websites.ownerId, ownerId), orderBy: asc(websites.createdAt) });
-  }
-
-  async slugTaken(slug: string, exceptWebsiteId?: string): Promise<boolean> {
-    const where = exceptWebsiteId ? and(eq(websites.slug, slug), ne(websites.id, exceptWebsiteId)) : eq(websites.slug, slug);
-    return (await this.db.select({ id: websites.id }).from(websites).where(where).limit(1)).length > 0;
+  listByWedding(weddingId: string): Promise<Website[]> {
+    return this.db.query.websites.findMany({ where: eq(websites.weddingId, weddingId), orderBy: [asc(websites.position), asc(websites.createdAt)] });
   }
 
   async update(id: string, patch: WebsitePatch): Promise<Website> {

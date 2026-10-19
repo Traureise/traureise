@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { decideGuestRequestAction, deleteHouseholdAction } from "@/app/actions/guests";
 import { Button } from "@/components/ui/button";
 
-export function DeleteHouseholdButton({ websiteId, householdId, name }: { websiteId: string; householdId: string; name: string }) {
+export function DeleteHouseholdButton({ weddingId, householdId, name }: { weddingId: string; householdId: string; name: string }) {
   const t = useTranslations("guests.household");
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -21,7 +21,7 @@ export function DeleteHouseholdButton({ websiteId, householdId, name }: { websit
       onClick={() => {
         if (!window.confirm(t("confirmDelete", { name }))) return;
         start(async () => {
-          const result = await deleteHouseholdAction(websiteId, householdId);
+          const result = await deleteHouseholdAction(weddingId, householdId);
           if (result.ok) toast.success(t("deleted"));
           router.refresh();
         });
@@ -34,14 +34,14 @@ export function DeleteHouseholdButton({ websiteId, householdId, name }: { websit
 }
 
 /** Zur Gästeliste / Ablehnen for a household's request to bring someone. */
-export function RequestActions({ websiteId, requestId }: { websiteId: string; requestId: string }) {
+export function RequestActions({ weddingId, requestId }: { weddingId: string; requestId: string }) {
   const t = useTranslations("guests.overview");
   const tErrors = useTranslations("errors");
   const router = useRouter();
   const [pending, start] = useTransition();
   const decide = (decision: "added" | "declined") =>
     start(async () => {
-      const result = await decideGuestRequestAction(websiteId, requestId, decision);
+      const result = await decideGuestRequestAction(weddingId, requestId, decision);
       if (!result.ok) toast.error(tErrors(result.error ?? "unknown"));
       router.refresh();
     });

@@ -26,7 +26,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
   const { fehler } = await searchParams;
   const t = await getTranslations("pricing");
   const user = await getCurrentUser();
-  const plans = user ? await c.listWebsitePlans.execute(user.id) : [];
+  const plans = user ? await c.listWeddingPlans.execute(user.id) : [];
 
   return (
     <PageShell header={user ? <AppHeader email={user.email} /> : <div className="mx-auto w-full max-w-5xl px-4 pt-8 sm:px-6"><Logo /></div>}>
@@ -80,12 +80,18 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
                     <input type="hidden" name="tier" value={row.tier} />
                     <label className="block space-y-1 text-sm">
                       <span>{t("websiteLabel")}</span>
-                      <select name="websiteId" className="block h-10 w-full rounded-md border border-input bg-background px-2">
-                        {buyable.map((plan) => (
-                          <option key={plan.websiteId} value={plan.websiteId}>
-                            {plan.title}
-                          </option>
-                        ))}
+                      <select name="weddingId" className="block h-10 w-full rounded-md border border-input bg-background px-2">
+                        {buyable.map((plan) => {
+                          // What this wedding pays: an upgrade is reduced by what it already paid.
+                          const price = plan.prices[row.tier as PaidTier] ?? { dueCents: row.priceCents, creditCents: 0 };
+                          return (
+                            <option key={plan.weddingId} value={plan.weddingId}>
+                              {price.creditCents > 0
+                                ? t("planOptionCredit", { title: plan.title, price: price.dueCents / 100, credit: price.creditCents / 100 })
+                                : t("planOption", { title: plan.title, price: price.dueCents / 100 })}
+                            </option>
+                          );
+                        })}
                       </select>
                     </label>
                     <Button type="submit" className="w-full">

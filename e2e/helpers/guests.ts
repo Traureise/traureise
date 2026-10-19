@@ -1,5 +1,6 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import { addItem, openSection } from "./editor";
+import { weddingIdOf } from "./weddings";
 
 /** Adds a schedule item (an event guests can answer for). */
 export async function addEvent(page: Page, editorUrl: string, name: string, date: string, time: string) {
@@ -7,13 +8,20 @@ export async function addEvent(page: Page, editorUrl: string, name: string, date
   await addItem(page, { Art: { select: "Feier" }, Name: name, "Beginn (Datum)": date, "Beginn (Uhrzeit)": time });
 }
 
-export const guestsUrl = (editorUrl: string) => editorUrl.replace(/\/edit$/, "/gaeste");
-export const websiteIdOf = (editorUrl: string) => /\/websites\/([0-9a-f-]{36})\//.exec(editorUrl)![1]!;
+/** The guest list of the wedding a website editor URL belongs to. */
+export const guestsUrl = (editorUrl: string) => `/hochzeiten/${weddingIdOf(editorUrl)}/gaeste`;
+export { weddingIdOf };
 
 export const household = (page: Page, name: string) => page.getByTestId("household").filter({ has: page.getByRole("heading", { name, exact: true }) });
 
 /** Adds a household from the Gäste page; `events` limits the invitation to those events. */
-export async function addHousehold(page: Page, name: string, people: { name: string; child?: boolean }[], events?: { uninvite: string[] }) {
+export async function addHousehold(
+  page: Page,
+  name: string,
+  people: { name: string; child?: boolean }[],
+  events?: { uninvite: string[] },
+  extra: { email?: string; personalLine?: string } = {},
+) {
   await page.getByRole("button", { name: "Haushalt hinzufügen" }).click();
   const form = page.getByRole("form", { name: "Neuer Haushalt" });
   await form.getByLabel("Name des Haushalts").fill(name);
@@ -23,6 +31,8 @@ export async function addHousehold(page: Page, name: string, people: { name: str
     if (person.child) await form.getByTestId("household-person").nth(i).getByLabel("Kind").check();
   }
   for (const event of events?.uninvite ?? []) await form.getByLabel(event, { exact: true }).uncheck();
+  if (extra.email) await form.getByLabel("E-Mail-Adresse (optional)").fill(extra.email);
+  if (extra.personalLine) await form.getByLabel("Persönliche Zeile für die Dankeskarte (optional)").fill(extra.personalLine);
   await form.getByRole("button", { name: "Speichern" }).click();
   await expect(form).toBeHidden();
   await expect(household(page, name)).toBeVisible();
@@ -41,8 +51,8 @@ export async function setClockOffset(request: APIRequestContext, baseURL: string
   expect(res.ok()).toBe(true);
 }
 
-export async function runGuestJobs(request: APIRequestContext, baseURL: string, websiteId: string) {
-  const res = await request.post(`${baseURL}/api/test/jobs`, { data: { websiteId } });
+export async function runGuestJobs(request: APIRequestContext, baseURL: string, weddingId: string) {
+  const res = await request.post(`${baseURL}/api/test/jobs`, { data: { weddingId } });
   expect(res.ok()).toBe(true);
   return (await res.json()) as { deleted: string[]; warned: string[]; summaries: string[] };
 }

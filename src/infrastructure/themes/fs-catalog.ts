@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import type { ThemeCatalog } from "@/application/ports";
-import { parseThemeManifest, type ThemeManifest } from "@/domain/theme";
+import { parseThemeManifest, themeAssetFiles, type ThemeManifest } from "@/domain/theme";
 
 export const PREFERRED_DEFAULT_THEME = "salbei";
 
@@ -17,7 +17,7 @@ export function loadThemes(dir: string): ThemeLoadResult {
     try {
       const parsed = parseThemeManifest(JSON.parse(readFileSync(manifestPath, "utf8")), folder);
       if (!parsed.ok) throw new Error(JSON.stringify(parsed.fieldErrors));
-      const assets = Object.values(parsed.value.assets).filter(Boolean) as string[];
+      const assets = themeAssetFiles(parsed.value);
       const missing = assets.filter((file) => !existsSync(path.join(dir, folder, file)));
       if (missing.length) throw new Error(`missing assets: ${missing.join(", ")}`);
       themes.push(parsed.value);
@@ -30,6 +30,7 @@ export function loadThemes(dir: string): ThemeLoadResult {
 
 export class FsThemeCatalog implements ThemeCatalog {
   private themes: ThemeManifest[];
+  private svgs = new Map<string, string>();
 
   constructor(readonly dir: string) {
     const { themes, errors } = loadThemes(dir);
@@ -50,10 +51,21 @@ export class FsThemeCatalog implements ThemeCatalog {
     return this.get(PREFERRED_DEFAULT_THEME)?.id ?? this.themes[0]!.id;
   }
 
+  readSvg(themeId: string, file: string): string | null {
+    const filePath = file.endsWith(".svg") ? this.assetPath(themeId, file) : null;
+    if (!filePath) return null;
+    let svg = this.svgs.get(filePath);
+    if (svg === undefined) {
+      svg = readFileSync(filePath, "utf8");
+      this.svgs.set(filePath, svg);
+    }
+    return svg;
+  }
+
   /** Absolute path of a declared asset, or null (only files listed in the manifest are served). */
   assetPath(themeId: string, file: string): string | null {
     const theme = this.get(themeId);
-    if (!theme || !Object.values(theme.assets).includes(file)) return null;
+    if (!theme || !themeAssetFiles(theme).includes(file)) return null;
     return path.join(this.dir, themeId, file);
   }
 }

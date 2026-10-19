@@ -10,9 +10,9 @@ import { requireProfile } from "@/lib/session";
 export async function startCheckoutAction(form: FormData): Promise<void> {
   const user = await requireProfile();
   const tier = String(form.get("tier") ?? "");
-  const websiteId = String(form.get("websiteId") ?? "");
+  const weddingId = String(form.get("weddingId") ?? "");
   const result = PAID_TIERS.includes(tier as PaidTier)
-    ? await runAction(() => container().startCheckout.execute(user, websiteId, tier as PaidTier))
+    ? await runAction(() => container().startCheckout.execute(user, weddingId, tier as PaidTier))
     : ({ ok: false } as const);
   redirect(result.ok ? result.data.url : "/preise?fehler=checkout");
 }

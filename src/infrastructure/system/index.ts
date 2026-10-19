@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { Clock, GuestLinks, TokenGenerator } from "@/application/ports";
 
 export const systemClock: Clock = { now: () => new Date() };
@@ -13,9 +13,19 @@ export const cryptoTokens: TokenGenerator = {
  * any time while the database holds only its SHA-256 hash.
  */
 export function hmacGuestLinks(secret: string): GuestLinks {
+  const sign = (purpose: string, householdId: string) => createHmac("sha256", secret).update(`${purpose}:${householdId}`).digest("base64url");
   return {
-    tokenFor: (householdId) => createHmac("sha256", secret).update(`household:${householdId}`).digest("base64url"),
+    tokenFor: (householdId) => sign("household", householdId),
     hash: (token) => createHash("sha256").update(token).digest("hex"),
+    // "<household id>.<signature>": verifiable without a stored token, and a different purpose than the personal link.
+    unsubscribeTokenFor: (householdId) => `${householdId}.${sign("unsubscribe", householdId)}`,
+    verifyUnsubscribe(token) {
+      const [householdId, signature] = token.split(".");
+      if (!householdId || !signature || !/^[0-9a-f-]{36}$/.test(householdId)) return null;
+      const expected = Buffer.from(sign("unsubscribe", householdId));
+      const given = Buffer.from(signature);
+      return given.length === expected.length && timingSafeEqual(given, expected) ? householdId : null;
+    },
   };
 }
 

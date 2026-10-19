@@ -10,3 +10,8 @@ export function checkUpload(file: { size: number; contentType: string }): Upload
   if (file.size > MAX_UPLOAD_BYTES) return "too_large";
   return null;
 }
+
+/** Where the app serves an uploaded image. */
+export function uploadPath(key: string): string {
+  return `/uploads/${key}`;
+}

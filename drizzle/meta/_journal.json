@@ -22,6 +22,34 @@
       "when": 1792345612882,
       "tag": "0002_guests",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792357422371,
+      "tag": "0003_cards",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792385890935,
+      "tag": "0004_site_enabled",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792389857733,
+      "tag": "0005_drop_website_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792389863643,
+      "tag": "0006_weddings",
+      "breakpoints": true
     }
   ]
 }

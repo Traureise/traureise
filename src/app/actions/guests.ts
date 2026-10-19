@@ -6,41 +6,41 @@ import { runAction, type ActionResult } from "@/lib/action-result";
 import { clientIp } from "@/lib/client-ip";
 import { requireUser } from "@/lib/session";
 
-async function guests<T>(websiteId: string, fn: (userId: string) => Promise<T>): Promise<ActionResult<T>> {
+async function guests<T>(weddingId: string, fn: (userId: string) => Promise<T>): Promise<ActionResult<T>> {
   const user = await requireUser();
   const result = await runAction(() => fn(user.id));
-  if (result.ok) revalidatePath(`/websites/${websiteId}/gaeste`, "layout");
+  if (result.ok) revalidatePath(`/hochzeiten/${weddingId}`, "layout");
   return result;
 }
 
-export async function saveHouseholdAction(websiteId: string, householdId: string | null, input: unknown) {
-  return guests(websiteId, async (userId) => {
-    await container().saveHousehold.execute(userId, websiteId, householdId, input);
+export async function saveHouseholdAction(weddingId: string, householdId: string | null, input: unknown) {
+  return guests(weddingId, async (userId) => {
+    await container().saveHousehold.execute(userId, weddingId, householdId, input);
     return undefined;
   });
 }
 
-export async function deleteHouseholdAction(websiteId: string, householdId: string) {
-  return guests(websiteId, (userId) => container().deleteHousehold.execute(userId, websiteId, householdId));
+export async function deleteHouseholdAction(weddingId: string, householdId: string) {
+  return guests(weddingId, (userId) => container().deleteHousehold.execute(userId, weddingId, householdId));
 }
 
-export async function saveRsvpSettingsAction(websiteId: string, input: unknown) {
-  return guests(websiteId, (userId) => container().saveRsvpSettings.execute(userId, websiteId, input));
+export async function saveRsvpSettingsAction(weddingId: string, input: unknown) {
+  return guests(weddingId, (userId) => container().saveRsvpSettings.execute(userId, weddingId, input));
 }
 
-export async function savePollAction(websiteId: string, pollId: string | null, input: unknown) {
-  return guests(websiteId, async (userId) => {
-    await container().savePoll.execute(userId, websiteId, pollId, input);
+export async function savePollAction(weddingId: string, pollId: string | null, input: unknown) {
+  return guests(weddingId, async (userId) => {
+    await container().savePoll.execute(userId, weddingId, pollId, input);
     return undefined;
   });
 }
 
-export async function deletePollAction(websiteId: string, pollId: string) {
-  return guests(websiteId, (userId) => container().deletePoll.execute(userId, websiteId, pollId));
+export async function deletePollAction(weddingId: string, pollId: string) {
+  return guests(weddingId, (userId) => container().deletePoll.execute(userId, weddingId, pollId));
 }
 
-export async function decideGuestRequestAction(websiteId: string, requestId: string, decision: "added" | "declined") {
-  return guests(websiteId, (userId) => container().decideGuestRequest.execute(userId, websiteId, requestId, decision));
+export async function decideGuestRequestAction(weddingId: string, requestId: string, decision: "added" | "declined") {
+  return guests(weddingId, (userId) => container().decideGuestRequest.execute(userId, weddingId, requestId, decision));
 }
 
 /** The guests' side: the personal link's token is the only key. */

@@ -31,7 +31,8 @@ DATABASE_URL=postgres://traureise:<password>@localhost:5432/traureise SMTP_HOST=
 - **Integration tests** run the Drizzle repositories against a real PostgreSQL with the real migrations,
   send email through Mailpit, and process real images with sharp.
 - **End-to-end tests** run in Chromium against `docker compose up`. They log in through magic links read
-  from the Mailpit API and cover the dashboard, every editor section and field with the live preview,
+  from the Mailpit API and cover the Hochzeit form and the wedding's timeline with versions and their
+  assignment on the guest list, a walk over every couple page checking the way back, every editor section and field with the live preview,
   the public page, calendar export, sharing, theming, authorization, deletion and logout, plus the legal
   pages, data export and account deletion, and guests and RSVP (guest list, settings, polls, preview,
   answers through personal links, isolation between households, overview, CSV and account export,

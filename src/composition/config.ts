@@ -23,6 +23,11 @@ const schema = z.object({
   APP_SECRET: z.string().optional(),
   // Retention and daily summaries run in the app every this many minutes; 0 turns them off (tests).
   GUEST_JOBS_INTERVAL_MINUTES: z.coerce.number().int().nonnegative().default(15),
+  // Card emails and reminders: at most this many per job pass, with this pause between two (SMTP rate limit).
+  MAIL_BATCH_SIZE: z.coerce.number().int().positive().default(50),
+  MAIL_SEND_INTERVAL_MS: z.coerce.number().int().nonnegative().default(1000),
+  // Font files for card exports (fontsource packages); the Docker image ships them.
+  CARD_FONTS_DIR: z.string().default("./node_modules/@fontsource"),
   // Testing only: /api/test/clock moves the app's clock and /api/test/jobs runs the guest jobs.
   TEST_HOOKS: z.stringbool().default(false),
   // Linked in the footer (AGPL § 13). Point it at your own source if you run a modified version.

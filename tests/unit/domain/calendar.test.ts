@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildIcs, mapLink } from "@/domain/calendar";
+import { buildAllDayIcs, buildIcs, mapLink } from "@/domain/calendar";
 
 const base = {
   uid: "item-1@traureise",
@@ -49,5 +49,16 @@ describe("mapLink", () => {
     expect(mapLink("Hofweg 3, Beispielstadt")).toBe(
       "https://www.openstreetmap.org/search?query=Hofweg%203%2C%20Beispielstadt",
     );
+  });
+});
+
+describe("buildAllDayIcs", () => {
+  it("makes an all-day event for a date without a time (Save the Date)", () => {
+    const ics = buildAllDayIcs({ uid: "w1-wedding@traureise", title: "Hochzeit Anna & Ben", location: "Hamburg", date: "2027-12-31", url: "http://localhost:3000/anna" }, new Date("2026-10-18T10:00:00Z"));
+    expect(ics).toContain("DTSTART;VALUE=DATE:20271231\r\n");
+    expect(ics).toContain("DTEND;VALUE=DATE:20280101\r\n");
+    expect(ics).toContain("SUMMARY:Hochzeit Anna & Ben\r\n");
+    expect(ics).toContain("LOCATION:Hamburg\r\n");
+    expect(ics.endsWith("END:VCALENDAR\r\n")).toBe(true);
   });
 });

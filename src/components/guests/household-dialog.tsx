@@ -14,13 +14,22 @@ import { Label } from "@/components/ui/label";
 import type { FieldErrors } from "@/domain/result";
 
 type Person = { key: string; id: string | null; name: string; isChild: boolean };
-export type HouseholdDraft = { id: string; name: string; invitedEventIds: string[] | null; people: { id: string; name: string; isChild: boolean }[] };
+export type HouseholdDraft = {
+  id: string;
+  name: string;
+  invitedEventIds: string[] | null;
+  email: string | null;
+  personalLine: string;
+  /** The household asked for no more emails (which cleared the address). */
+  unsubscribed: boolean;
+  people: { id: string; name: string; isChild: boolean }[];
+};
 
 let counter = 0;
 const newPerson = (): Person => ({ key: `new-${++counter}`, id: null, name: "", isChild: false });
 
 /** Adds a household, or edits one (`household` set): name, people, and the events it is invited to. */
-export function HouseholdDialog({ websiteId, events, household }: { websiteId: string; events: { id: string; name: string }[]; household?: HouseholdDraft }) {
+export function HouseholdDialog({ weddingId, events, household }: { weddingId: string; events: { id: string; name: string }[]; household?: HouseholdDraft }) {
   const t = useTranslations("guests.household");
   const tErrors = useTranslations("errors");
   const router = useRouter();
@@ -30,12 +39,16 @@ export function HouseholdDialog({ websiteId, events, household }: { websiteId: s
   const [name, setName] = useState(household?.name ?? "");
   const [people, setPeople] = useState<Person[]>(household ? household.people.map((p) => ({ ...p, key: p.id })) : [newPerson()]);
   const [invited, setInvited] = useState<string[]>(household?.invitedEventIds ?? events.map((e) => e.id));
+  const [email, setEmail] = useState(household?.email ?? "");
+  const [personalLine, setPersonalLine] = useState(household?.personalLine ?? "");
   const idPrefix = household ? `household-${household.id}` : "household-new";
 
   function reset() {
     setErrors({});
     if (!household) {
       setName("");
+      setEmail("");
+      setPersonalLine("");
       setPeople([newPerson()]);
       setInvited(events.map((e) => e.id));
     }
@@ -45,9 +58,11 @@ export function HouseholdDialog({ websiteId, events, household }: { websiteId: s
     event.preventDefault();
     start(async () => {
       const allInvited = events.every((e) => invited.includes(e.id));
-      const result = await saveHouseholdAction(websiteId, household?.id ?? null, {
+      const result = await saveHouseholdAction(weddingId, household?.id ?? null, {
         name,
         invitedEventIds: allInvited ? null : invited,
+        email,
+        personalLine,
         people: people.map(({ id, name, isChild }) => ({ id, name, isChild })),
       });
       if (!result.ok) {
@@ -111,6 +126,19 @@ export function HouseholdDialog({ websiteId, events, household }: { websiteId: s
             </Button>
             <FieldError code={errors.people} />
           </fieldset>
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-email`}>{t("email")}</Label>
+            <Input id={`${idPrefix}-email`} type="email" value={email} onChange={(e) => setEmail(e.target.value)} aria-describedby={`${idPrefix}-email-hint`} />
+            <p id={`${idPrefix}-email-hint`} className="text-xs text-muted-foreground">
+              {household?.unsubscribed ? t("emailUnsubscribed") : t("emailHint")}
+            </p>
+            <FieldError code={errors.email} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-personal-line`}>{t("personalLine")}</Label>
+            <Input id={`${idPrefix}-personal-line`} value={personalLine} onChange={(e) => setPersonalLine(e.target.value)} placeholder={t("personalLinePlaceholder")} />
+            <FieldError code={errors.personalLine} />
+          </div>
           {events.length > 0 && (
             <fieldset className="space-y-2">
               <legend className="text-sm font-medium">{t("invitedTo")}</legend>
@@ -138,5 +166,46 @@ export function HouseholdDialog({ websiteId, events, household }: { websiteId: s
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** The quick way for one person: a household named after them, with only them in it. */
+export function QuickAddPerson({ weddingId }: { weddingId: string }) {
+  const t = useTranslations("guests.household");
+  const tErrors = useTranslations("errors");
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string>();
+  const [pending, start] = useTransition();
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    start(async () => {
+      const result = await saveHouseholdAction(weddingId, null, { name, people: [{ name, isChild: false }] });
+      if (!result.ok) {
+        setError(result.fieldErrors?.name ?? result.fieldErrors?.["people.0.name"] ?? result.error ?? "unknown");
+        return;
+      }
+      toast.success(t("quickAdded", { name: name.trim() }));
+      setName("");
+      setError(undefined);
+      router.refresh();
+    });
+  }
+
+  return (
+    <form onSubmit={submit} className="flex min-w-0 flex-wrap items-start gap-2" aria-label={t("quickLabel")}>
+      <div className="min-w-0 flex-1 space-y-1">
+        <Label htmlFor="quick-person" className="sr-only">
+          {t("quickLabel")}
+        </Label>
+        <Input id="quick-person" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("quickPlaceholder")} className="min-w-48" />
+        {error && <p className="text-sm text-destructive">{tErrors(error)}</p>}
+      </div>
+      <Button type="submit" variant="secondary" disabled={pending || !name.trim()}>
+        <Plus aria-hidden />
+        {t("quickAdd")}
+      </Button>
+    </form>
   );
 }

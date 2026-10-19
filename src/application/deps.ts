@@ -1,4 +1,8 @@
 import type {
+  CardMailTemplates,
+  CardRenderer,
+  CardRepository,
+  CardTexts,
   ArchiveWriter,
   BillingRepository,
   BillingSettings,
@@ -19,6 +23,7 @@ import type {
   UploadRepository,
   UserRepository,
   WebsiteRepository,
+  WeddingRepository,
 } from "./ports";
 
 /** Everything use cases may depend on. Wired in src/composition/container.ts. */
@@ -27,6 +32,7 @@ export type Deps = {
   magicLinks: MagicLinkRepository;
   sessions: SessionRepository;
   rateLimiter: RateLimiter;
+  weddings: WeddingRepository;
   websites: WebsiteRepository;
   uploads: UploadRepository;
   storage: FileStorage;
@@ -44,5 +50,11 @@ export type Deps = {
   guests: GuestRepository;
   guestLinks: GuestLinks;
   guestMail: GuestMailTemplates;
+  cards: CardRepository;
+  cardRenderer: CardRenderer;
+  cardMail: CardMailTemplates;
+  cardTexts: CardTexts;
+  /** Emails per job run, and the pause between two (rate limit for the SMTP server). */
+  mailRate: { batchSize: number; intervalMs: number };
   appUrl: string;
 };

@@ -10,8 +10,9 @@ import { FieldError } from "@/components/forms/field-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { NOTIFY_MODES, type NotifyMode, type RsvpSettings } from "@/domain/guests";
+import { DateField } from "@/components/forms/date-field";
+import { MessageField } from "@/components/forms/message-field";
+import { NOTIFY_MODES, WHATSAPP_MESSAGE_MAX, type NotifyMode, type RsvpSettings } from "@/domain/guests";
 
 type Option = { key: string; id: string | null; label: string };
 let counter = 0;
@@ -42,13 +43,13 @@ export function OptionList({ options, onChange, label, addLabel, removeLabel }: 
 export const toOptions = (options: { id: string; label: string }[]): Option[] => options.map((o) => ({ key: o.id, id: o.id, label: o.label }));
 
 export function RsvpSettingsForm({
-  websiteId,
+  weddingId,
   settings,
   schedule,
   whatsappDefault,
   notificationsLocked,
 }: {
-  websiteId: string;
+  weddingId: string;
   settings: RsvpSettings;
   schedule: { id: string; name: string }[];
   whatsappDefault: string;
@@ -68,7 +69,7 @@ export function RsvpSettingsForm({
     event.preventDefault();
     save(
       () =>
-        saveRsvpSettingsAction(websiteId, {
+        saveRsvpSettingsAction(weddingId, {
           replyBy,
           eventIds: schedule.every((e) => eventIds.includes(e.id)) ? null : eventIds,
           meal: { eventId: mealEvent, options: mealOptions.map(({ id, label }) => ({ id, label })) },
@@ -81,12 +82,7 @@ export function RsvpSettingsForm({
 
   return (
     <form onSubmit={submit} className="space-y-8" aria-label={t("title")}>
-      <div className="space-y-2">
-        <Label htmlFor="rsvp-reply-by">{t("replyBy")}</Label>
-        <Input id="rsvp-reply-by" type="date" value={replyBy} onChange={(e) => setReplyBy(e.target.value)} className="w-auto" />
-        <p className="text-xs text-muted-foreground">{t("replyByHint")}</p>
-        <FieldError code={errors.replyBy} />
-      </div>
+      <DateField id="rsvp-reply-by" label={t("replyBy")} value={replyBy} onChange={setReplyBy} hint={t("replyByHint")} error={errors.replyBy} />
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">{t("events")}</legend>
@@ -139,12 +135,7 @@ export function RsvpSettingsForm({
         {notificationsLocked && <p className="text-xs text-muted-foreground">{t("notifyLocked")}</p>}
       </fieldset>
 
-      <div className="space-y-2">
-        <Label htmlFor="rsvp-whatsapp">{t("whatsapp")}</Label>
-        <Textarea id="rsvp-whatsapp" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder={whatsappDefault} rows={3} />
-        <p className="text-xs text-muted-foreground">{t("whatsappHint")}</p>
-        <FieldError code={errors.whatsappMessage} />
-      </div>
+      <MessageField id="rsvp-whatsapp" label={t("whatsapp")} value={whatsapp} onChange={setWhatsapp} defaultText={whatsappDefault} max={WHATSAPP_MESSAGE_MAX} hint={t("whatsappHint")} rows={3} error={errors.whatsappMessage} />
 
       <Button type="submit" disabled={pending}>
         {t("save")}

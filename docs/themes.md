@@ -67,8 +67,10 @@ copied into the image. You can also mount your own `themes/` directory as a volu
 | `assets.divider` | file name | Optional. An ornament between sections. |
 | `assets.background` | file name | Optional. A tiled background pattern. |
 
+| `cards.layouts` | array, optional | Card layouts for Save the Dates, invitations, thank-you cards and engagement announcements. See [Card layouts](#card-layouts). |
+
 Asset file names must match `^[a-z0-9][a-z0-9-]*\.(svg|png|jpg|webp)$` and live directly in the theme
-folder. Only files listed in `assets` are served (under `/theme-assets/<id>/<file>`).
+folder. Only files listed in `assets` (and the masks and ornaments of the card layouts) are served (under `/theme-assets/<id>/<file>`).
 
 The authoritative schema is `themeManifestSchema` in `src/domain/theme.ts`. `themes/theme.schema.json` is a
 JSON Schema copy for editor autocompletion.
@@ -121,6 +123,40 @@ That way one SVG works with every palette.
 
 Without a hero frame, the cover photo gets rounded corners. Without a divider, a thin line in the
 accent colour is shown.
+
+## Card layouts
+
+A theme can offer layouts for the four cards (Save the Date, invitation, thank-you card, engagement
+announcement). Couples pick a theme, a palette and a layout per card; only themes with a layout for that
+kind are offered. Like the rest of a theme, a layout is data, so a new design is a new folder, no code:
+
+```json
+"cards": {
+  "layouts": [
+    { "id": "bogen", "name": { "de": "Foto im Bogen" }, "photo": "masked", "photoMask": "frame.svg", "ornament": "divider.svg" },
+    { "id": "rahmen", "name": { "de": "Schmuckrahmen" }, "photo": "none", "ornament": "divider.svg", "border": true, "surface": "surface" },
+    { "id": "danke", "name": { "de": "Nur Text" }, "kinds": ["thankYou"], "photo": "none", "align": "left" }
+  ]
+}
+```
+
+| Field | Values | Notes |
+|---|---|---|
+| `id` | `[a-z0-9-]` | Unique within the theme. |
+| `name` | localized text | Shown in the card editor. |
+| `kinds` | `saveTheDate`, `invitation`, `thankYou`, `engagement` | Optional; all four if left out. |
+| `photo` | `masked`, `circle`, `rect`, `full`, `none` | `masked` clips the photo to `photoMask`; `full` fills the card and sets the text in white on a gradient. |
+| `photoMask` | file name | Required for `masked`: a single-colour SVG shape on transparent ground (like the hero frame, 4:5). |
+| `ornament` | file name | Optional single-colour SVG under the names, about 240 × 40, tinted in the palette's accent. |
+| `align` | `center` (default), `left` | Text alignment. |
+| `surface` | `background` (default), `surface`, `primary` | The card's colour from the palette. On `primary`, text uses the background colour. |
+| `border` | `true`, `false` (default) | A thin inner frame in the accent colour. |
+| `headingCase` | `normal` (default), `upper` | Upper-case headings and names. |
+
+Cards use the theme's fonts unless the couple picks other ones. One component draws every card, on the
+page, in the editor and in the PDF/PNG export, so what you see in the editor is what gets printed. Keep the
+SVGs to plain shapes (paths, circles, no text, no external references): the exporter renders them itself.
+Both bundled themes have three layouts for all four kinds.
 
 ## Rules for contributed themes
 

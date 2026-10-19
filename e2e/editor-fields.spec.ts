@@ -4,20 +4,9 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { login, uniqueEmail } from "./helpers/auth";
 import { addItem, fillForm, openSection } from "./helpers/editor";
+import { createWeddingWithWebsite } from "./helpers/weddings";
 
 const PHOTO = path.join(import.meta.dirname, "assets/photo.jpg");
-
-async function createWebsite(page: Page, slug: string) {
-  await page.getByRole("button", { name: "Erstellen", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Hochzeitswebsite" }).click();
-  const dialog = page.getByRole("dialog", { name: "Neue Hochzeitswebsite" });
-  await dialog.getByLabel("Eure Namen").fill("Clara & Dev");
-  await dialog.getByLabel("Hochzeitsdatum (optional)").fill("2027-06-12");
-  await dialog.getByLabel("Webadresse").fill(slug);
-  await dialog.getByRole("button", { name: "Website erstellen" }).click();
-  await expect(page).toHaveURL(/\/websites\/[0-9a-f-]{36}\/edit$/);
-  return page.url();
-}
 
 /** Opens the "new item" form, fills it and submits, leaving the form open (for error cases). */
 async function submitNewItem(page: Page, values: Parameters<typeof fillForm>[1]): Promise<Locator> {
@@ -42,40 +31,52 @@ test("every editor field reaches the public website, and invalid input explains 
 
   await test.step("log in and create a website", async () => {
     await login(page, uniqueEmail("clara"), "Clara");
-    editorUrl = await createWebsite(page, slug);
+    ({ editorUrl } = await createWeddingWithWebsite(page, slug, { names: "Clara & Dev" }));
+  });
+
+  await test.step("wedding details: names are required; the time zone is the wedding's", async () => {
+    await openSection(page, editorUrl, "Startseite");
+    await page.getByTestId("home-wedding-details").getByRole("button", { name: "Angaben ändern" }).click();
+    const details = page.getByRole("dialog", { name: "Eure Hochzeit" });
+    await details.getByLabel("Eure Namen").fill(" ");
+    await details.getByLabel("Adresse eurer Hochzeit").fill("konto");
+    await details.getByRole("button", { name: "Speichern" }).click();
+    await expect(details.getByText("Bitte fülle dieses Feld aus.")).toBeVisible();
+    await expect(details.getByText("Diese Adresse ist für Traureise reserviert.")).toBeVisible();
+    await details.getByLabel("Eure Namen").fill("Clara & Dev");
+    await details.getByLabel("Adresse eurer Hochzeit").fill(slug);
+    await details.getByLabel("Zeitzone").selectOption("Europe/London");
+    await details.getByRole("button", { name: "Speichern" }).click();
+    await expect(details).toBeHidden();
   });
 
   await test.step("home: invalid input shows errors next to the fields", async () => {
-    await openSection(page, editorUrl, "Startseite");
-    await page.getByLabel("Titel", { exact: true }).fill(" ");
     await page.getByLabel("Hashtag").fill("#clara und dev");
-    await page.getByLabel("Webadresse").fill("dashboard");
+    await page.getByLabel("Webadresse dieser Version").fill("dashboard");
     await page.getByRole("button", { name: "Speichern" }).click();
-    await expect(page.getByText("Bitte fülle dieses Feld aus.")).toBeVisible();
     await expect(page.getByText("Ein Hashtag darf nur Buchstaben, Ziffern und Unterstriche enthalten.")).toBeVisible();
     await expect(page.getByText("Diese Adresse ist für Traureise reserviert.")).toBeVisible();
 
-    await page.getByLabel("Webadresse").fill("Clara Und Dev");
+    await page.getByLabel("Webadresse dieser Version").fill("Clara Und Dev");
     await page.getByRole("button", { name: "Speichern" }).click();
     await expect(page.getByText("Nur Kleinbuchstaben, Ziffern und einzelne Bindestriche (z. B. anna-und-ben).")).toBeVisible();
   });
 
-  await test.step("home: web address, time zone and cover image upload errors", async () => {
-    await page.getByLabel("Titel", { exact: true }).fill("Clara & Dev");
+  await test.step("home: web address and cover image upload errors", async () => {
     await page.getByLabel("Hashtag").fill("#claraunddev");
-    await page.getByLabel("Webadresse").fill(`${slug}-neu`);
-    await page.getByLabel("Zeitzone").selectOption("Europe/London");
+    await page.getByLabel("Webadresse dieser Version").fill(`${slug}-neu`);
     await page.getByRole("button", { name: "Speichern" }).click();
     await expect(page.getByRole("link", { name: "Öffentliche Seite öffnen" })).toHaveAttribute("href", `/${slug}-neu`);
     await expect(page.getByText("Diese Adresse ist für Traureise reserviert.")).toHaveCount(0);
 
-    expect((await page.request.get(`/${slug}`)).status()).toBe(404);
+    // The old address is now only the wedding's, which shows its first online version.
     expect((await page.request.get(`/${slug}-neu`)).status()).toBe(200);
+    expect((await page.request.get(`/${slug}`)).status()).toBe(200);
+    expect((await page.request.get(`/${slug}-frei`)).status()).toBe(404);
 
     // Reload: the saved values come back from the server.
     await page.reload();
-    await expect(page.getByLabel("Zeitzone")).toHaveValue("Europe/London");
-    await expect(page.getByLabel("Webadresse")).toHaveValue(`${slug}-neu`);
+    await expect(page.getByLabel("Webadresse dieser Version")).toHaveValue(`${slug}-neu`);
 
     const upload = page.locator('input[type="file"]');
     await upload.setInputFiles({ name: "notizen.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.7") });
@@ -163,7 +164,7 @@ test("every editor field reaches the public website, and invalid input explains 
     // Section title errors were not saved.
     await expect(page.getByRole("heading", { name: "x".repeat(61) })).toHaveCount(0);
 
-    // The calendar entry follows the website's time zone (London, summer time = UTC+1).
+    // The calendar entry follows the wedding's time zone (London, summer time = UTC+1).
     const download = page.waitForEvent("download");
     await party.getByRole("link", { name: "Zum Kalender hinzufügen" }).click();
     const ics = await readFile(await (await download).path(), "utf8");

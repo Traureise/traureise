@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FONT_PAIRINGS, findFontPairing } from "@/domain/fonts";
-import { parseThemeManifest, resolveDesign } from "@/domain/theme";
+import { cardLayoutsFor, parseThemeManifest, resolveDesign, themeAssetFiles } from "@/domain/theme";
 
 const manifest = {
   id: "salbei",
@@ -65,5 +65,37 @@ describe("font pairings", () => {
     expect(FONT_PAIRINGS.length).toBeGreaterThanOrEqual(6);
     expect(new Set(FONT_PAIRINGS.map((p) => p.id)).size).toBe(FONT_PAIRINGS.length);
     expect(findFontPairing("klassisch")?.heading).toBeTruthy();
+  });
+});
+
+describe("card layouts", () => {
+  const layout = { id: "bogen", name: { de: "Foto im Bogen" }, photo: "masked", photoMask: "frame.svg", ornament: "divider.svg" };
+  const withCards = (cards: unknown) => parseThemeManifest({ ...manifest, cards }, "salbei");
+
+  it("are optional, so older theme folders still load", () => {
+    const parsed = parseThemeManifest(manifest, "salbei");
+    expect(parsed.ok && cardLayoutsFor(parsed.value, "invitation")).toEqual([]);
+  });
+
+  it("apply to every kind unless they list some, with defaults for the rest", () => {
+    const parsed = withCards({ layouts: [layout, { id: "schlicht", name: { de: "Schlicht" }, kinds: ["thankYou"], photo: "none" }] });
+    if (!parsed.ok) throw new Error(JSON.stringify(parsed.fieldErrors));
+    expect(cardLayoutsFor(parsed.value, "invitation").map((l) => l.id)).toEqual(["bogen"]);
+    expect(cardLayoutsFor(parsed.value, "thankYou").map((l) => l.id)).toEqual(["bogen", "schlicht"]);
+    expect(cardLayoutsFor(parsed.value, "saveTheDate")[0]).toMatchObject({ align: "center", surface: "background", border: false, headingCase: "normal" });
+  });
+
+  it("reject unknown kinds, photo styles, unsafe files and duplicate ids", () => {
+    expect(withCards({ layouts: [{ ...layout, kinds: ["menu"] }] }).ok).toBe(false);
+    expect(withCards({ layouts: [{ ...layout, photo: "hexagon" }] }).ok).toBe(false);
+    expect(withCards({ layouts: [{ ...layout, ornament: "../x.svg" }] }).ok).toBe(false);
+    expect(withCards({ layouts: [layout, layout] }).ok).toBe(false);
+    expect(withCards({ layouts: [{ ...layout, photo: "masked", photoMask: undefined }] }).ok).toBe(false);
+  });
+
+  it("count their files as theme assets (served and checked by the loader)", () => {
+    const parsed = withCards({ layouts: [{ ...layout, ornament: "blatt.svg" }] });
+    if (!parsed.ok) throw new Error("invalid");
+    expect(themeAssetFiles(parsed.value).sort()).toEqual(["blatt.svg", "divider.svg", "frame.svg", "preview.svg"]);
   });
 });

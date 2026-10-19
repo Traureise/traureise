@@ -5,8 +5,10 @@ export type PaidTier = Exclude<Tier, "website">;
 export const PAID_TIERS = ["rsvp", "invitations", "complete"] as const satisfies readonly PaidTier[];
 
 /**
- * Which tier unlocks a feature. Setting up guests is free; `rsvp` is sending: active personal links,
- * sharing them and notifications.
+ * Which tier unlocks a feature. Setting up guests and designing cards is free; the tiers unlock sending:
+ * `rsvp` active personal links, sharing them and notifications; `invitations` Save the Dates and invitations
+ * (links, export), email sending and email reminders; `complete` thank-you cards and the engagement announcement.
+ * Extra versions of an item need the tier of that item; an extra website needs any paid tier.
  */
 export const FEATURE_TIERS = {
   website: "website",
@@ -16,14 +18,23 @@ export const FEATURE_TIERS = {
   polls: "website",
   mealChoices: "website",
   rsvp: "rsvp",
-  invitations: "invitations",
   saveTheDates: "invitations",
-  cards: "complete",
+  invitations: "invitations",
+  emailSending: "invitations",
+  emailReminders: "invitations",
+  thankYouCards: "complete",
+  engagementCards: "complete",
+  // More than one version of an item, for different audiences (the first of each is free).
+  websiteVersions: "rsvp",
+  saveTheDateVersions: "invitations",
+  invitationVersions: "invitations",
+  thankYouVersions: "complete",
+  engagementVersions: "complete",
 } as const satisfies Record<string, Tier>;
 export type Feature = keyof typeof FEATURE_TIERS;
 
 /** Tiers whose features all exist. A tier is only sold once it is released. */
-const RELEASED_TIERS: readonly Tier[] = ["website", "rsvp"];
+const RELEASED_TIERS: readonly Tier[] = ["website", "rsvp", "invitations", "complete"];
 
 export type Entitlement = { tier: PaidTier; purchaseRef: string; validUntil: Date; revokedAt: Date | null };
 
@@ -70,7 +81,28 @@ export function isTierReleased(tier: Tier, unlocked: readonly Tier[] = []): bool
   return RELEASED_TIERS.includes(tier) || unlocked.includes(tier);
 }
 
-/** Tiers a website can buy now: released, with a product, and above what it already has. */
+/**
+ * What a wedding has already paid counts towards a higher tier: the listed price of the highest tier it still
+ * holds (that price already covers the lower tiers bought before it). Revoked and expired purchases count nothing.
+ */
+export function upgradeCreditCents(offers: readonly TierOffer[], entitlements: readonly Entitlement[], now: Date): number {
+  const held = activeTier(entitlements, now);
+  return offers.find((o) => o.tier === held)?.priceCents ?? 0;
+}
+
+export type CheckoutPrice = { dueCents: number; creditCents: number };
+
+/** The price of `tier` for a wedding: the listed price minus its upgrade credit. */
+export function checkoutPrice(tier: PaidTier, offers: readonly TierOffer[], entitlements: readonly Entitlement[], now: Date): CheckoutPrice {
+  const creditCents = upgradeCreditCents(offers, entitlements, now);
+  const listed = offers.find((o) => o.tier === tier)?.priceCents ?? 0;
+  return { dueCents: Math.max(0, listed - creditCents), creditCents };
+}
+
+/** The payment provider takes no reduced price below one whole euro. */
+export const MIN_UPGRADE_CENTS = 100;
+
+/** Tiers a website can buy now: released, with a product, above what it already has, and an upgrade worth at least a euro. */
 export function sellableTiers(
   offers: readonly TierOffer[],
   unlocked: readonly Tier[],
@@ -78,7 +110,13 @@ export function sellableTiers(
   now = new Date(),
 ): PaidTier[] {
   const current = rank(activeTier(entitlements, now));
-  return offers.filter((o) => o.productId && isTierReleased(o.tier, unlocked) && rank(o.tier) > current).map((o) => o.tier);
+  return offers
+    .filter((o) => o.productId && isTierReleased(o.tier, unlocked) && rank(o.tier) > current)
+    .filter((o) => {
+      const price = checkoutPrice(o.tier, offers, entitlements, now);
+      return price.creditCents === 0 || price.dueCents >= MIN_UPGRADE_CENTS;
+    })
+    .map((o) => o.tier);
 }
 
 export type PricingRow = { tier: Tier; priceCents: number; status: "included" | "available" | "comingSoon" };

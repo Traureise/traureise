@@ -15,7 +15,7 @@ import type { Poll, PollScope } from "@/domain/guests";
 import { blankOption, OptionList, toOptions } from "./rsvp-settings-form";
 
 /** Creates a poll, or edits one (`poll` set). */
-export function PollForm({ websiteId, poll, onDone }: { websiteId: string; poll?: Poll; onDone: () => void }) {
+export function PollForm({ weddingId, poll, onDone }: { weddingId: string; poll?: Poll; onDone: () => void }) {
   const t = useTranslations("guests.polls");
   const router = useRouter();
   const { pending, errors, save } = useSave();
@@ -29,7 +29,7 @@ export function PollForm({ websiteId, poll, onDone }: { websiteId: string; poll?
   function submit(event: React.FormEvent) {
     event.preventDefault();
     save(
-      () => savePollAction(websiteId, poll?.id ?? null, { question, options: options.map(({ id, label }) => ({ id, label })), multiple, allowOther, per }),
+      () => savePollAction(weddingId, poll?.id ?? null, { question, options: options.map(({ id, label }) => ({ id, label })), multiple, allowOther, per }),
       () => {
         router.refresh();
         onDone();
@@ -80,7 +80,7 @@ export function PollForm({ websiteId, poll, onDone }: { websiteId: string; poll?
   );
 }
 
-export function PollList({ websiteId, polls }: { websiteId: string; polls: Poll[] }) {
+export function PollList({ weddingId, polls }: { weddingId: string; polls: Poll[] }) {
   const t = useTranslations("guests.polls");
   const router = useRouter();
   const [editing, setEditing] = useState<string | null>(null);
@@ -91,7 +91,7 @@ export function PollList({ websiteId, polls }: { websiteId: string; polls: Poll[
         {polls.map((poll) => (
           <li key={poll.id} data-testid="poll">
             {editing === poll.id ? (
-              <PollForm websiteId={websiteId} poll={poll} onDone={() => setEditing(null)} />
+              <PollForm weddingId={weddingId} poll={poll} onDone={() => setEditing(null)} />
             ) : (
               <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-background p-4">
                 <div className="flex-1">
@@ -109,7 +109,7 @@ export function PollList({ websiteId, polls }: { websiteId: string; polls: Poll[
                   onClick={() => {
                     if (!window.confirm(t("confirmDelete", { question: poll.question }))) return;
                     start(async () => {
-                      await deletePollAction(websiteId, poll.id);
+                      await deletePollAction(weddingId, poll.id);
                       toast.success(t("deleted"));
                       router.refresh();
                     });
@@ -124,7 +124,7 @@ export function PollList({ websiteId, polls }: { websiteId: string; polls: Poll[
         ))}
       </ul>
       {editing === "new" ? (
-        <PollForm websiteId={websiteId} onDone={() => setEditing(null)} />
+        <PollForm weddingId={weddingId} onDone={() => setEditing(null)} />
       ) : (
         <Button type="button" variant="outline" onClick={() => setEditing("new")}>
           <Plus aria-hidden />

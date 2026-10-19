@@ -11,13 +11,13 @@ import { uploadUrl } from "@/lib/format";
 
 /** Uploads immediately (re-encoded, EXIF stripped on the server) and reports the new key. */
 export function ImageField({
-  websiteId,
+  weddingId,
   label,
   value,
   onChange,
   error,
 }: {
-  websiteId: string;
+  weddingId: string;
   label: string;
   value: string | null;
   onChange: (key: string | null) => void;
@@ -40,7 +40,7 @@ export function ImageField({
     form.set("file", file);
     start(async () => {
       try {
-        const result = await uploadImageAction(websiteId, form);
+        const result = await uploadImageAction(weddingId, form);
         if (result.ok) {
           setUploadError(undefined);
           onChange(result.data);

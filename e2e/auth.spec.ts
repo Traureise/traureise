@@ -5,7 +5,8 @@ import { watchInbox } from "./helpers/mailpit";
 test("first login creates an account, asks for the first name, and logout ends the session", async ({ page }) => {
   const email = uniqueEmail("clara");
   await login(page, email, "Clara");
-  await expect(page.getByRole("heading", { name: "Willkommen, Clara" })).toBeVisible();
+  // Without a wedding yet, the first page is the Hochzeit form.
+  await expect(page.getByRole("heading", { level: 1, name: "Eure Hochzeit" })).toBeVisible();
 
   await page.getByRole("button", { name: "Abmelden" }).click();
   await expect(page).toHaveURL(/\/$/);
@@ -14,7 +15,7 @@ test("first login creates an account, asks for the first name, and logout ends t
 
   // Second login: no name step any more.
   await login(page, email);
-  await expect(page.getByRole("heading", { name: "Willkommen, Clara" })).toBeVisible();
+  await expect(page).toHaveURL(/\/hochzeiten\/neu$/);
 });
 
 test("a magic link works only once", async ({ page, browser }) => {
@@ -44,7 +45,7 @@ test("invalid email addresses are rejected", async ({ page }) => {
 });
 
 test("private pages require a login", async ({ page }) => {
-  for (const path of ["/dashboard", "/websites/00000000-0000-0000-0000-000000000000/edit", "/willkommen"]) {
+  for (const path of ["/dashboard", "/hochzeiten", "/hochzeiten/neu", "/hochzeiten/00000000-0000-0000-0000-000000000000", "/hochzeiten/00000000-0000-0000-0000-000000000000/gaeste", "/willkommen"]) {
     await page.goto(path);
     await expect(page).toHaveURL(/\/login$/);
   }

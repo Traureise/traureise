@@ -2,8 +2,9 @@ import { unzipSync } from "fflate";
 import type { Browser, Locator, Page } from "@playwright/test";
 import { expect, recordForeignRequests, test } from "./fixtures";
 import { login, uniqueEmail } from "./helpers/auth";
+import { captureWindowOpen, openedUrls } from "./helpers/cards";
 import { createWebsite } from "./helpers/editor";
-import { addEvent, addHousehold, daysUntil, guestLink, guestsUrl, household, runGuestJobs, setClockOffset, websiteIdOf } from "./helpers/guests";
+import { addEvent, addHousehold, daysUntil, guestLink, guestsUrl, household, runGuestJobs, setClockOffset, weddingIdOf } from "./helpers/guests";
 import { waitForMail } from "./helpers/mailpit";
 
 /** A guest opens their link in a browser of their own: no session, and no third-party requests either. */
@@ -30,6 +31,7 @@ test("a couple invites households, guests answer through their links, and the co
   let editorUrl = "";
   let weberLink = "";
   let muellerLink = "";
+  await captureWindowOpen(page);
 
   await test.step("the couple sets up events, households, RSVP settings and polls for free", async () => {
     await login(page, email, "Nora");
@@ -104,8 +106,8 @@ test("a couple invites households, guests answer through their links, and the co
     weberLink = await guestLink(page, "Familie Weber");
     muellerLink = await guestLink(page, "Müller");
     expect(weberLink).not.toBe(muellerLink);
-    const whatsapp = household(page, "Familie Weber").getByRole("link", { name: "WhatsApp" });
-    const href = (await whatsapp.getAttribute("href"))!;
+    await household(page, "Familie Weber").getByRole("button", { name: "WhatsApp" }).click();
+    const href = (await openedUrls(page)).at(-1)!;
     expect(href.startsWith("https://wa.me/?text=")).toBe(true);
     const text = decodeURIComponent(href.slice("https://wa.me/?text=".length));
     expect(text).toContain("Hallo Familie Weber, wir heiraten!");
@@ -245,7 +247,7 @@ test("a couple invites households, guests answer through their links, and the co
   await test.step("the account export contains the guest list and answers", async () => {
     const zip = unzipSync(new Uint8Array(await (await page.request.get("/konto/export")).body()));
     const data = JSON.parse(new TextDecoder().decode(zip["data.json"]));
-    const guests = data.websites[0].guests;
+    const guests = data.weddings[0].guests;
     expect(guests.settings).toMatchObject({ replyBy: "2027-05-01", notify: "each" });
     expect(guests.polls.map((p: { question: string }) => p.question)).toEqual(["Musikwunsch?", "Braucht ihr den Shuttle?"]);
     const weber = guests.households.find((h: { name: string }) => h.name === "Familie Weber");
@@ -276,7 +278,7 @@ test("12 months after the wedding the guest data is deleted, after a warning 30 
   await page.goto(guestsUrl(editorUrl));
   await addHousehold(page, "Familie Kern", [{ name: "Eva" }]);
   const link = await guestLink(page, "Familie Kern");
-  const websiteId = websiteIdOf(`${editorUrl}/`);
+  const websiteId = weddingIdOf(editorUrl);
   const end = "2028-06-13T00:00:00Z";
 
   try {

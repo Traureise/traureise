@@ -11,30 +11,15 @@ describe("email", () => {
 });
 
 describe("parseHome", () => {
-  const home = {
-    title: "Anna & Ben",
-    weddingDate: "2027-06-12",
-    location: "Beispielstadt",
-    welcomeMessage: "Schön, dass ihr da seid.",
-    hashtag: "#annaundben",
-    showCountdown: true,
-    timezone: "Europe/Berlin",
-  };
+  const home = { welcomeMessage: "Schön, dass ihr da seid.", hashtag: "#annaundben", showCountdown: true };
 
-  it("accepts a complete home section and strips the hashtag sign", () => {
-    const result = parseHome(home);
-    expect(result.ok && result.value).toMatchObject({ title: "Anna & Ben", hashtag: "annaundben" });
+  it("is the website version's own part: welcome text, hashtag and countdown (names, date and place are the wedding's)", () => {
+    const result = parseHome({ ...home, title: "ignored", weddingDate: "2027-06-12" });
+    expect(result.ok && result.value).toEqual({ welcomeMessage: "Schön, dass ihr da seid.", hashtag: "annaundben", showCountdown: true });
   });
 
-  it("treats empty date and location as not decided yet", () => {
-    const result = parseHome({ ...home, weddingDate: "", location: "  " });
-    expect(result.ok && result.value).toMatchObject({ weddingDate: null, location: null });
-  });
-
-  it("rejects an empty title, an impossible date and an unknown timezone", () => {
-    expect(parseHome({ ...home, title: " " }).ok).toBe(false);
-    expect(parseHome({ ...home, weddingDate: "2027-02-30" }).ok).toBe(false);
-    expect(parseHome({ ...home, timezone: "Mars/Olympus" }).ok).toBe(false);
+  it("rejects an invalid hashtag", () => {
+    expect(parseHome({ ...home, hashtag: "#anna ben" }).ok).toBe(false);
   });
 
   it("defaults to Berlin time", () => {

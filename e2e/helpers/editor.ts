@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { createWeddingWithWebsite } from "./weddings";
 
 export type FieldValue = string | { select: string } | { file: string };
 export type Values = Record<string, FieldValue>;
@@ -47,7 +48,7 @@ export async function deleteItem(page: Page, headline: string) {
 }
 
 export async function expectItems(page: Page, headlines: string[]) {
-  await expect(items(page)).toHaveText(headlines);
+  await expect(items(page).getByTestId("item-headline")).toHaveText(headlines);
 }
 
 export async function openSection(page: Page, editorUrl: string, name: string) {
@@ -75,15 +76,7 @@ export async function renameSection(page: Page, sectionId: string, title: string
   await expect(page.getByTestId("site-preview").getByTestId(`site-section-${sectionId}`).getByRole("heading", { level: 2 })).toHaveText(title);
 }
 
-/** Creates a website from the dashboard and returns the editor URL. */
+/** A new wedding whose (published) website has this address; returns the website editor's URL. */
 export async function createWebsite(page: Page, slug: string, weddingDate = "2027-06-12") {
-  await page.getByRole("button", { name: "Erstellen", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Hochzeitswebsite" }).click();
-  const dialog = page.getByRole("dialog", { name: "Neue Hochzeitswebsite" });
-  await dialog.getByLabel("Eure Namen").fill("Anna & Ben");
-  await dialog.getByLabel("Hochzeitsdatum (optional)").fill(weddingDate);
-  await dialog.getByLabel("Webadresse").fill(slug);
-  await dialog.getByRole("button", { name: "Website erstellen" }).click();
-  await expect(page).toHaveURL(/\/websites\/[0-9a-f-]{36}\/edit$/);
-  return page.url();
+  return (await createWeddingWithWebsite(page, slug, { date: weddingDate })).editorUrl;
 }

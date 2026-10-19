@@ -1,21 +1,43 @@
-/* Fonts available to wedding websites (see src/domain/fonts.ts). Self-hosted, SIL Open Font License. */
+/* Fonts available to wedding websites (see src/domain/fonts.ts). Self-hosted, SIL Open Font License.
+   latin-ext covers names like Łukasz or Dvořák; browsers only fetch it when such a letter appears.
+   The card exporter loads the same weights (CARD_FONT_WEIGHTS in src/infrastructure/cards/renderer.tsx). */
 @import "@fontsource/cormorant-garamond/latin-500.css";
+@import "@fontsource/cormorant-garamond/latin-ext-500.css";
 @import "@fontsource/cormorant-garamond/latin-600.css";
+@import "@fontsource/cormorant-garamond/latin-ext-600.css";
 @import "@fontsource/source-sans-3/latin-400.css";
+@import "@fontsource/source-sans-3/latin-ext-400.css";
 @import "@fontsource/source-sans-3/latin-600.css";
+@import "@fontsource/source-sans-3/latin-ext-600.css";
 @import "@fontsource/great-vibes/latin-400.css";
+@import "@fontsource/great-vibes/latin-ext-400.css";
 @import "@fontsource/lora/latin-400.css";
+@import "@fontsource/lora/latin-ext-400.css";
 @import "@fontsource/lora/latin-600.css";
+@import "@fontsource/lora/latin-ext-600.css";
 @import "@fontsource/josefin-sans/latin-400.css";
+@import "@fontsource/josefin-sans/latin-ext-400.css";
 @import "@fontsource/josefin-sans/latin-600.css";
+@import "@fontsource/josefin-sans/latin-ext-600.css";
 @import "@fontsource/work-sans/latin-400.css";
+@import "@fontsource/work-sans/latin-ext-400.css";
 @import "@fontsource/work-sans/latin-600.css";
+@import "@fontsource/work-sans/latin-ext-600.css";
 @import "@fontsource/playfair-display/latin-500.css";
+@import "@fontsource/playfair-display/latin-ext-500.css";
 @import "@fontsource/nunito-sans/latin-400.css";
+@import "@fontsource/nunito-sans/latin-ext-400.css";
 @import "@fontsource/nunito-sans/latin-700.css";
+@import "@fontsource/nunito-sans/latin-ext-700.css";
 @import "@fontsource/parisienne/latin-400.css";
+@import "@fontsource/parisienne/latin-ext-400.css";
 @import "@fontsource/raleway/latin-400.css";
+@import "@fontsource/raleway/latin-ext-400.css";
 @import "@fontsource/raleway/latin-600.css";
+@import "@fontsource/raleway/latin-ext-600.css";
 @import "@fontsource/dm-serif-display/latin-400.css";
+@import "@fontsource/dm-serif-display/latin-ext-400.css";
 @import "@fontsource/dm-sans/latin-400.css";
+@import "@fontsource/dm-sans/latin-ext-400.css";
 @import "@fontsource/dm-sans/latin-600.css";
+@import "@fontsource/dm-sans/latin-ext-600.css";

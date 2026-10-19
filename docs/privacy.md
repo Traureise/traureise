@@ -15,6 +15,9 @@ obligations as an operator; have your own privacy policy reviewed.
 | Website content and uploaded photos | The wedding website | Until the website or account is deleted |
 | Guest list: households, names, child flag, answers (attendance, events, meal, allergies, poll answers), requests to bring someone, messages | RSVP for the couple | Until the couple deletes them, the website or the account is deleted, or automatically at the end of the RSVP package (12 months after the wedding) |
 | Hash of each household's link | Finding the household behind a link | As long as the household |
+| A household's email address (optional) and personal line for the thank-you card | Cards and reminders by email; the thank-you card | With the guest list; an unsubscribe clears the address at once |
+| Per card and household: left out, when and how it was sent (email, WhatsApp, copied link), email errors, reminders sent, when it was first opened | The couple's overview of who got and opened which card | With the guest list |
+| Cards: design, texts, photo | The cards | Until the card, website or account is deleted |
 | Rate-limit entries for answers (link hash or client address, time) | Protection against abuse | Deleted with the next answer or login request once older than 15 minutes |
 
 Allergies and intolerances can be health data (Art. 9 DSGVO). They are only asked for so the couple can
@@ -24,6 +27,10 @@ sends `Referrer-Policy: no-referrer` and `noindex`. See [Guests and RSVP](guests
 
 Photos are re-encoded on upload, which strips EXIF data such as GPS positions and camera details.
 Deleting a website deletes its photos from storage.
+
+"Opened" is recorded when the household's own page shows a card (the envelope is opened), by the page
+itself. Emails carry no tracking pixel, no read receipt and no wrapped links; the card image is attached,
+not loaded from a server. See [ADR 0022](adr/0022-opened-status-without-tracking.md).
 
 ## Cookies
 
@@ -44,8 +51,9 @@ and its reasons are in [ADR 0005](adr/0005-gdpr-no-runtime-third-party-requests.
 
 ## Your processors
 
-What leaves your server depends on your configuration: your SMTP provider (login emails, and RSVP
-notifications to the couple, which contain guests' names, answers and messages) and, if you
+What leaves your server depends on your configuration: your SMTP provider (login emails, RSVP
+notifications to the couple, which contain guests' names, answers and messages, and cards and reminders to
+guests' email addresses) and, if you
 use it, your S3 provider (photos). Prefer EU providers and sign data processing agreements with them.
 
 ## Cookies, legal pages and account rights

@@ -21,5 +21,12 @@
     }
   ],
   "fonts": { "defaultPairing": "klassisch" },
-  "assets": { "preview": "preview.svg", "heroFrame": "frame.svg", "divider": "divider.svg" }
+  "assets": { "preview": "preview.svg", "heroFrame": "frame.svg", "divider": "divider.svg" },
+  "cards": {
+    "layouts": [
+      { "id": "bogen", "name": { "de": "Foto im Bogen", "en": "Arched photo" }, "photo": "masked", "photoMask": "frame.svg", "ornament": "divider.svg" },
+      { "id": "rahmen", "name": { "de": "Schmuckrahmen", "en": "Framed" }, "photo": "none", "ornament": "divider.svg", "border": true, "surface": "surface" },
+      { "id": "vollbild", "name": { "de": "Vollbild", "en": "Full photo" }, "photo": "full", "ornament": "divider.svg" }
+    ]
+  }
 }

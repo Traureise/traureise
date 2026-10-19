@@ -9,9 +9,7 @@ export function daysUntil(isoDate: string, now: Date, timeZone: string): number 
   return Math.round((dateFromIso(isoDate).getTime() - dateFromIso(today).getTime()) / 86_400_000);
 }
 
-export function uploadUrl(key: string): string {
-  return `/uploads/${key}`;
-}
+export { uploadPath as uploadUrl } from "@/domain/images";
 
 export function themeAssetUrl(themeId: string, file: string): string {
   return `/theme-assets/${themeId}/${file}`;

@@ -35,6 +35,37 @@
       "body": "Das RSVP-Paket für „{title}“ endet bald. Am {date} löschen wir die Gästeliste mit allen Antworten automatisch, so wie es in unserer Datenschutzerklärung steht.",
       "hint": "Wenn ihr die Antworten behalten wollt, ladet vorher auf der Gäste-Seite die CSV-Datei herunter.",
       "button": "Zur Gästeliste"
+    },
+    "card": {
+      "subject": {
+        "saveTheDate": "Save the Date von {couple}",
+        "invitation": "Einladung zur Hochzeit von {couple}",
+        "thankYou": "Ein Dankeschön von {couple}",
+        "engagement": "{couple} haben sich verlobt"
+      },
+      "imageAlt": {
+        "saveTheDate": "Save the Date von {couple}",
+        "invitation": "Einladung von {couple}",
+        "thankYou": "Dankeskarte von {couple}",
+        "engagement": "Verlobungsanzeige von {couple}"
+      },
+      "button": {
+        "saveTheDate": "Karte ansehen",
+        "invitation": "Zur Einladung und Antwort",
+        "thankYou": "Karte ansehen",
+        "engagement": "Karte ansehen"
+      },
+      "linkHint": "Der Link gehört zu {household}. Ihr könnt ihn im Haushalt weitergeben."
+    },
+    "reminder": {
+      "subject": "Erinnerung: Antwort für die Hochzeit von {couple}",
+      "replyBy": "Bitte antwortet bis zum {date}.",
+      "button": "Jetzt antworten"
+    },
+    "guestFooter": {
+      "sender": "Diese E-Mail hat Traureise im Auftrag von {couple} verschickt, weil sie euch auf ihre Gästeliste gesetzt haben. Wenn ihr antwortet, geht eure Antwort direkt an {couple}.",
+      "unsubscribe": "Keine E-Mails mehr zu dieser Hochzeit: {url}",
+      "unsubscribeLink": "Keine E-Mails mehr zu dieser Hochzeit"
     }
   },
   "landing": {
@@ -60,7 +91,8 @@
     "firstNameLabel": "Vorname",
     "continue": "Weiter",
     "logout": "Abmelden",
-    "account": "Konto"
+    "account": "Konto",
+    "weddings": "Hochzeiten"
   },
   "errors": {
     "required": "Bitte fülle dieses Feld aus.",
@@ -100,81 +132,18 @@
     "invalid_person": "Diese Person gehört nicht zu diesem Haushalt.",
     "invalid_input": "Diese Antwort konnten wir nicht lesen. Bitte lade die Seite neu.",
     "inactive": "Dieser Link ist noch nicht aktiv.",
-    "closed": "Die Antwortfrist ist vorbei."
-  },
-  "dashboard": {
-    "title": "Dashboard",
-    "greeting": "Willkommen, {name}",
-    "create": "Erstellen",
-    "createMenu": {
-      "website": "Hochzeitswebsite",
-      "invitation": "Einladung",
-      "saveTheDate": "Save the Date",
-      "thankYou": "Dankeskarte",
-      "engagement": "Verlobungsanzeige"
-    },
-    "tabs": {
-      "websites": "Hochzeitswebsites",
-      "saveTheDates": "Save the Dates",
-      "invitations": "Einladungen",
-      "cards": "Karten",
-      "archived": "Archiviert"
-    },
-    "empty": {
-      "websites": "Hier erscheint eure Hochzeitswebsite",
-      "saveTheDates": "Deine Save the Dates erscheinen hier",
-      "invitations": "Deine Einladungen erscheinen hier",
-      "cards": "Deine Karten erscheinen hier",
-      "archived": "Archivierte Entwürfe erscheinen hier",
-      "comingSoon": "Diese Funktion folgt in einer der nächsten Versionen."
-    },
-    "createFirst": "Hochzeitswebsite erstellen",
-    "card": {
-      "dateOpen": "Datum noch offen",
-      "locationOpen": "Ort noch offen",
-      "view": "Ansehen",
-      "edit": "Bearbeiten",
-      "share": "Teilen",
-      "delete": "Löschen",
-      "coverAlt": "Titelbild von {title}",
-      "plan": "Paket: {tier}",
-      "upgrade": "Paket wählen",
-      "guests": "Gäste"
-    },
-    "deleteDialog": {
-      "title": "Website löschen?",
-      "body": "„{title}“ wird mit allen Inhalten und Bildern endgültig gelöscht. Gäste erreichen die Seite danach nicht mehr.",
-      "cancel": "Abbrechen",
-      "confirm": "Endgültig löschen",
-      "done": "Website gelöscht"
-    },
-    "share": {
-      "title": "Website teilen",
-      "qrAlt": "QR-Code für {url}",
-      "download": "QR-Code herunterladen",
-      "copyQr": "QR-Code kopieren",
-      "qrCopied": "QR-Code kopiert",
-      "copyLink": "Link kopieren",
-      "linkCopied": "Link kopiert",
-      "copyFailed": "Kopieren hat nicht geklappt. Bitte markiere den Link und kopiere ihn selbst.",
-      "urlLabel": "Link zur Website"
-    },
-    "createDialog": {
-      "title": "Neue Hochzeitswebsite",
-      "lead": "Ihr könnt alles später noch ändern.",
-      "titleLabel": "Eure Namen",
-      "titlePlaceholder": "Anna & Ben",
-      "dateLabel": "Hochzeitsdatum (optional)",
-      "slugLabel": "Webadresse",
-      "slugHint": "Leer lassen, dann schlagen wir eine Adresse aus euren Namen vor.",
-      "themeLabel": "Theme",
-      "submit": "Website erstellen",
-      "cancel": "Abbrechen"
-    },
-    "purchaseThanks": "Danke für deinen Kauf! Sobald die Zahlung bestätigt ist, ist dein Paket bei der Website freigeschaltet."
+    "closed": "Die Antwortfrist ist vorbei.",
+    "no_email": "Dieser Haushalt hat keine E-Mail-Adresse.",
+    "excluded": "Dieser Haushalt ist bei dieser Karte ausgelassen.",
+    "locked": "Dafür braucht diese Website ein Paket.",
+    "answered": "Dieser Haushalt hat schon geantwortet.",
+    "last_version": "Die letzte Version lässt sich nicht löschen.",
+    "no_date": "Das geht, sobald eure Hochzeit ein Datum hat.",
+    "not_manual": "Nur von Hand markierte Karten lassen sich zurücksetzen.",
+    "already_sent": "Diese Karte hat der Haushalt schon."
   },
   "editor": {
-    "back": "Zurück zum Dashboard",
+    "back": "Zur Hochzeit",
     "backToOverview": "Zurück zur Übersicht",
     "preview": "Vorschau",
     "openPublic": "Öffentliche Seite öffnen",
@@ -201,17 +170,13 @@
       "replace": "Bild ersetzen",
       "remove": "Bild entfernen",
       "uploading": "Lädt hoch …",
-      "titleLabel": "Titel",
-      "dateLabel": "Hochzeitsdatum",
-      "dateOpen": "Datum noch offen",
-      "locationLabel": "Ort",
-      "locationOpen": "Ort noch offen",
       "welcomeLabel": "Begrüßung",
       "hashtagLabel": "Hashtag",
       "countdownLabel": "Countdown bis zur Hochzeit anzeigen",
-      "timezoneLabel": "Zeitzone",
-      "slugLabel": "Webadresse",
-      "slugHint": "Nur Kleinbuchstaben, Ziffern und Bindestriche."
+      "slugLabel": "Webadresse dieser Version",
+      "slugHint": "Nur Kleinbuchstaben, Ziffern und Bindestriche.",
+      "slugChangeHint": "Mit einer neuen Adresse funktionieren Links und QR-Codes zu dieser Version, die ihr schon geteilt oder gedruckt habt, nicht mehr – es gibt keine Weiterleitung. Die persönlichen Links eurer Gäste bleiben gültig.",
+      "wedding": "Namen, Datum und Ort gelten für die ganze Hochzeit."
     },
     "theme": {
       "title": "Theme",
@@ -245,7 +210,9 @@
       "deleted": "Eintrag gelöscht",
       "storyLabel": "Eure Geschichte",
       "newItem": "Neuer Eintrag",
-      "editItem": "Eintrag bearbeiten"
+      "editItem": "Eintrag bearbeiten",
+      "sharedSchedule": "Der Tagesablauf gilt für die ganze Hochzeit: Änderungen sehen alle Website-Versionen, die Einladungen und das Antwortformular.",
+      "showOnVersion": "Auf dieser Website zeigen"
     },
     "fields": {
       "image": "Bild",
@@ -266,7 +233,17 @@
       "question": "Frage",
       "answer": "Antwort",
       "chooseOption": "Bitte wählen"
-    }
+    },
+    "publish": {
+      "published": "Veröffentlicht",
+      "draft": "Entwurf: noch nicht öffentlich",
+      "publish": "Veröffentlichen",
+      "unpublish": "Offline nehmen",
+      "publishedToast": "Die Website ist online",
+      "unpublishedToast": "Die Website ist offline",
+      "offlineExtra": "Diese Version ist offline: Weitere Website-Versionen gibt es mit einem Paket."
+    },
+    "dateOpen": "Datum noch offen"
   },
   "sections": {
     "titles": {
@@ -377,17 +354,19 @@
   "pricing": {
     "title": "Preise",
     "lead": "Die Hochzeitswebsite ist kostenlos. Für mehr bezahlt ihr einmal pro Hochzeit – kein Abo, keine versteckten Kosten.",
-    "note": "Einmalpreise pro Hochzeit, inkl. MwSt. Ein Paket gilt bis 12 Monate nach eurem Hochzeitstag. Verkauf und Rechnung über unseren Zahlungsdienstleister.",
+    "note": "Einmalpreise pro Hochzeit, inkl. MwSt. Ein Paket gilt bis 12 Monate nach eurem Hochzeitstag. Wechselt ihr später in ein größeres Paket, zahlt ihr nur die Differenz: Was ihr für die Hochzeit schon bezahlt habt, wird angerechnet. Verkauf und Rechnung über unseren Zahlungsdienstleister.",
     "free": "kostenlos",
     "price": "{price, number, ::currency/EUR precision-integer}",
     "once": "einmalig",
     "included": "Immer dabei",
     "comingSoon": "bald verfügbar",
     "buy": "Jetzt kaufen",
-    "websiteLabel": "Für welche Website?",
+    "websiteLabel": "Für welche Hochzeit?",
+    "planOption": "{title} · {price, number, ::currency/EUR precision-integer}",
+    "planOptionCredit": "{title} · {price, number, ::currency/EUR precision-integer} ({credit, number, ::currency/EUR precision-integer} angerechnet)",
     "loginToBuy": "Anmelden, um zu kaufen",
-    "createWebsiteFirst": "Lege zuerst eine Hochzeitswebsite an.",
-    "owned": "Deine Websites haben dieses Paket schon.",
+    "createWebsiteFirst": "Legt zuerst eure Hochzeit an.",
+    "owned": "Eure Hochzeiten haben dieses Paket schon.",
     "checkoutFailed": "Die Bezahlseite konnte nicht geöffnet werden. Bitte versuch es noch einmal.",
     "tiers": {
       "website": {
@@ -413,16 +392,20 @@
         "name": "Einladungen",
         "features": [
           "Alles aus „RSVP“",
-          "Digitale Einladungen",
-          "Save the Dates per Link oder E-Mail"
+          "Save the Date und Einladung mit Umschlag, im Design eurer Wahl",
+          "Versand per Link, WhatsApp oder E-Mail",
+          "Erinnerungen per E-Mail, automatisch oder per Klick",
+          "Sehen, wer die Karte geöffnet hat",
+          "Export als PDF (A6, A5) und Bild"
         ]
       },
       "complete": {
         "name": "Komplett",
         "features": [
           "Alles aus „Einladungen“",
-          "Verlobungs- und Dankeskarten",
-          "Passende Designs für alles"
+          "Dankeskarte mit persönlicher Zeile pro Haushalt",
+          "Verlobungsanzeige mit eigenem Link",
+          "Export als PDF und Bild"
         ]
       }
     }
@@ -456,7 +439,7 @@
   },
   "guests": {
     "title": "Gäste",
-    "backToDashboard": "Zurück zum Dashboard",
+    "backToDashboard": "Zur Hochzeit",
     "editWebsite": "Website bearbeiten",
     "tabs": {
       "label": "Gäste",
@@ -535,7 +518,16 @@
       "saved": "Gespeichert",
       "confirmDelete": "„{name}“ mit allen Antworten löschen?",
       "deleted": "Haushalt gelöscht",
-      "delete": "Löschen"
+      "delete": "Löschen",
+      "email": "E-Mail-Adresse (optional)",
+      "emailHint": "Für Karten und Erinnerungen per E-Mail. Ohne Adresse verschickt ihr per Link oder WhatsApp.",
+      "emailUnsubscribed": "Dieser Haushalt hat sich von E-Mails abgemeldet. Tragt nur eine Adresse ein, wenn er euch ausdrücklich darum bittet.",
+      "personalLine": "Persönliche Zeile für die Dankeskarte (optional)",
+      "personalLinePlaceholder": "z. B. Danke für den wunderbaren Kuchen!",
+      "quickLabel": "Einzelne Person schnell hinzufügen",
+      "quickPlaceholder": "Name, z. B. Tante Erika",
+      "quickAdd": "Person hinzufügen",
+      "quickAdded": "{name} hinzugefügt"
     },
     "details": {
       "show": "Antworten ansehen",
@@ -585,7 +577,7 @@
       },
       "notifyLocked": "E-Mails verschicken wir, sobald das RSVP-Paket aktiv ist.",
       "whatsapp": "Text für WhatsApp",
-      "whatsappHint": "'{name}' wird durch den Namen des Haushalts ersetzt, der Link kommt automatisch dazu.",
+      "whatsappHint": "Der Link kommt automatisch dazu.",
       "save": "Einstellungen speichern"
     },
     "polls": {
@@ -620,12 +612,77 @@
       "sampleHousehold": "Familie Muster",
       "samplePerson1": "Alex",
       "samplePerson2": "Sam"
+    },
+    "sending": {
+      "choose": "Versand",
+      "rsvpLink": "Antwortlink",
+      "filter": "Nach Versand filtern",
+      "filters": {
+        "nicht-gesendet": "{kind} nicht gesendet",
+        "nicht-geoeffnet": "{kind} nicht geöffnet",
+        "geoeffnet": "{kind} geöffnet"
+      },
+      "counts": "{opened} von {households} Haushalten geöffnet · {sent} gesendet",
+      "unlock": "Paket freischalten",
+      "emailLocked": "E-Mail-Versand freischalten",
+      "sendAll": "Per E-Mail an alle senden ({count})",
+      "sendAllTitle": "{kind} an {count, plural, one {# Haushalt} other {# Haushalte}} per E-Mail senden?",
+      "sendAllBody": "Wir schicken die Karte an alle Haushalte mit E-Mail-Adresse, die sie noch nicht bekommen haben. Die E-Mails gehen nach und nach raus; den Stand seht ihr hier in der Liste.",
+      "sendAllConfirm": "Jetzt senden",
+      "cancel": "Abbrechen",
+      "queued": "{count, plural, one {# E-Mail wird} other {# E-Mails werden}} verschickt.",
+      "whatsapp": "WhatsApp",
+      "email": "E-Mail senden",
+      "emailQueued": "E-Mail an {household} wird verschickt.",
+      "exclude": "Auslassen",
+      "include": "Wieder einbeziehen",
+      "remind": "Erinnerung senden",
+      "reminderQueued": "Erinnerung an {household} wird verschickt.",
+      "remindAll": "Erinnerung an alle offenen ({count})",
+      "remindAllTitle": "{count, plural, one {# offenen Haushalt} other {# offene Haushalte}} erinnern?",
+      "remindAllBody": "{email, plural, =0 {} one {# Haushalt bekommt eine E-Mail. } other {# Haushalte bekommen eine E-Mail. }}{whatsapp, plural, =0 {} one {Für # Haushalt ohne E-Mail öffnet ihr danach WhatsApp.} other {Für # Haushalte ohne E-Mail öffnet ihr danach WhatsApp.}}",
+      "remindAllConfirm": "Erinnern",
+      "remindersQueued": "{count, plural, one {# Erinnerung wird} other {# Erinnerungen werden}} per E-Mail verschickt.",
+      "whatsappListTitle": "Per WhatsApp erinnern",
+      "whatsappListBody": "Diese Haushalte haben keine E-Mail-Adresse. Öffnet WhatsApp für jeden einzeln.",
+      "channelEmail": "E-Mail: {email}",
+      "channelLink": "Link oder WhatsApp",
+      "channelUnsubscribed": "Keine E-Mails gewünscht",
+      "status": {
+        "notSent": "Nicht gesendet",
+        "queued": "E-Mail wird verschickt",
+        "failed": "E-Mail fehlgeschlagen",
+        "excluded": "Ausgelassen",
+        "sent": {
+          "email": "Per E-Mail gesendet am {date}",
+          "whatsapp": "Per WhatsApp geteilt am {date}",
+          "link": "Link kopiert am {date}",
+          "manual": "Als gesendet markiert am {date}"
+        },
+        "opened": "Geöffnet am {date}"
+      },
+      "waitsForDate": "Versenden geht, sobald eure Hochzeit ein Datum hat.",
+      "setDate": "Datum eintragen",
+      "markSent": "Als gesendet markieren",
+      "markedSent": "{kind} für {household} als gesendet markiert",
+      "unmarkSent": "Doch nicht gesendet",
+      "markAll": "Alle als gesendet markieren ({count})",
+      "markAllTitle": "{kind} für {count, plural, one {# Haushalt} other {# Haushalte}} als gesendet markieren?",
+      "markAllBody": "Für Karten, die ihr selbst verschickt habt, etwa per WhatsApp vom Handy, persönlich oder per Post. Die Haushalte sehen die Karte dann auch über ihren persönlichen Link.",
+      "markAllConfirm": "Als gesendet markieren",
+      "markedAll": "{count, plural, one {# Haushalt} other {# Haushalte}} als gesendet markiert"
+    },
+    "versions": {
+      "label": "Versionen",
+      "choose": "{item}",
+      "saved": "Version für {household} gespeichert"
     }
   },
   "rsvp": {
     "pageTitle": "Eure Antwort · {title}",
     "formLabel": "Antwortformular",
     "greeting": "Hallo {household}!",
+    "answerTitle": "Eure Antwort",
     "replyBy": "Bitte antwortet bis zum {date}.",
     "previewNote": "Vorschau: So sieht das Formular für eure Gäste aus. Hier wird nichts gespeichert.",
     "closed": "Die Antwortfrist ist vorbei. Hier seht ihr eure Antwort. Wenn sich etwas ändert, meldet euch bitte direkt bei {title}.",
@@ -660,5 +717,272 @@
     "inactiveTitle": "Dieser Link ist noch nicht aktiv",
     "inactiveBody": "Hier könnt ihr bald antworten. Schaut einfach später noch einmal vorbei.",
     "allergiesHint": "Freiwillig. Nur das Brautpaar sieht diese Angabe, damit es die Küche informieren kann. Sie wird mit der Gästeliste nach der Hochzeit gelöscht."
+  },
+  "cards": {
+    "labels": {
+      "eyebrow": {
+        "saveTheDate": "Save the Date",
+        "invitation": "Einladung",
+        "thankYou": "Danke",
+        "engagement": "Wir sind verlobt"
+      },
+      "replyBy": "Bitte antwortet bis zum {date}",
+      "time": "{time} Uhr",
+      "dateTbd": "Datum folgt"
+    },
+    "defaults": {
+      "saveTheDate": {
+        "heading": "Haltet euch den Tag frei",
+        "text": "Einladung folgt",
+        "message": "Hallo {name}, merkt euch schon mal den Tag! Hier ist unser Save the Date. Liebe Grüße"
+      },
+      "invitation": {
+        "heading": "Wir heiraten",
+        "text": "Wir freuen uns sehr, wenn ihr diesen Tag mit uns feiert.",
+        "message": "Hallo {name}, hier ist eure Einladung zu unserer Hochzeit. Über den Link könnt ihr uns auch gleich antworten. Liebe Grüße"
+      },
+      "thankYou": {
+        "heading": "Von Herzen danke",
+        "text": "Danke, dass ihr unseren Tag so besonders gemacht habt.",
+        "message": "Hallo {name}, wir sagen danke! Liebe Grüße"
+      },
+      "engagement": {
+        "heading": "Wir haben uns verlobt",
+        "text": "Wir sind überglücklich und wollten es euch als Erste erzählen.",
+        "message": "Wir haben uns verlobt! Schaut euch unsere Verlobungsanzeige an."
+      }
+    },
+    "reminderMessage": "Hallo {name}, kleine Erinnerung: Sagt uns bitte über diesen Link, ob ihr zu unserer Hochzeit kommt. Liebe Grüße",
+    "sampleHousehold": "Familie Beispiel",
+    "calendarTitle": "Hochzeit von {couple}",
+    "firstVersionLabel": "Standard"
+  },
+  "letter": {
+    "to": "Für {name}",
+    "toEveryone": "Für euch",
+    "everyone": "euch",
+    "open": "Brief für {name} öffnen",
+    "hint": "Zum Öffnen tippen",
+    "label": {
+      "saveTheDate": "Save the Date von {names}",
+      "invitation": "Einladung von {names}",
+      "thankYou": "Dankeskarte von {names}",
+      "engagement": "Verlobungsanzeige von {names}"
+    },
+    "toForm": "Zur Antwort",
+    "calendar": "Zum Kalender hinzufügen",
+    "website": "Zur Website",
+    "engagementTitle": "{title} · Verlobung",
+    "inactiveTitle": "Diese Karte ist noch nicht freigeschaltet",
+    "inactiveBody": "Schaut einfach später noch einmal vorbei."
+  },
+  "unsubscribe": {
+    "title": "Keine E-Mails mehr",
+    "body": "Möchtet ihr keine E-Mails mehr zur Hochzeit von {couple} bekommen? Dann löschen wir die E-Mail-Adresse von {household} aus ihrer Gästeliste. Euer Link funktioniert weiter.",
+    "confirm": "Keine E-Mails mehr senden",
+    "done": "Erledigt: {household} bekommt keine E-Mails mehr zur Hochzeit von {couple}. Die Adresse ist gelöscht."
+  },
+  "cardKinds": {
+    "saveTheDate": "Save the Date",
+    "invitation": "Einladung",
+    "thankYou": "Dankeskarte",
+    "engagement": "Verlobungsanzeige"
+  },
+  "cardEditor": {
+    "back": "Zur Hochzeit",
+    "openPreview": "Vorschau mit Umschlag",
+    "formLabel": "Karte gestalten",
+    "preview": "Vorschau",
+    "previewTitle": "Vorschau",
+    "previewNote": "Vorschau: So sieht eure Karte für Gäste aus. Hier wird nichts gespeichert oder gezählt.",
+    "backToEditor": "Zurück zum Bearbeiten",
+    "locked": "Gestalten und Vorschau sind kostenlos. Für Links, Export und E-Mail-Versand braucht diese Website das passende Paket.",
+    "lockedLink": "Pakete ansehen",
+    "design": "Design",
+    "theme": "Theme",
+    "palette": "Farben",
+    "layout": "Layout",
+    "fonts": "Schriften",
+    "fontsDefault": "Wie im Theme",
+    "content": "Inhalt",
+    "photo": "Foto",
+    "fields": {
+      "heading": "Überschrift",
+      "names": "Eure Namen",
+      "place": "Ort",
+      "eventId": "Event aus dem Tagesablauf",
+      "time": "Uhrzeit",
+      "venue": "Ort der Feier",
+      "text": "Text",
+      "eyebrow": "Zeile über den Namen"
+    },
+    "noEvent": "Kein Event (Hochzeitsdatum)",
+    "fromSchedule": "aus dem Tagesablauf",
+    "showReplyBy": "Antwortfrist auf der Karte zeigen",
+    "showReplyByUnset": "Antwortfrist zeigen (in den Gäste-Einstellungen festlegen)",
+    "personalLineHint": "Eine persönliche Zeile pro Haushalt tragt ihr in der Gästeliste ein. In der Vorschau steht ein Beispiel.",
+    "samplePersonalLine": "Danke, dass ihr dabei wart!",
+    "sending": "Versand",
+    "envelope": "Mit Umschlag öffnen",
+    "message": "Text für WhatsApp und E-Mail",
+    "messageHint": "Für WhatsApp, E-Mail und die Gästeliste.",
+    "reminderDays": "Automatische Erinnerungen (Tage vor der Antwortfrist)",
+    "reminderDaysHint": "Zum Beispiel „14, 3“. Nur per E-Mail und nur an Haushalte, die noch nicht geantwortet haben. Leer lassen für keine automatischen Erinnerungen.",
+    "reminderMessage": "Text der Erinnerung",
+    "save": "Speichern",
+    "saving": "Speichert …",
+    "saved": "Gespeichert",
+    "dateOpen": "Datum noch offen",
+    "messageHintEngagement": "Für WhatsApp, E-Mail und die Gästeliste; beim öffentlichen Link kommt der Text vor den Link.",
+    "offlineWebsites": "Haushalte, deren Website-Version noch nicht veröffentlicht ist, bekommen auf dieser Karte keinen Link zur Website.",
+    "waitsForDate": "Noch kein Datum: Auf der Karte steht „Datum folgt“. Versenden und Exportieren geht, sobald ihr ein Datum eingetragen habt.",
+    "setDate": "Datum eintragen",
+    "versions": "Versionen",
+    "export": "Exportieren",
+    "formats": {
+      "a6": "PDF (A6)",
+      "a5": "PDF (A5)",
+      "png": "Bild (PNG)"
+    },
+    "saveAndClose": "Speichern und schließen",
+    "saveOptions": "Weitere Speicher-Optionen"
+  },
+  "forms": {
+    "messageHint": "'{name}' wird durch den Namen des Haushalts ersetzt.",
+    "messageDefault": "Leer lassen für den Standardtext.",
+    "messageCount": "{count} von {max} Zeichen",
+    "dateOptional": "Datum (optional)"
+  },
+  "share": {
+    "copyLink": "Link kopieren",
+    "copyText": "Text und Link kopieren",
+    "linkCopied": "Link kopiert",
+    "copyFailed": "Kopieren hat nicht geklappt. Bitte markiere den Link und kopiere ihn selbst.",
+    "whatsapp": "WhatsApp",
+    "whatsappShare": "Per WhatsApp teilen",
+    "title": "Website teilen",
+    "qrAlt": "QR-Code für {url}",
+    "download": "QR-Code herunterladen",
+    "copyQr": "QR-Code kopieren",
+    "qrCopied": "QR-Code kopiert",
+    "urlLabel": "Link zur Website",
+    "button": "Teilen"
+  },
+  "weddings": {
+    "listTitle": "Eure Hochzeiten",
+    "listLead": "Jede Hochzeit hat ihre eigene Gästeliste, ihre Karten, ihre Website und ihre Pakete.",
+    "new": "Neue Hochzeit",
+    "open": "Öffnen",
+    "all": "Alle Hochzeiten",
+    "switcher": "Hochzeit wechseln",
+    "breadcrumb": "Navigation",
+    "dateOpen": "Datum noch offen",
+    "form": {
+      "title": "Eure Hochzeit",
+      "lead": "Mehr brauchen wir für den Anfang nicht. Daraus entstehen eure Verlobungsanzeige, das Save the Date, die Website, die Einladung und die Dankeskarte. Alles lässt sich später ändern.",
+      "submit": "Hochzeit anlegen"
+    },
+    "fields": {
+      "titleLabel": "Eure Namen",
+      "titlePlaceholder": "Anna & Ben",
+      "hasDate": "Habt ihr schon ein Datum?",
+      "yes": "Ja",
+      "no": "Noch nicht",
+      "dateLabel": "Hochzeitsdatum",
+      "locationLabel": "Ort (optional)",
+      "timezoneLabel": "Zeitzone",
+      "slugLabel": "Adresse eurer Hochzeit",
+      "slugHint": "Für den Link der Verlobungsanzeige und den Kalendereintrag. Eure Website-Versionen haben eigene Adressen.",
+      "slugChangeHint": "Mit einer neuen Adresse funktionieren Links zur Verlobungsanzeige und zum Kalendereintrag, die ihr schon geteilt habt, nicht mehr – es gibt keine Weiterleitung. Die persönlichen Links eurer Gäste bleiben gültig."
+    },
+    "details": {
+      "open": "Angaben ändern",
+      "title": "Eure Hochzeit",
+      "lead": "Namen, Datum und Ort gelten für alle Karten und Website-Versionen. Was ihr in einer Karte selbst umgeschrieben habt, bleibt.",
+      "submit": "Speichern",
+      "cancel": "Abbrechen",
+      "saved": "Gespeichert"
+    },
+    "home": {
+      "welcome": "Schön, dass ihr wieder da seid, {names}",
+      "welcomeFirst": "Schön, dass ihr da seid, {names}",
+      "wish": "Wir wünschen euch, dass bis zum großen Tag alles ganz entspannt läuft.",
+      "countdown": "{days, plural, =0 {Heute ist der große Tag} one {Noch # Tag} other {Noch # Tage}}",
+      "dateOpen": "Datum noch offen",
+      "timeline": "Eure Schritte",
+      "when": {
+        "engagement": "Verlobung",
+        "saveTheDate": "6–12 Monate vorher",
+        "website": "Wann ihr mögt",
+        "invitation": "3–4 Monate vorher",
+        "thankYou": "Nach der Hochzeit"
+      },
+      "next": "Als Nächstes",
+      "continue": "Weitermachen",
+      "openStep": "Öffnen",
+      "done": "Erledigt",
+      "status": {
+        "engagementShared": "Geteilt · ein Link für alle",
+        "household": "{opened} von {households} Haushalten geöffnet · {sent} gesendet",
+        "noHouseholds": "Entwurf · noch keine Haushalte in der Gästeliste",
+        "waitsForDate": "Entwurf · wartet auf euer Datum",
+        "websiteOnline": "{online, plural, one {Veröffentlicht} other {# Versionen veröffentlicht}}",
+        "websiteDraft": "Entwurf · noch nicht veröffentlicht"
+      },
+      "share": "Teilen",
+      "send": "Versenden",
+      "view": "Ansehen",
+      "guests": "Gäste",
+      "guestSummary": "{households, plural, =0 {Noch keine Haushalte} one {# Haushalt} other {# Haushalte}} · {coming} Zusagen · {open} offen",
+      "guestList": "Gästeliste",
+      "plan": "Paket: {tier}",
+      "upgrade": "Paket wählen",
+      "purchaseThanks": "Danke für deinen Kauf! Sobald die Zahlung bestätigt ist, ist dein Paket für diese Hochzeit freigeschaltet.",
+      "websitePreviewAlt": "Vorschau der Website",
+      "cardPreviewAlt": "Vorschau: {item}",
+      "shareTitle": "{item} teilen",
+      "settings": "Hochzeit"
+    },
+    "delete": {
+      "button": "Hochzeit löschen",
+      "title": "Hochzeit löschen?",
+      "body": "„{title}“ wird mit allen Karten, Website-Versionen, der Gästeliste und Bildern endgültig gelöscht. Gäste erreichen ihre Links danach nicht mehr.",
+      "cancel": "Abbrechen",
+      "confirm": "Endgültig löschen",
+      "done": "Hochzeit gelöscht"
+    },
+    "versions": {
+      "label": "Versionen",
+      "menu": "Version: {label}",
+      "add": "+ Version",
+      "addItem": "Neue Version",
+      "addTitle": "Neue Version: {item}",
+      "addLead": "Zum Beispiel eine für die Familie und eine für Freunde. Wer welche Version bekommt, wählt ihr in der Gästeliste.",
+      "addLeadEngagement": "Jede Version hat ihren eigenen Link.",
+      "addLeadWebsite": "Jede Version hat ihre eigene Adresse und ist ein Entwurf, bis ihr sie veröffentlicht. In der Gästeliste wählt ihr, auf welche Version die Karten eines Haushalts verlinken.",
+      "name": "Name der Version",
+      "namePlaceholder": "Familie",
+      "copyFrom": "Kopie von",
+      "submit": "Version anlegen",
+      "cancel": "Abbrechen",
+      "locked": "Weitere Versionen gibt es mit einem Paket",
+      "created": "Version angelegt",
+      "rename": "Umbenennen",
+      "renameTitle": "Version umbenennen",
+      "save": "Speichern",
+      "renamed": "Umbenannt",
+      "delete": "Version löschen",
+      "deleteTitle": "„{label}“ löschen?",
+      "deleteBody": "Haushalte mit dieser Version bekommen danach die erste Version. Was schon gesendet wurde, bleibt gesendet.",
+      "deleteConfirm": "Endgültig löschen",
+      "deleted": "Version gelöscht"
+    },
+    "items": {
+      "engagement": "Verlobungsanzeige",
+      "saveTheDate": "Save the Date",
+      "website": "Hochzeitswebsite",
+      "invitation": "Einladung",
+      "thankYou": "Dankeskarte"
+    }
   }
 }

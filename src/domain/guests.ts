@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { localDay } from "./days";
+import { isValidEmail, normalizeEmail } from "./email";
 import { isoDate, optional, requiredText, text } from "./fields";
 import { parseWith, type FieldErrors, type Parsed } from "./result";
 
@@ -51,6 +53,12 @@ export type Household = {
   /** When the household last answered; null while open. */
   respondedAt: Date | null;
   createdAt: Date;
+  /** Optional: cards and reminders by email (v4). */
+  email: string | null;
+  /** Optional line on this household's thank-you card. */
+  personalLine: string;
+  /** Set when the household asked for no more emails (which cleared the address). */
+  unsubscribedAt: Date | null;
   people: Guest[];
   requests: GuestRequest[];
 };
@@ -58,6 +66,8 @@ export type Household = {
 export type RsvpEvent = { id: string; name: string; startDate: string; startTime: string };
 
 export const NAME_MAX = 120;
+/** The RSVP link's WhatsApp text. */
+export const WHATSAPP_MESSAGE_MAX = 500;
 export const ALLERGIES_MAX = 500;
 export const MESSAGE_MAX = 2000;
 export const OTHER_MAX = 200;
@@ -89,8 +99,6 @@ export function householdStatus(household: Pick<Household, "respondedAt" | "peop
   return household.people.some((p) => p.attending) ? "answered" : "declined";
 }
 
-const localDay = (now: Date, timeZone: string) =>
-  new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 const localHour = (now: Date, timeZone: string) => Number(new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", hourCycle: "h23" }).format(now));
 
 /** Answers can change until the end of the reply-by day in the website's timezone. */
@@ -123,7 +131,7 @@ const settingsSchema = z.object({
     .default(null)
     .transform((m) => (m && m.options.length > 0 ? m : null)),
   notify: z.enum(NOTIFY_MODES, "invalid_option").default("off"),
-  whatsappMessage: optional(z.string().trim().max(500, "too_long")).default(null),
+  whatsappMessage: optional(z.string().trim().max(WHATSAPP_MESSAGE_MAX, "too_long")).default(null),
 });
 export type RsvpSettingsInput = z.infer<typeof settingsSchema>;
 
@@ -144,9 +152,13 @@ export function parsePoll(input: unknown): Parsed<PollInput> {
   return parseWith(pollSchema, input);
 }
 
+export const PERSONAL_LINE_MAX = 300;
+
 const householdSchema = z.object({
   name: requiredText(NAME_MAX),
   invitedEventIds: ids.nullable().default(null),
+  email: optional(z.string().transform(normalizeEmail).refine(isValidEmail, "invalid_email")).default(null),
+  personalLine: text(PERSONAL_LINE_MAX),
   people: z
     .array(z.object({ id: optional(z.string().max(64)).default(null), name: text(NAME_MAX), isChild: z.boolean().default(false) }))
     .max(30)

@@ -47,9 +47,7 @@ function fold(line: string): string {
   return parts.join("\r\n ");
 }
 
-export function buildIcs(event: CalendarEvent, now: Date): string {
-  const start = toUtc(event.start, event.timeZone);
-  const end = event.end ? toUtc(event.end, event.timeZone) : new Date(start.getTime() + DEFAULT_DURATION_MS);
+function calendar(event: Pick<CalendarEvent, "uid" | "title" | "description" | "location" | "url">, times: string[], now: Date): string {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -59,8 +57,7 @@ export function buildIcs(event: CalendarEvent, now: Date): string {
     "BEGIN:VEVENT",
     `UID:${event.uid}`,
     `DTSTAMP:${formatUtc(now)}`,
-    `DTSTART:${formatUtc(start)}`,
-    `DTEND:${formatUtc(end)}`,
+    ...times,
     `SUMMARY:${escapeText(event.title)}`,
     ...(event.description ? [`DESCRIPTION:${escapeText(event.description)}`] : []),
     ...(event.location ? [`LOCATION:${escapeText(event.location)}`] : []),
@@ -69,6 +66,23 @@ export function buildIcs(event: CalendarEvent, now: Date): string {
     "END:VCALENDAR",
   ];
   return lines.map(fold).join("\r\n") + "\r\n";
+}
+
+export function buildIcs(event: CalendarEvent, now: Date): string {
+  const start = toUtc(event.start, event.timeZone);
+  const end = event.end ? toUtc(event.end, event.timeZone) : new Date(start.getTime() + DEFAULT_DURATION_MS);
+  return calendar(event, [`DTSTART:${formatUtc(start)}`, `DTEND:${formatUtc(end)}`], now);
+}
+
+/** An all-day event (the wedding day on a Save the Date, which has no time yet). */
+export function buildAllDayIcs(event: { uid: string; title: string; location?: string; date: string; url?: string }, now: Date): string {
+  const day = (date: Date) => date.toISOString().slice(0, 10).replace(/-/g, "");
+  const start = new Date(`${event.date}T00:00:00Z`);
+  return calendar(
+    { ...event, description: "", location: event.location ?? "" },
+    [`DTSTART;VALUE=DATE:${day(start)}`, `DTEND;VALUE=DATE:${day(new Date(start.getTime() + 86_400_000))}`],
+    now,
+  );
 }
 
 /** Map links go to OpenStreetMap; nothing is loaded until the guest clicks. */

@@ -58,14 +58,26 @@ rendered.
 
 ## Data model
 
-Every table holding user data cascades from `users.id`: deleting a user deletes their sessions,
-websites, sections, items and upload records. Section items are one table with a `jsonb` column whose
+Every table holding user data cascades from `users.id`: deleting a user deletes their sessions and
+weddings. Everything a couple makes cascades from `weddings.id` ([ADR 0023](adr/0023-everything-belongs-to-the-wedding.md)):
+website versions (`websites`, with their sections and items), the schedule (`wedding_events`), card versions,
+the guest list, entitlements and upload records. Section items are one table with a `jsonb` column whose
 shape is validated by the zod schemas in `src/domain/sections.ts`.
 
 The guest list (`rsvp_settings`, `rsvp_polls`, `households`, `guests`, `guest_requests`) cascades from
-`websites.id`. Households are found by the SHA-256 of their personal link's token, which is an HMAC of
+`weddings.id`. Households are found by the SHA-256 of their personal link's token, which is an HMAC of
 the household id with `APP_SECRET` ([ADR 0015](adr/0015-households-with-hashed-personal-links.md)).
 Retention and daily summaries run as `RunGuestJobs` on a timer started in `src/instrumentation.ts`
 ([ADR 0018](adr/0018-background-jobs-inside-the-app.md)).
+
+Cards (`cards`, several versions per wedding and kind) cascade from `weddings.id`. `card_deliveries` (sent,
+email claims and reminders per household and kind, whichever version went out), `card_opens` (opened, per
+version) and `household_versions` (which version a household gets) cascade from the household, so retention
+removes them with the guest list ([ADR 0024](adr/0024-versions-for-audiences.md)). One React component, `CardView`
+(`src/components/cards/card-view.tsx`), draws a card from a `CardModel` (`src/domain/cards.ts`) on the
+household page, in the editor's live preview, on the wedding's timeline, and through satori for the email image
+and the PDF/PNG exports (`src/infrastructure/cards/renderer.tsx`, [ADR 0020](adr/0020-card-rendering-and-export.md)).
+Card emails are queued in `card_deliveries` and sent by `RunMailJobs`, kicked after the request and run
+with the guest jobs ([ADR 0021](adr/0021-sending-email-on-the-couples-behalf.md)).
 
 The reasoning behind these choices is recorded in the [design decisions](adr/0001-nextjs-with-layered-architecture.md).

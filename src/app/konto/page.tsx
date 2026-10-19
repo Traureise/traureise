@@ -57,8 +57,8 @@ export default async function AccountPage() {
             ) : (
               <ul className="space-y-2">
                 {purchases.map((p) => (
-                  <li key={`${p.websiteId}-${p.tier}-${p.purchasedAt.toISOString()}`} className="text-sm" data-testid="purchase">
-                    <span className="font-medium">{t("purchases.item", { tier: tPricing(`${p.tier}.name`), website: p.websiteTitle })}</span>
+                  <li key={`${p.weddingId}-${p.tier}-${p.purchasedAt.toISOString()}`} className="text-sm" data-testid="purchase">
+                    <span className="font-medium">{t("purchases.item", { tier: tPricing(`${p.tier}.name`), website: p.weddingTitle })}</span>
                     {" · "}
                     {t("purchases.purchasedAt", { date: date(p.purchasedAt) })}
                     {" · "}

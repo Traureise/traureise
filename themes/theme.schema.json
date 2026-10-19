@@ -32,6 +32,32 @@
         "defaultPairing": { "enum": ["klassisch", "romantisch", "modern", "elegant", "verspielt", "markant", "buchsatz", "schlicht"] }
       }
     },
+    "cards": {
+      "type": "object",
+      "description": "Card layouts for Save the Dates, invitations, thank-you cards and engagement announcements (docs/themes.md).",
+      "required": ["layouts"],
+      "properties": {
+        "layouts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "photo"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+              "name": { "$ref": "#/$defs/localized" },
+              "kinds": { "type": "array", "minItems": 1, "items": { "enum": ["saveTheDate", "invitation", "thankYou", "engagement"] } },
+              "photo": { "enum": ["masked", "circle", "rect", "full", "none"] },
+              "photoMask": { "$ref": "#/$defs/file" },
+              "ornament": { "$ref": "#/$defs/file" },
+              "align": { "enum": ["center", "left"] },
+              "surface": { "enum": ["background", "surface", "primary"] },
+              "border": { "type": "boolean" },
+              "headingCase": { "enum": ["normal", "upper"] }
+            }
+          }
+        }
+      }
+    },
     "assets": {
       "type": "object",
       "required": ["preview"],

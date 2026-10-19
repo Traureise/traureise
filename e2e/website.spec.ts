@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { Page } from "@playwright/test";
 import { expect, recordForeignRequests, test } from "./fixtures";
 import { login, uniqueEmail } from "./helpers/auth";
 import {
@@ -14,6 +13,7 @@ import {
   toggleVisibility,
   type Values,
 } from "./helpers/editor";
+import { createWeddingWithWebsite, homeUrl, publishWebsite, step } from "./helpers/weddings";
 
 const COVER = path.join(import.meta.dirname, "assets/cover.jpg");
 const PHOTO = path.join(import.meta.dirname, "assets/photo.jpg");
@@ -101,40 +101,34 @@ const COLLECTIONS: CollectionCase[] = [
   },
 ];
 
-async function createWebsite(page: Page, slug: string) {
-  await page.getByRole("button", { name: "Erstellen", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Hochzeitswebsite" }).click();
-  const dialog = page.getByRole("dialog", { name: "Neue Hochzeitswebsite" });
-  await dialog.getByLabel("Eure Namen").fill("Anna & Ben");
-  await dialog.getByLabel("Hochzeitsdatum (optional)").fill("2027-06-12");
-  await dialog.getByLabel("Webadresse").fill(slug);
-  await dialog.getByRole("button", { name: "Website erstellen" }).click();
-  await expect(page).toHaveURL(/\/websites\/[0-9a-f-]{36}\/edit$/);
-  return page.url();
-}
-
 test("a couple builds, shares, restyles and deletes their wedding website", async ({ page, browser, baseURL, context, thirdPartyRequests }) => {
   test.setTimeout(6 * 60_000);
   const slug = `anna-und-ben-${Date.now()}`;
   const publicUrl = `${baseURL}/${slug}`;
   const preview = page.getByTestId("site-preview");
   let editorUrl = "";
+  let weddingId = "";
 
-  await test.step("log in and create a website", async () => {
+  await test.step("log in, create the wedding; its website is a draft until published", async () => {
     await login(page, uniqueEmail("anna"), "Anna");
-    await expect(page.getByRole("heading", { name: "Willkommen, Anna" })).toBeVisible();
-    editorUrl = await createWebsite(page, slug);
+    await expect(page.getByRole("heading", { name: "Eure Hochzeit" })).toBeVisible();
+    ({ weddingId, editorUrl } = await createWeddingWithWebsite(page, slug, { published: false }));
+    await page.goto(editorUrl);
     await expect(preview.getByTestId("site-title")).toHaveText("Anna & Ben");
     await expect(preview.getByTestId("site-location")).toHaveText("Ort noch offen");
+    expect((await page.request.get(`/${slug}`)).status()).toBe(404);
   });
 
-  await test.step("edit the home section with live preview", async () => {
+  await test.step("names, date and place are the wedding's; the home section has the rest, with live preview", async () => {
     await openSection(page, editorUrl, "Startseite");
+    await page.getByTestId("home-wedding-details").getByRole("button", { name: "Angaben ändern" }).click();
+    let details = page.getByRole("dialog", { name: "Eure Hochzeit" });
+    await details.getByLabel("Eure Namen").fill("Anna & Ben heiraten");
+    await details.getByLabel("Ort (optional)").fill("Gut Sonnenhof, Beispielstadt");
+    await details.getByRole("button", { name: "Speichern" }).click();
+    await expect(details).toBeHidden();
     await page.locator('input[type="file"]').setInputFiles(COVER);
     await expect(preview.locator("img.site-cover")).toBeVisible();
-    await page.getByLabel("Titel", { exact: true }).fill("Anna & Ben heiraten");
-    await page.getByLabel("Ort noch offen").uncheck();
-    await page.getByLabel("Ort", { exact: true }).fill("Gut Sonnenhof, Beispielstadt");
     await page.getByLabel("Begrüßung").fill("Wir freuen uns riesig auf euch!");
     await page.getByLabel("Hashtag").fill("#annaundben");
     await page.getByRole("switch", { name: "Countdown bis zur Hochzeit anzeigen" }).click();
@@ -155,13 +149,17 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
     await page.locator('input[type="file"]').setInputFiles(COVER);
     await expect(preview.locator("img.site-cover")).toBeVisible();
 
-    // Undecided date shows the placeholder.
-    await page.getByLabel("Datum noch offen").check();
-    await page.getByRole("button", { name: "Speichern" }).click();
+    // Not planned yet shows the placeholder.
+    await page.getByTestId("home-wedding-details").getByRole("button", { name: "Angaben ändern" }).click();
+    details = page.getByRole("dialog", { name: "Eure Hochzeit" });
+    await details.getByLabel("Noch nicht").check();
+    await details.getByRole("button", { name: "Speichern" }).click();
     await expect(preview.getByTestId("site-date")).toHaveText("Datum noch offen");
-    await page.getByLabel("Datum noch offen").uncheck();
-    await page.getByLabel("Hochzeitsdatum").fill("2027-06-12");
-    await page.getByRole("button", { name: "Speichern" }).click();
+    await page.getByTestId("home-wedding-details").getByRole("button", { name: "Angaben ändern" }).click();
+    details = page.getByRole("dialog", { name: "Eure Hochzeit" });
+    await details.getByLabel("Ja", { exact: true }).check();
+    await details.getByLabel("Hochzeitsdatum").fill("2027-06-12");
+    await details.getByRole("button", { name: "Speichern" }).click();
     await expect(preview.getByTestId("site-date")).toHaveText("Samstag, 12. Juni 2027");
   });
 
@@ -208,7 +206,8 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
     await expect(page.getByTestId("section-nav").getByRole("link", { name: /Momente/ })).toContainText("Sichtbar");
   });
 
-  await test.step("the public page shows exactly the visible content", async () => {
+  await test.step("the public page shows exactly the visible content once published", async () => {
+    await publishWebsite(page, editorUrl);
     const guest = await context.newPage();
     await guest.goto(`/${slug}`);
     await expect(guest).toHaveTitle("Anna & Ben heiraten");
@@ -240,14 +239,14 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
     await guest.close();
   });
 
-  await test.step("share the website from the dashboard", async () => {
+  await test.step("share the website from the wedding's home", async () => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-    await page.goto("/dashboard");
-    const card = page.getByTestId("website-card");
-    await expect(card.getByRole("heading", { name: "Anna & Ben heiraten" })).toBeVisible();
-    await expect(card).toContainText("12. Juni 2027");
-    await expect(card).toContainText("Gut Sonnenhof, Beispielstadt");
-    await expect(card.getByTestId("public-url")).toHaveText(publicUrl);
+    await page.goto(homeUrl(weddingId));
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Anna & Ben heiraten");
+    await expect(page.getByTestId("wedding-badge")).toContainText("12. Juni 2027 · Gut Sonnenhof, Beispielstadt");
+    const card = step(page, "Hochzeitswebsite");
+    await expect(card).toHaveAttribute("data-state", "done");
+    await expect(card.getByTestId("step-status")).toHaveText("Veröffentlicht");
 
     await card.getByRole("button", { name: "Teilen" }).click();
     const dialog = page.getByRole("dialog", { name: "Website teilen" });
@@ -290,32 +289,13 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
     await guest.close();
   });
 
-  await test.step("placeholder tabs show empty states", async () => {
-    await page.goto("/dashboard");
-    const expectations: [string, string][] = [
-      ["Save the Dates", "Deine Save the Dates erscheinen hier"],
-      ["Einladungen", "Deine Einladungen erscheinen hier"],
-      ["Karten", "Deine Karten erscheinen hier"],
-      ["Archiviert", "Archivierte Entwürfe erscheinen hier"],
-    ];
-    for (const [tab, text] of expectations) {
-      await page.getByRole("link", { name: tab, exact: true }).click();
-      await expect(page.getByTestId("empty-state")).toContainText(text);
-    }
-    await page.getByRole("button", { name: "Erstellen", exact: true }).click();
-    await page.getByRole("menuitem", { name: "Einladung" }).click();
-    await expect(page).toHaveURL(/tab=invitations/);
-    await expect(page.getByTestId("empty-state")).toContainText("Deine Einladungen erscheinen hier");
-  });
-
   await test.step("another user cannot see or edit the website", async () => {
     const ben = await browser.newContext({ extraHTTPHeaders: { "x-forwarded-for": "10.200.0.1" } });
     const benForeign = recordForeignRequests(ben, baseURL!);
     const benPage = await ben.newPage();
     await login(benPage, uniqueEmail("ben"), "Ben");
-    await expect(benPage.getByTestId("website-card")).toHaveCount(0);
-    for (const suffix of ["", "/home", "/faqs"]) {
-      const res = await benPage.goto(`${editorUrl}${suffix}`);
+    for (const url of [homeUrl(weddingId), `${homeUrl(weddingId)}/gaeste`, editorUrl, `${editorUrl}/home`, `${editorUrl}/faqs`]) {
+      const res = await benPage.goto(url);
       expect(res?.status()).toBe(404);
       await expect(benPage.getByRole("heading", { name: "Seite nicht gefunden" })).toBeVisible();
     }
@@ -323,14 +303,21 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
     thirdPartyRequests.push(...benForeign);
   });
 
-  await test.step("delete the website", async () => {
-    await page.goto("/dashboard");
-    await page.getByTestId("website-card").getByRole("button", { name: "Löschen" }).click();
-    const dialog = page.getByRole("alertdialog", { name: "Website löschen?" });
-    await dialog.getByRole("button", { name: "Endgültig löschen" }).click();
-    await expect(page.getByTestId("website-card")).toHaveCount(0);
-    await expect(page.getByTestId("empty-state")).toContainText("Hier erscheint eure Hochzeitswebsite");
+  await test.step("take the website offline, then delete the wedding", async () => {
+    await page.goto(editorUrl);
+    await page.getByTestId("publish-control").getByRole("button", { name: "Offline nehmen" }).click();
+    await expect(page.getByTestId("publish-control")).toHaveAttribute("data-published", "false");
     expect((await page.request.get(`/${slug}`)).status()).toBe(404);
+    await publishWebsite(page, editorUrl);
+    await page.goto(homeUrl(weddingId));
+    await page.getByRole("button", { name: "Hochzeit löschen" }).click();
+    const dialog = page.getByRole("alertdialog", { name: "Hochzeit löschen?" });
+    await dialog.getByRole("button", { name: "Endgültig löschen" }).click();
+    await expect(page).toHaveURL(/\/hochzeiten$/);
+    await expect(page.getByTestId("wedding")).toHaveCount(0);
+    expect((await page.request.get(`/${slug}`)).status()).toBe(404);
+    await page.goto("/dashboard");
+    await expect(page).toHaveURL(/\/hochzeiten\/neu$/);
   });
 
   await test.step("log out", async () => {

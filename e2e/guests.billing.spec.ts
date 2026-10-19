@@ -2,7 +2,7 @@ import type { APIRequestContext } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { login, uniqueEmail } from "./helpers/auth";
 import { createWebsite } from "./helpers/editor";
-import { addHousehold, daysUntil, guestLink, guestsUrl, household, runGuestJobs, setClockOffset, websiteIdOf } from "./helpers/guests";
+import { addHousehold, daysUntil, guestLink, guestsUrl, household, runGuestJobs, setClockOffset, weddingIdOf } from "./helpers/guests";
 
 const STUB_URL = process.env.E2E_CREEM_STUB_URL ?? "http://localhost:4010";
 
@@ -44,7 +44,7 @@ test.describe("RSVP package", () => {
       await page.getByTestId("tier-rsvp").getByRole("button", { name: "Jetzt kaufen" }).click();
       await expect(page).toHaveURL(new RegExp(`^${STUB_URL}/checkout/ch_`));
       await page.getByRole("button", { name: "Bezahlen" }).click();
-      await expect(page).toHaveURL(/\/dashboard\?kauf=danke/);
+      await expect(page).toHaveURL(/\/hochzeiten\/[0-9a-f-]{36}\?kauf=danke/);
 
       await page.goto(guestsUrl(editorUrl));
       await expect(page.getByTestId("rsvp-locked")).toHaveCount(0);
@@ -70,7 +70,7 @@ test.describe("RSVP package", () => {
     });
 
     await test.step("at the regular end date the guest data is deleted", async () => {
-      const websiteId = websiteIdOf(`${editorUrl}/`);
+      const websiteId = weddingIdOf(`${editorUrl}/`);
       try {
         await setClockOffset(page.request, baseURL!, daysUntil("2028-06-13T00:00:00Z") + 1);
         expect((await runGuestJobs(page.request, baseURL!, websiteId)).deleted).toEqual([websiteId]);

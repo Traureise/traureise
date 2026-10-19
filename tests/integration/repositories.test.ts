@@ -1,27 +1,19 @@
 import { eq, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import type { Section } from "@/application/ports";
-import { SECTION_KINDS } from "@/domain/sections";
+import { parseItem, SECTION_KINDS } from "@/domain/sections";
 import { magicLinkTokens, rateLimitHits, sectionItems, sessions, uploads, users, websiteSections } from "@/infrastructure/db/schema";
 import { DrizzleMagicLinkRepository, DrizzleSessionRepository, PostgresRateLimiter } from "@/infrastructure/repositories/auth";
 import { DrizzleUploadRepository } from "@/infrastructure/repositories/uploads";
 import { DrizzleUserRepository } from "@/infrastructure/repositories/users";
 import { DrizzleWebsiteRepository } from "@/infrastructure/repositories/websites";
-import { setupTestDatabase } from "./db";
+import { DrizzleWeddingRepository } from "@/infrastructure/repositories/weddings";
+import { seedWedding, setupTestDatabase } from "./db";
 
 const db = setupTestDatabase();
 const userRepo = new DrizzleUserRepository(db);
 const websiteRepo = new DrizzleWebsiteRepository(db);
-const sections: Section[] = SECTION_KINDS.map((kind) => ({ kind, title: null, visible: true, body: "" }));
-
-async function seedWebsite(email = "anna@example.org", slug = "anna-und-ben") {
-  const user = await userRepo.create(email);
-  const website = await websiteRepo.create(
-    { ownerId: user.id, slug, title: "Anna & Ben", weddingDate: "2027-06-12", themeId: "salbei", timezone: "Europe/Berlin" },
-    sections,
-  );
-  return { user, website };
-}
+const weddingRepo = new DrizzleWeddingRepository(db);
+const seedWebsite = (email?: string, slug?: string) => seedWedding(db, email, slug);
 
 describe("DrizzleUserRepository", () => {
   it("creates, finds and updates users; creating twice returns the same user", async () => {
@@ -86,27 +78,73 @@ describe("magic links and sessions", () => {
   });
 });
 
-describe("DrizzleWebsiteRepository", () => {
-  it("creates a website with all sections and finds it by id, slug and owner", async () => {
-    const { user, website } = await seedWebsite();
-    expect(website).toMatchObject({ slug: "anna-und-ben", weddingDate: "2027-06-12", showCountdown: false, paletteId: null });
-    expect(await websiteRepo.findBySlug("anna-und-ben")).toMatchObject({ id: website.id });
-    expect((await websiteRepo.listByOwner(user.id)).map((w) => w.id)).toEqual([website.id]);
-    expect((await websiteRepo.listSections(website.id)).map((s) => s.kind).sort()).toEqual([...SECTION_KINDS].sort());
-    expect(await websiteRepo.findById("not-a-uuid")).toBeNull();
+describe("DrizzleWeddingRepository", () => {
+  it("creates a wedding and finds it by id, slug and owner", async () => {
+    const { user, wedding } = await seedWebsite();
+    expect(wedding).toMatchObject({ slug: "anna-und-ben", title: "Anna & Ben", weddingDate: "2027-06-12", location: null, lastOpenedAt: null });
+    expect(await weddingRepo.findBySlug("anna-und-ben")).toMatchObject({ id: wedding.id });
+    expect((await weddingRepo.listByOwner(user.id)).map((w) => w.id)).toEqual([wedding.id]);
+    expect(await weddingRepo.findById("not-a-uuid")).toBeNull();
+    const at = new Date("2020-01-01T00:00:00Z");
+    expect(await weddingRepo.update(wedding.id, { location: "Kempten", weddingDate: null })).toMatchObject({ location: "Kempten", weddingDate: null });
+    await weddingRepo.markUsed(wedding.id);
+    expect((await weddingRepo.findById(wedding.id))!.lastOpenedAt!.getTime()).toBeGreaterThan(at.getTime());
   });
 
-  it("enforces unique slugs and reports them as taken", async () => {
-    const { website } = await seedWebsite();
-    expect(await websiteRepo.slugTaken("anna-und-ben")).toBe(true);
-    expect(await websiteRepo.slugTaken("anna-und-ben", website.id)).toBe(false);
+  it("reports who uses a slug: weddings and website versions share one namespace", async () => {
+    const { wedding, website } = await seedWebsite();
+    expect(await weddingRepo.slugOwners("anna-und-ben")).toEqual({ weddingIds: [wedding.id], websites: [{ id: website.id, weddingId: wedding.id }] });
+    expect(await weddingRepo.slugOwners("frei")).toEqual({ weddingIds: [], websites: [] });
     await expect(seedWebsite("ben@example.org", "anna-und-ben")).rejects.toThrow();
+  });
+
+  it("keeps the schedule as the wedding's events, in order", async () => {
+    const { wedding } = await seedWebsite();
+    const event = (name: string) => {
+      const parsed = parseItem("schedule", { eventType: "ceremony", name, startDate: "2027-06-12", startTime: "14:00" });
+      if (!parsed.ok) throw new Error("fixture");
+      return parsed.value;
+    };
+    const a = await weddingRepo.addEvent(wedding.id, event("Trauung"));
+    const b = await weddingRepo.addEvent(wedding.id, event("Feier"));
+    expect([a.position, b.position]).toEqual([0, 1]);
+    await weddingRepo.setEventOrder(wedding.id, [b.id, a.id]);
+    expect((await weddingRepo.listEvents(wedding.id)).map((e) => e.data.name)).toEqual(["Feier", "Trauung"]);
+    await weddingRepo.updateEvent(a.id, event("Standesamt"));
+    expect((await weddingRepo.findEvent(wedding.id, a.id))?.data.name).toBe("Standesamt");
+    await weddingRepo.deleteEvent(a.id);
+    expect(await weddingRepo.findEvent(wedding.id, a.id)).toBeNull();
+    expect(await weddingRepo.findEvent(wedding.id, "nope")).toBeNull();
+  });
+
+  it("deletes the wedding with its website versions, sections and events", async () => {
+    const { wedding, website } = await seedWebsite();
+    await websiteRepo.addItem(website.id, "faqs", { question: "A", answer: "1", imageKey: null });
+    await weddingRepo.delete(wedding.id);
+    expect(await websiteRepo.findById(website.id)).toBeNull();
+    expect(await db.select().from(websiteSections).where(eq(websiteSections.websiteId, website.id))).toHaveLength(0);
+    expect(await db.select().from(sectionItems).where(eq(sectionItems.websiteId, website.id))).toHaveLength(0);
+  });
+});
+
+describe("DrizzleWebsiteRepository", () => {
+  it("creates a website version with all sections and lists a wedding's versions first first", async () => {
+    const { wedding, website } = await seedWebsite();
+    expect(website).toMatchObject({ slug: "anna-und-ben", label: "Standard", position: 0, published: false, hiddenEventIds: [], showCountdown: false, paletteId: null });
+    expect(await websiteRepo.findBySlug("anna-und-ben")).toMatchObject({ id: website.id });
+    const copy = { ...website, id: undefined, createdAt: undefined, updatedAt: undefined };
+    const friends = await websiteRepo.create({ ...copy, label: "Freunde", position: 1, slug: "anna-und-ben-freunde" }, []);
+    expect((await websiteRepo.listByWedding(wedding.id)).map((w) => w.label)).toEqual(["Standard", "Freunde"]);
+    expect((await websiteRepo.listSections(website.id)).map((s) => s.kind).sort()).toEqual([...SECTION_KINDS].sort());
+    expect(await websiteRepo.listSections(friends.id)).toEqual([]);
+    expect(await websiteRepo.findById("not-a-uuid")).toBeNull();
+    await expect(websiteRepo.create({ ...copy, position: 2 }, [])).rejects.toThrow();
   });
 
   it("updates website fields and sections", async () => {
     const { website } = await seedWebsite();
-    const updated = await websiteRepo.update(website.id, { location: "Beispielstadt", weddingDate: null, showCountdown: true });
-    expect(updated).toMatchObject({ location: "Beispielstadt", weddingDate: null, showCountdown: true });
+    const updated = await websiteRepo.update(website.id, { welcomeMessage: "Hallo", published: true, hiddenEventIds: ["e1"], showCountdown: true });
+    expect(updated).toMatchObject({ welcomeMessage: "Hallo", published: true, hiddenEventIds: ["e1"], showCountdown: true });
     await websiteRepo.updateSection(website.id, "faqs", { title: "Fragen", visible: false });
     expect((await websiteRepo.listSections(website.id)).find((s) => s.kind === "faqs")).toMatchObject({ title: "Fragen", visible: false });
   });
@@ -129,7 +167,7 @@ describe("DrizzleWebsiteRepository", () => {
     expect(await websiteRepo.findItem(website.id, "nope")).toBeNull();
   });
 
-  it("deletes a website with its sections and items", async () => {
+  it("deletes a website version with its sections and items", async () => {
     const { website } = await seedWebsite();
     await websiteRepo.addItem(website.id, "faqs", { question: "A", answer: "1", imageKey: null });
     await websiteRepo.delete(website.id);
@@ -140,23 +178,23 @@ describe("DrizzleWebsiteRepository", () => {
 });
 
 describe("DrizzleUploadRepository and cascades", () => {
-  it("tracks uploads per website", async () => {
+  it("tracks uploads per wedding", async () => {
     const repo = new DrizzleUploadRepository(db);
-    const { user, website } = await seedWebsite();
-    await repo.create({ key: "k1.webp", ownerId: user.id, websiteId: website.id, contentType: "image/webp", size: 3 });
-    expect(await repo.belongsToWebsite("k1.webp", website.id)).toBe(true);
-    expect(await repo.listKeysByWebsite(website.id)).toEqual(["k1.webp"]);
+    const { user, wedding } = await seedWebsite();
+    await repo.create({ key: "k1.webp", ownerId: user.id, weddingId: wedding.id, contentType: "image/webp", size: 3 });
+    expect(await repo.belongsToWedding("k1.webp", wedding.id)).toBe(true);
+    expect(await repo.listKeysByWedding(wedding.id)).toEqual(["k1.webp"]);
     await repo.delete("k1.webp");
-    expect(await repo.belongsToWebsite("k1.webp", website.id)).toBe(false);
+    expect(await repo.belongsToWedding("k1.webp", wedding.id)).toBe(false);
   });
 
   it("removes all of a user's data when the user is deleted", async () => {
-    const { user, website } = await seedWebsite();
-    await new DrizzleUploadRepository(db).create({ key: "k1.webp", ownerId: user.id, websiteId: website.id, contentType: "image/webp", size: 3 });
+    const { user, wedding } = await seedWebsite();
+    await new DrizzleUploadRepository(db).create({ key: "k1.webp", ownerId: user.id, weddingId: wedding.id, contentType: "image/webp", size: 3 });
     await new DrizzleSessionRepository(db).create({ userId: user.id, tokenHash: "s", expiresAt: new Date() });
     await db.delete(users).where(eq(users.id, user.id));
     const counts = await db.execute<{ n: number }>(
-      sql`select (select count(*) from websites) + (select count(*) from website_sections) + (select count(*) from sessions) + (select count(*) from uploads) as n`,
+      sql`select (select count(*) from weddings) + (select count(*) from websites) + (select count(*) from website_sections) + (select count(*) from sessions) + (select count(*) from uploads) as n`,
     );
     expect(Number(counts[0]!.n)).toBe(0);
     expect(await db.select().from(uploads)).toHaveLength(0);

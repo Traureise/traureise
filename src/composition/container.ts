@@ -10,19 +10,18 @@ import {
   UpdateProfile,
   VerifyMagicLink,
 } from "@/application/auth";
-import { GetPricing, HandlePaymentWebhook, ListPurchases, ListWebsitePlans, StartCheckout } from "@/application/billing";
+import { GetPricing, HandlePaymentWebhook, ListPurchases, ListWeddingPlans, StartCheckout } from "@/application/billing";
 import type { Deps } from "@/application/deps";
 import type { BillingSettings, FileStorage, PaymentProvider } from "@/application/ports";
 import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
 import { CreemPaymentProvider } from "@/infrastructure/payments/creem";
 import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing";
-import { GetEventIcs, GetPublicWebsite } from "@/application/public";
+import { GetEventIcs, GetPublicWebsite, GetWeddingIcs } from "@/application/public";
 import {
   DecideGuestRequest,
   DeleteHousehold,
   DeletePoll,
   ExportGuestsCsv,
-  GetGuestForm,
   GetGuestFormPreview,
   GetGuestPage,
   RunGuestJobs,
@@ -32,20 +31,33 @@ import {
   SubmitGuestResponse,
 } from "@/application/guests";
 import { createGuestMailTemplates } from "@/infrastructure/mail/guest-templates";
+import {
+  ExportCard,
+  GetCardEditor,
+  GetCardPreview,
+  GetEngagementPage,
+  GetHouseholdPage,
+  GetUnsubscribe,
+  MarkCardsOpened,
+  MarkCardsSent,
+  MarkEngagementShared,
+  RunMailJobs,
+  SaveCard,
+  SendCardEmails,
+  SendReminders,
+  SetCardExcluded,
+  ShareCard,
+  Unsubscribe,
+} from "@/application/cards";
+import { SatoriCardRenderer } from "@/infrastructure/cards/renderer";
+import { createCardMailTemplates, createCardTexts } from "@/infrastructure/mail/card-templates";
+import { DrizzleCardRepository } from "@/infrastructure/repositories/cards";
 import { DrizzleGuestRepository } from "@/infrastructure/repositories/guests";
 import { AddItem, DeleteItem, MoveItem, UpdateItem, UpdateSection } from "@/application/sections";
 import { GetUpload, UploadImage } from "@/application/uploads";
-import {
-  CreateWebsite,
-  DeleteWebsite,
-  GetWebsiteForOwner,
-  ListWebsites,
-  SelectTheme,
-  SetCoverImage,
-  UpdateDesign,
-  UpdateHome,
-  UpdateSlug,
-} from "@/application/websites";
+import { AddVersion, AssignVersion, DeleteVersion, RenameVersion } from "@/application/versions";
+import { CreateWedding, DeleteWedding, GetRecentWedding, GetWeddingHome, ListWeddings, MarkWeddingUsed, UpdateWeddingDetails, UpdateWeddingSlug } from "@/application/weddings";
+import { GetWebsiteForOwner, SelectTheme, SetCoverImage, SetEventShown, SetPublished, UpdateDesign, UpdateHome, UpdateSlug } from "@/application/websites";
 import { createDatabase } from "@/infrastructure/db/client";
 import { SharpImageProcessor } from "@/infrastructure/images/sharp";
 import { createMagicLinkTemplate } from "@/infrastructure/mail/magic-link-template";
@@ -54,6 +66,7 @@ import { DrizzleMagicLinkRepository, DrizzleSessionRepository, PostgresRateLimit
 import { DrizzleUploadRepository } from "@/infrastructure/repositories/uploads";
 import { DrizzleUserRepository } from "@/infrastructure/repositories/users";
 import { DrizzleWebsiteRepository } from "@/infrastructure/repositories/websites";
+import { DrizzleWeddingRepository } from "@/infrastructure/repositories/weddings";
 import { LocalFileStorage } from "@/infrastructure/storage/local";
 import { S3FileStorage } from "@/infrastructure/storage/s3";
 import { adjustableClock, cryptoTokens, hmacGuestLinks, systemClock } from "@/infrastructure/system";
@@ -106,6 +119,7 @@ function build() {
     magicLinks: new DrizzleMagicLinkRepository(db),
     sessions: new DrizzleSessionRepository(db),
     rateLimiter: new PostgresRateLimiter(db),
+    weddings: new DrizzleWeddingRepository(db),
     websites: new DrizzleWebsiteRepository(db),
     uploads: new DrizzleUploadRepository(db),
     storage: createStorage(config),
@@ -129,6 +143,11 @@ function build() {
     guests: new DrizzleGuestRepository(db),
     guestLinks: hmacGuestLinks(appSecret(config)),
     guestMail: createGuestMailTemplates(),
+    cards: new DrizzleCardRepository(db),
+    cardRenderer: new SatoriCardRenderer(path.resolve(config.CARD_FONTS_DIR)),
+    cardMail: createCardMailTemplates(),
+    cardTexts: createCardTexts(),
+    mailRate: { batchSize: config.MAIL_BATCH_SIZE, intervalMs: config.MAIL_SEND_INTERVAL_MS },
     appUrl: config.APP_URL.replace(/\/$/, ""),
   };
 
@@ -155,15 +174,26 @@ function build() {
     getCurrentUser: new GetCurrentUser(deps),
     logout: new Logout(deps),
     updateProfile: new UpdateProfile(deps),
-    createWebsite: new CreateWebsite(deps),
-    listWebsites: new ListWebsites(deps),
+    createWedding: new CreateWedding(deps),
+    listWeddings: new ListWeddings(deps),
+    getRecentWedding: new GetRecentWedding(deps),
+    getWeddingHome: new GetWeddingHome(deps),
+    markWeddingUsed: new MarkWeddingUsed(deps),
+    updateWeddingDetails: new UpdateWeddingDetails(deps),
+    updateWeddingSlug: new UpdateWeddingSlug(deps),
+    deleteWedding: new DeleteWedding(deps),
+    addVersion: new AddVersion(deps),
+    renameVersion: new RenameVersion(deps),
+    deleteVersion: new DeleteVersion(deps),
+    assignVersion: new AssignVersion(deps),
     getWebsiteForOwner: new GetWebsiteForOwner(deps),
     updateHome: new UpdateHome(deps),
     updateSlug: new UpdateSlug(deps),
+    setPublished: new SetPublished(deps),
+    setEventShown: new SetEventShown(deps),
     setCoverImage: new SetCoverImage(deps),
     selectTheme: new SelectTheme(deps),
     updateDesign: new UpdateDesign(deps),
-    deleteWebsite: new DeleteWebsite(deps),
     updateSection: new UpdateSection(deps),
     addItem: new AddItem(deps),
     updateItem: new UpdateItem(deps),
@@ -173,10 +203,11 @@ function build() {
     getUpload: new GetUpload(deps),
     getPublicWebsite: new GetPublicWebsite(deps),
     getEventIcs: new GetEventIcs(deps),
+    getWeddingIcs: new GetWeddingIcs(deps),
     exportAccount: new ExportAccount(deps),
     deleteAccount: new DeleteAccount(deps),
     getPricing: new GetPricing(deps),
-    listWebsitePlans: new ListWebsitePlans(deps),
+    listWeddingPlans: new ListWeddingPlans(deps),
     listPurchases: new ListPurchases(deps),
     startCheckout: new StartCheckout(deps),
     handlePaymentWebhook: new HandlePaymentWebhook(deps),
@@ -188,10 +219,26 @@ function build() {
     deletePoll: new DeletePoll(deps),
     decideGuestRequest: new DecideGuestRequest(deps),
     exportGuestsCsv: new ExportGuestsCsv(deps),
-    getGuestForm: new GetGuestForm(deps),
     getGuestFormPreview: new GetGuestFormPreview(deps),
     submitGuestResponse: new SubmitGuestResponse(deps),
     runGuestJobs: new RunGuestJobs(deps),
+    getCardEditor: new GetCardEditor(deps),
+    saveCard: new SaveCard(deps),
+    exportCard: new ExportCard(deps),
+    markEngagementShared: new MarkEngagementShared(deps),
+    getHouseholdPage: new GetHouseholdPage(deps),
+    getCardPreview: new GetCardPreview(deps),
+    markCardsOpened: new MarkCardsOpened(deps),
+    getEngagementPage: new GetEngagementPage(deps),
+    shareCard: new ShareCard(deps),
+    setCardExcluded: new SetCardExcluded(deps),
+    markCardsSent: new MarkCardsSent(deps),
+    sendCardEmails: new SendCardEmails(deps),
+    sendReminders: new SendReminders(deps),
+    /** A fresh instance per run: it caches contexts and images for that run only. */
+    runMailJobs: (options: { weddingId?: string; automatic?: boolean } = {}) => new RunMailJobs(deps).execute(options),
+    getUnsubscribe: new GetUnsubscribe(deps),
+    unsubscribe: new Unsubscribe(deps),
   };
 }
 

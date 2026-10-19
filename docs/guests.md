@@ -1,13 +1,14 @@
 # Guests and RSVP
 
-Couples keep their guest list in Traureise and send each household a personal link. Guests answer in one
+Couples keep their guest list in Traureise and send each household a personal link. The link is also
+where the household gets its Save the Date, invitation and thank-you card ([cards](cards.md)). Guests answer in one
 form: who is coming, to which events, the meal, allergies and intolerances, the couple's own questions,
 requests to bring someone else, and a message. The couple sees the answers on the **Gäste** page.
 
 ## For couples
 
-The **Gäste** page (`/websites/<id>/gaeste`) is linked from the website card on the dashboard and from the
-editor. It has three tabs:
+The **Gäste** page (`/hochzeiten/<id>/gaeste`) is linked from the wedding's home and from the website editor.
+It has three tabs:
 
 - **Übersicht**: a pie chart of everyone (kommen, kommen nicht, offen), how many households have answered,
   the headcount per event, counts per dish and per poll answer, the allergy list, and pending requests for
@@ -22,12 +23,20 @@ editor. It has three tabs:
   choice, optionally with a free "Andere" answer, and answered per person or once per household.
 - **Vorschau**: the form exactly as guests see it, in the website's theme. Nothing is saved.
 
+**Person hinzufügen** next to the list adds one person as their own household in one step (just the name);
+**Haushalt hinzufügen** opens the full form.
+
+Each household can have an **email address** (optional, for cards and reminders by email) and a
+**personal line** for the thank-you card. A household that unsubscribed from emails shows "Keine E-Mails
+gewünscht"; its address is gone.
+
 A household is invited to all RSVP events unless you untick some; its form then shows only those events,
 and the meal choice only if it is invited to the meal's event.
 
 **WhatsApp** opens `https://wa.me/?text=…` with the text and link, in your own WhatsApp. Traureise sends
-nothing to WhatsApp or anyone else. Reminders work the same way: send the link again to households that
-have not answered.
+nothing to WhatsApp or anyone else. **Erinnerung senden** sends a reminder to a household that has not
+answered (an email where there is an address and the Einladungen package, otherwise WhatsApp), and the
+invitation can send reminders automatically ([Reminders](cards.md#reminders)).
 
 ## For guests
 
@@ -45,7 +54,8 @@ yet" page. Without billing (self-hosted) everything is available
 
 ## Retention
 
-Guest data (households, people, answers, requests) is deleted automatically at the latest of 12 months after
+Guest data (households, people, answers, requests, email addresses, personal lines, and the cards' sent and
+opened status) is deleted automatically at the latest of 12 months after
 the wedding and the end of the RSVP package. About 30 days before, the couple gets an email and a notice on
 the Gäste page suggesting the CSV export. A refund stops the links at once but keeps the data until that
 date. Without a wedding date and without a package nothing is deleted automatically

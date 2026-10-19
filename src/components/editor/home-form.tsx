@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { saveHomeAction, setCoverImageAction } from "@/app/actions/editor";
 import type { Website } from "@/application/ports";
 import { FieldError } from "@/components/forms/field-error";
+import { SlugChangeHint } from "@/components/forms/slug-change-hint";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,13 +15,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { ImageField } from "./image-field";
 import { useSave } from "./use-save";
 
-export function HomeForm({ website, appUrl, timeZones }: { website: Website; appUrl: string; timeZones: string[] }) {
+/** The home section of one website version. Names, date, place and time zone are the wedding's (details dialog). */
+export function HomeForm({ website, appUrl, details }: { website: Website; appUrl: string; details: React.ReactNode }) {
   const t = useTranslations("editor");
   const tErrors = useTranslations("errors");
   const { pending, errors, save } = useSave();
-  const [dateOpen, setDateOpen] = useState(!website.weddingDate);
-  const [locationOpen, setLocationOpen] = useState(!website.location);
   const [countdown, setCountdown] = useState(website.showCountdown);
+  const [slug, setSlug] = useState(website.slug);
   const [, startCover] = useTransition();
 
   function setCover(key: string | null) {
@@ -33,50 +34,17 @@ export function HomeForm({ website, appUrl, timeZones }: { website: Website; app
 
   function submit(form: FormData) {
     const value = (key: string) => String(form.get(key) ?? "");
-    save(() =>
-      saveHomeAction(website.id, {
-        title: value("title"),
-        weddingDate: dateOpen ? "" : value("weddingDate"),
-        location: locationOpen ? "" : value("location"),
-        welcomeMessage: value("welcomeMessage"),
-        hashtag: value("hashtag"),
-        showCountdown: countdown,
-        timezone: value("timezone"),
-        slug: value("slug"),
-      }),
-    );
+    save(() => saveHomeAction(website.id, { welcomeMessage: value("welcomeMessage"), hashtag: value("hashtag"), showCountdown: countdown, slug: value("slug") }));
   }
 
   return (
     <div className="space-y-6">
-      <ImageField websiteId={website.id} label={t("home.cover")} value={website.coverImageKey} onChange={setCover} />
+      <div className="flex flex-wrap items-center gap-x-2 rounded-lg bg-secondary/40 p-3 text-sm text-muted-foreground" data-testid="home-wedding-details">
+        {t("home.wedding")}
+        {details}
+      </div>
+      <ImageField weddingId={website.weddingId} label={t("home.cover")} value={website.coverImageKey} onChange={setCover} />
       <form onSubmit={(e) => (e.preventDefault(), submit(new FormData(e.currentTarget)))} className="space-y-5">
-        <div className="space-y-2">
-          <Label htmlFor="title">{t("home.titleLabel")}</Label>
-          <Input id="title" name="title" defaultValue={website.title} />
-          <FieldError code={errors.title} />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="weddingDate">{t("home.dateLabel")}</Label>
-          <Input id="weddingDate" name="weddingDate" type="date" defaultValue={website.weddingDate ?? ""} disabled={dateOpen} />
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={dateOpen} onChange={(e) => setDateOpen(e.target.checked)} className="size-4 accent-primary" />
-            {t("home.dateOpen")}
-          </label>
-          <FieldError code={errors.weddingDate} />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="location">{t("home.locationLabel")}</Label>
-          <Input id="location" name="location" defaultValue={website.location ?? ""} disabled={locationOpen} />
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={locationOpen} onChange={(e) => setLocationOpen(e.target.checked)} className="size-4 accent-primary" />
-            {t("home.locationOpen")}
-          </label>
-          <FieldError code={errors.location} />
-        </div>
-
         <div className="space-y-2">
           <Label htmlFor="welcomeMessage">{t("home.welcomeLabel")}</Label>
           <Textarea id="welcomeMessage" name="welcomeMessage" rows={5} defaultValue={website.welcomeMessage} />
@@ -95,31 +63,22 @@ export function HomeForm({ website, appUrl, timeZones }: { website: Website; app
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="timezone">{t("home.timezoneLabel")}</Label>
-          <select
-            id="timezone"
-            name="timezone"
-            defaultValue={website.timezone}
-            className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
-          >
-            {timeZones.map((tz) => (
-              <option key={tz} value={tz}>
-                {tz}
-              </option>
-            ))}
-          </select>
-          <FieldError code={errors.timezone} />
-        </div>
-
-        <div className="space-y-2">
           <Label htmlFor="slug">{t("home.slugLabel")}</Label>
-          <div className="flex items-center rounded-lg border border-input focus-within:ring-3 focus-within:ring-ring/50">
-            <span className="pl-3 text-sm whitespace-nowrap text-muted-foreground">{appUrl.replace(/^https?:\/\//, "")}/</span>
-            <Input id="slug" name="slug" defaultValue={website.slug} className="border-0 pl-0.5 focus-visible:ring-0" aria-describedby="slug-hint" />
+          <div className="flex min-w-0 items-center rounded-lg border border-input focus-within:ring-3 focus-within:ring-ring/50">
+            <span className="truncate pl-3 text-sm whitespace-nowrap text-muted-foreground">{appUrl.replace(/^https?:\/\//, "")}/</span>
+            <Input
+              id="slug"
+              name="slug"
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+              className="min-w-0 border-0 pl-0.5 focus-visible:ring-0"
+              aria-describedby="slug-hint slug-change"
+            />
           </div>
           <p id="slug-hint" className="text-xs text-muted-foreground">
             {t("home.slugHint")}
           </p>
+          <SlugChangeHint id="slug-change" saved={website.slug} value={slug} message={t("home.slugChangeHint")} />
           <FieldError code={errors.slug} />
         </div>
 
