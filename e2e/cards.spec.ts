@@ -169,6 +169,8 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
       await expect(cards).toHaveCount(2);
       await expect(cards.nth(0)).toHaveAttribute("data-testid", "page-card-invitation");
       await expect(cards.nth(1)).toHaveAttribute("data-testid", "page-card-saveTheDate");
+      // The invitation links the household's website too.
+      await expect(cards.nth(0).getByRole("link", { name: "Zur Website" })).toHaveAttribute("href", `/${slug}`);
       await guest.getByRole("link", { name: "Zur Antwort" }).click();
       await guest.getByRole("region", { name: "Clara", exact: true }).getByLabel("Ich komme").check();
       await guest.getByRole("button", { name: "Antwort senden" }).click();

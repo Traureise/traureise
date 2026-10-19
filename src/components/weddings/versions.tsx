@@ -172,15 +172,15 @@ export function VersionActions({ weddingId, item, version, deletable }: { weddin
   }
 
   return (
-    <span className="inline-flex flex-wrap gap-1">
-      <Button type="button" variant="ghost" size="sm" onClick={() => setRenaming(true)}>
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <Button type="button" variant="ghost" size="xs" onClick={() => setRenaming(true)}>
         <PencilLine aria-hidden />
         {t("rename")}
       </Button>
       {deletable && (
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+            <Button type="button" variant="ghost" size="xs" className="text-destructive hover:text-destructive">
               <Trash2 aria-hidden />
               {t("delete")}
             </Button>

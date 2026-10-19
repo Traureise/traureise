@@ -63,10 +63,12 @@ export default async function CardEditorPage({ params }: Props) {
           <WeddingDetailsButton wedding={wedding} appUrl={c.appUrl} timeZones={timeZones} variant="link" />
         </p>
       </div>
-      <div className="space-y-2">
-        <p className="text-sm font-medium">{t("versions")}</p>
+      <div className="space-y-2" data-testid="versions">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-medium">{t("versions")}</p>
+          <VersionActions weddingId={id} item={card.kind} version={{ id: card.id, label: card.label }} deletable={data.versions.length > 1} />
+        </div>
         <VersionChips weddingId={id} item={card.kind} versions={data.versions} current={card.id} canAdd={data.canAddVersion} />
-        <VersionActions weddingId={id} item={card.kind} version={{ id: card.id, label: card.label }} deletable={data.versions.length > 1} />
       </div>
       <div className="flex flex-wrap gap-2">
         <Link href={`${base}/vorschau`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-sm text-primary hover:bg-secondary/50">

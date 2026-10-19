@@ -266,8 +266,10 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
                 <ChevronDown aria-hidden />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => save(true)}>{t("saveAndClose")}</DropdownMenuItem>
+            <DropdownMenuContent align="end" className="w-auto min-w-max">
+              <DropdownMenuItem className="whitespace-nowrap" onSelect={() => save(true)}>
+                {t("saveAndClose")}
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

@@ -51,10 +51,12 @@ export default async function EditorOverview({ params }: Props) {
         <p className="break-all text-muted-foreground">{view.publicUrl}</p>
       </div>
       <PublishControl websiteId={websiteId} published={website.published} online={view.online} />
-      <div className="space-y-2">
-        <p className="text-sm font-medium">{tVersions("label")}</p>
+      <div className="space-y-2" data-testid="versions">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-medium">{tVersions("label")}</p>
+          <VersionActions weddingId={id} item="website" version={{ id: websiteId, label: website.label }} deletable={view.versions.length > 1} />
+        </div>
         <VersionChips weddingId={id} item="website" versions={view.versions} current={websiteId} canAdd={view.canAddVersion} />
-        <VersionActions weddingId={id} item="website" version={{ id: websiteId, label: website.label }} deletable={view.versions.length > 1} />
       </div>
       <nav aria-label={t("nav.label")} className="space-y-6">
         <ul className="space-y-2">

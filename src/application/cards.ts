@@ -135,7 +135,7 @@ export type CardEditor = {
   /** Schedule items an invitation can show. */
   events: { id: string; name: string; startDate: string; startTime: string; venueName: string }[];
   replyBy: string | null;
-  /** Save the Date: some households' website versions are not online, so their cards have no website link. */
+  /** Save the Date and invitation: some households' website versions are not online, so their cards have no website link. */
   offlineWebsites: boolean;
   /** Save the Date and invitation without a wedding date: sending waits for one. */
   waitsForDate: boolean;
@@ -177,7 +177,7 @@ export class GetCardEditor {
       themes,
       events: ctx.eventItems.map((i) => ({ id: i.id, name: i.data.name, startDate: i.data.startDate, startTime: i.data.startTime, venueName: i.data.venueName })),
       replyBy: ctx.settings.replyBy,
-      offlineWebsites: kind === "saveTheDate" && ctx.websites.some((w) => !ctx.online(w)),
+      offlineWebsites: LINKS_WEBSITE.includes(kind) && ctx.websites.some((w) => !ctx.online(w)),
       waitsForDate: needsDate(kind) && !wedding.weddingDate,
       canAddVersion: ctx.can(VERSION_FEATURES[kind]),
       publicUrl: kind === "engagement" ? engagementUrl(this.deps, wedding, card, ctx.versionsOf(kind)) : null,
@@ -251,10 +251,13 @@ export type HouseholdPageView =
 
 const pageWebsite = ({ title, slug, weddingDate, timezone }: Wedding): PageWebsite => ({ title, slug, weddingDate, timezone });
 
-/** A card as a page shows it. Only the Save the Date links the website: the household's version, if online. */
+/** Save the Date and invitation link the website: the household's version, once it is online. */
+const LINKS_WEBSITE: readonly CardKind[] = ["saveTheDate", "invitation"];
+
+/** A card as a page shows it. */
 function pageCard(deps: Deps, ctx: GuestContext, card: Card, household: (Pick<Household, "name" | "personalLine"> & { id: string }) | null): PageCard {
   const { slug, weddingDate } = ctx.wedding;
-  const website = card.kind === "saveTheDate" ? (household ? ctx.websiteFor(household.id) : ctx.firstWebsite()) : null;
+  const website = LINKS_WEBSITE.includes(card.kind) ? (household ? ctx.websiteFor(household.id) : ctx.firstWebsite()) : null;
   return {
     kind: card.kind,
     label: card.label,

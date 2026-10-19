@@ -830,7 +830,7 @@
     "saved": "Gespeichert",
     "dateOpen": "Datum noch offen",
     "messageHintEngagement": "Für WhatsApp, E-Mail und die Gästeliste; beim öffentlichen Link kommt der Text vor den Link.",
-    "offlineWebsites": "Haushalte, deren Website-Version noch nicht veröffentlicht ist, bekommen keinen Link zur Website auf dem Save the Date.",
+    "offlineWebsites": "Haushalte, deren Website-Version noch nicht veröffentlicht ist, bekommen auf dieser Karte keinen Link zur Website.",
     "waitsForDate": "Noch kein Datum: Auf der Karte steht „Datum folgt“. Versenden und Exportieren geht, sobald ihr ein Datum eingetragen habt.",
     "setDate": "Datum eintragen",
     "versions": "Versionen",

@@ -129,6 +129,20 @@ describe("the website link and the date", () => {
     expect((await editor("saveTheDate")).offlineWebsites).toBe(false);
   });
 
+  it("the invitation links the household's website version too, once it is online", async () => {
+    const kern = await household("Kern");
+    await share("invitation", kern.id);
+    const link = async () => {
+      const view = await page(kern.id);
+      return view?.state === "page" ? view.cards.find((c) => c.kind === "invitation")?.websiteUrl : undefined;
+    };
+    expect(await link()).toBeNull();
+    expect((await editor("invitation")).offlineWebsites).toBe(true);
+    await new SetPublished(f.deps).execute(anna.id, websiteId, true);
+    expect(await link()).toBe("/anna-und-ben");
+    expect((await editor("invitation")).offlineWebsites).toBe(false);
+  });
+
   it("the engagement announcement never links the website", async () => {
     await new SetPublished(f.deps).execute(anna.id, websiteId, true);
     const engagement = await new GetEngagementPage(f.deps).execute("anna-und-ben");
