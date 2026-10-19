@@ -2,6 +2,7 @@ import type { APIRequestContext } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { login, uniqueEmail } from "./helpers/auth";
 import { createWebsite } from "./helpers/editor";
+import { homeUrl, weddingIdOf } from "./helpers/weddings";
 
 const STUB_URL = process.env.E2E_CREEM_STUB_URL ?? "http://localhost:4010";
 
@@ -35,15 +36,16 @@ test.describe("checkout", () => {
 
   test("buying a tier through the checkout grants it; replays are ignored and a refund revokes it", async ({ page, request }) => {
     test.setTimeout(3 * 60_000);
-    const card = page.getByTestId("website-card");
+    const plan = page.getByTestId("wedding-plan");
     let checkoutId = "";
+    let weddingId = "";
 
-    await test.step("a couple with a website opens the checkout from the pricing page", async () => {
+    await test.step("a couple opens the checkout for their wedding from the pricing page", async () => {
       await login(page, uniqueEmail("kauf"), "Paula");
-      await createWebsite(page, `paula-${Date.now()}`, "2027-06-12");
-      await page.goto("/dashboard");
-      await expect(card.getByTestId("website-plan")).toHaveText("Paket: Website");
-      await card.getByRole("link", { name: "Paket wählen" }).click();
+      weddingId = weddingIdOf(await createWebsite(page, `paula-${Date.now()}`, "2027-06-12"));
+      await page.goto(homeUrl(weddingId));
+      await expect(plan).toContainText("Paket: Website");
+      await plan.getByRole("link", { name: "Paket wählen" }).click();
       await expect(page).toHaveURL(/\/preise$/);
       const rsvp = page.getByTestId("tier-rsvp");
       await expect(rsvp.getByLabel("Für welche Hochzeit?")).toHaveValue(/[0-9a-f-]{36}/);
@@ -53,11 +55,11 @@ test.describe("checkout", () => {
       checkoutId = new URL(page.url()).pathname.split("/").pop()!;
     });
 
-    await test.step("paying sends the webhook and returns to the dashboard with the tier unlocked", async () => {
+    await test.step("paying sends the webhook and returns to the wedding with the tier unlocked", async () => {
       await page.getByRole("button", { name: "Bezahlen" }).click();
-      await expect(page).toHaveURL(/\/dashboard\?kauf=danke/);
+      await expect(page).toHaveURL(new RegExp(`/hochzeiten/${weddingId}\\?kauf=danke`));
       await expect(page.getByTestId("purchase-thanks")).toBeVisible();
-      await expect(card.getByTestId("website-plan")).toHaveText("Paket: RSVP");
+      await expect(plan).toContainText("Paket: RSVP");
 
       await page.getByRole("link", { name: "Konto", exact: true }).click();
       const purchase = page.getByTestId("purchase");
@@ -66,7 +68,7 @@ test.describe("checkout", () => {
       await expect(purchase).toContainText("gültig bis 12. Juni 2028");
 
       await page.goto("/preise");
-      await expect(page.getByTestId("tier-rsvp")).toContainText("Deine Websites haben dieses Paket schon.");
+      await expect(page.getByTestId("tier-rsvp")).toContainText("Eure Hochzeiten haben dieses Paket schon.");
     });
 
     await test.step("a replayed webhook is ignored", async () => {
@@ -81,8 +83,8 @@ test.describe("checkout", () => {
       expect(refund).toEqual({ status: 200, body: { ok: true, outcome: "applied" } });
       await page.goto("/konto");
       await expect(page.getByTestId("purchase")).toContainText("nicht mehr aktiv");
-      await page.goto("/dashboard");
-      await expect(card.getByTestId("website-plan")).toHaveText("Paket: Website");
+      await page.goto(homeUrl(weddingId));
+      await expect(plan).toContainText("Paket: Website");
 
       const forged = await request.post("/api/billing/webhook", {
         data: { id: "evt_forged", eventType: "checkout.completed", object: {} },

@@ -10,6 +10,7 @@ import {
   GetRecentWedding,
   GetWeddingHome,
   ListWeddings,
+  MarkWeddingUsed,
   UpdateWeddingDetails,
   UpdateWeddingSlug,
 } from "@/application/weddings";
@@ -64,9 +65,12 @@ describe("several weddings", () => {
     f.clock.advance(1000);
     const b = await create({ title: "Clara & Dana", hasDate: false });
     expect((await new GetRecentWedding(f.deps).execute(anna.id))?.id).toBe(b.id);
-    f.clock.advance(1000);
     await home(a.id);
+    // Rendering the home (also a link prefetch) is no visit; the page reports it.
+    expect((await new GetRecentWedding(f.deps).execute(anna.id))?.id).toBe(b.id);
+    await new MarkWeddingUsed(f.deps).execute(anna.id, a.id);
     expect((await new GetRecentWedding(f.deps).execute(anna.id))?.id).toBe(a.id);
+    await expect(new MarkWeddingUsed(f.deps).execute((await f.users.create("eve@example.org")).id, a.id)).rejects.toBeInstanceOf(NotFoundError);
     expect((await new ListWeddings(f.deps).execute(anna.id)).map((w) => w.title)).toEqual(["Anna & Ben", "Clara & Dana"]);
   });
 

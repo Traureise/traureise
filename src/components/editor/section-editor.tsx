@@ -99,7 +99,9 @@ export function SectionEditor({ websiteId, weddingId, section, items, hiddenEven
                 </li>
               ) : (
                 <li key={item.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-background p-3" data-testid="item">
-                  <span className="min-w-0 flex-1 truncate font-medium">{itemHeadline(section.kind as CollectionKind, item.data)}</span>
+                  <span className="min-w-0 flex-1 truncate font-medium" data-testid="item-headline">
+                    {itemHeadline(section.kind as CollectionKind, item.data)}
+                  </span>
                   {section.kind === "schedule" && (
                     <label className="flex basis-full items-center gap-2 text-sm text-muted-foreground sm:order-last">
                       <Switch

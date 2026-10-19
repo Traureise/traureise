@@ -24,7 +24,7 @@ export type Wedding = {
   updatedAt: Date;
 };
 export type NewWedding = Pick<Wedding, "ownerId" | "slug" | "title" | "weddingDate" | "timezone">;
-export type WeddingPatch = Partial<Pick<Wedding, "slug" | "title" | "weddingDate" | "location" | "timezone" | "lastOpenedAt">>;
+export type WeddingPatch = Partial<Pick<Wedding, "slug" | "title" | "weddingDate" | "location" | "timezone">>;
 
 /** A version of the wedding's website, for an audience. A draft (a 404 publicly) until published. */
 export type Website = {
@@ -107,6 +107,8 @@ export interface WeddingRepository {
   findBySlug(slug: string): Promise<Wedding | null>;
   listByOwner(ownerId: string): Promise<Wedding[]>;
   update(id: string, patch: WeddingPatch): Promise<Wedding>;
+  /** Remembers that the couple used the wedding now (wall-clock time, for "most recently used"). */
+  markUsed(id: string): Promise<void>;
   /** Deletes the wedding and, through the cascades, everything in it. */
   delete(id: string): Promise<void>;
   slugOwners(slug: string): Promise<SlugOwners>;

@@ -182,6 +182,12 @@ export class InMemoryWeddings implements WeddingRepository {
     Object.assign(wedding, patch, { updatedAt: new Date() });
     return copy(wedding);
   }
+  private uses = 0;
+  async markUsed(id: string) {
+    const wedding = this.weddings.find((w) => w.id === id);
+    // Wall-clock time in the database; here simply later than every use before.
+    if (wedding) wedding.lastOpenedAt = new Date(Date.UTC(2000, 0, 1) + ++this.uses * 1000);
+  }
   async delete(id: string) {
     this.weddings = this.weddings.filter((w) => w.id !== id);
     this.events = this.events.filter((e) => e.weddingId !== id);

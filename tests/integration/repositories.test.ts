@@ -85,8 +85,10 @@ describe("DrizzleWeddingRepository", () => {
     expect(await weddingRepo.findBySlug("anna-und-ben")).toMatchObject({ id: wedding.id });
     expect((await weddingRepo.listByOwner(user.id)).map((w) => w.id)).toEqual([wedding.id]);
     expect(await weddingRepo.findById("not-a-uuid")).toBeNull();
-    const at = new Date("2026-10-19T10:00:00Z");
-    expect(await weddingRepo.update(wedding.id, { location: "Kempten", weddingDate: null, lastOpenedAt: at })).toMatchObject({ location: "Kempten", weddingDate: null, lastOpenedAt: at });
+    const at = new Date("2020-01-01T00:00:00Z");
+    expect(await weddingRepo.update(wedding.id, { location: "Kempten", weddingDate: null })).toMatchObject({ location: "Kempten", weddingDate: null });
+    await weddingRepo.markUsed(wedding.id);
+    expect((await weddingRepo.findById(wedding.id))!.lastOpenedAt!.getTime()).toBeGreaterThan(at.getTime());
   });
 
   it("reports who uses a slug: weddings and website versions share one namespace", async () => {

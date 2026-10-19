@@ -35,6 +35,10 @@ export class DrizzleWeddingRepository implements WeddingRepository {
     return wedding!;
   }
 
+  async markUsed(id: string): Promise<void> {
+    await this.db.update(weddings).set({ lastOpenedAt: sql`now()` }).where(eq(weddings.id, id));
+  }
+
   async delete(id: string): Promise<void> {
     await this.db.delete(weddings).where(eq(weddings.id, id));
   }

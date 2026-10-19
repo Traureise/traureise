@@ -1,13 +1,14 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { unzipSync } from "fflate";
-import type { Download, Page } from "@playwright/test";
+import type { Download } from "@playwright/test";
 import { expect, recordForeignRequests, test } from "./fixtures";
 import { login, uniqueEmail } from "./helpers/auth";
-import { captureWindowOpen, chooseCard, createCard, openedUrls, openEnvelope, saveCard } from "./helpers/cards";
+import { captureWindowOpen, chooseCard, createCard, exportCard, openedUrls, openEnvelope, saveCard } from "./helpers/cards";
 import { createWebsite } from "./helpers/editor";
-import { addEvent, addHousehold, daysUntil, guestLink, guestsUrl, household, runGuestJobs, setClockOffset, websiteIdOf } from "./helpers/guests";
+import { addEvent, addHousehold, daysUntil, guestLink, guestsUrl, household, runGuestJobs, setClockOffset, weddingIdOf } from "./helpers/guests";
 import { messageHeaders, messagesFor, waitForMessages } from "./helpers/mailpit";
+import { homeUrl, step } from "./helpers/weddings";
 
 const PHOTO = path.join(import.meta.dirname, "assets/photo.jpg");
 const COUPLE = "Anna & Ben";
@@ -18,14 +19,6 @@ async function downloaded(download: Download) {
 
 /** Width of a PNG, from its IHDR chunk. */
 const pngWidth = (bytes: Uint8Array) => new DataView(bytes.buffer, bytes.byteOffset).getUint32(16);
-
-async function exportCard(page: Page, kind: string, format: "PDF (A6)" | "PDF (A5)" | "Bild (PNG)") {
-  const item = page.locator(`[data-testid="card-item"][data-kind="${kind}"]`);
-  await item.getByRole("button", { name: "Exportieren" }).click();
-  const downloading = page.waitForEvent("download");
-  await page.getByRole("menuitem", { name: format }).click();
-  return downloading;
-}
 
 test("Save the Dates, invitations and cards: design, send by link, WhatsApp and email, reminders, opened status, export and data rights", async ({
   page,
@@ -39,7 +32,8 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
   const slug = `anna-ben-karten-${Date.now()}`;
   const mail = { weber: uniqueEmail("weber"), kern: uniqueEmail("kern") };
   let editorUrl = "";
-  let websiteId = "";
+  let websiteId = ""; // the wedding
+  const cardUrls: Record<string, string> = {};
   let weberLink = "";
   let kernLink = "";
 
@@ -54,7 +48,7 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
     await test.step("set up a website, an event, the reply-by date and three households", async () => {
       await login(page, email, "Anna");
       editorUrl = await createWebsite(page, slug, "2027-06-12");
-      websiteId = websiteIdOf(`${editorUrl}/`);
+      websiteId = weddingIdOf(editorUrl);
       await addEvent(page, editorUrl, "Trauung", "2027-06-12", "14:30");
       await page.goto(guestsUrl(editorUrl));
       await addHousehold(page, "Familie Weber", [{ name: "Clara" }], undefined, { email: mail.weber, personalLine: "Danke für den Kuchen!" });
@@ -72,9 +66,12 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
     });
 
     await test.step("the couple designs a Save the Date in another theme, with photo and text, in the live preview", async () => {
-      await createCard(page, "Save the Date");
+      cardUrls.saveTheDate = await createCard(page, websiteId, "Save the Date");
       const preview = page.getByTestId("card-preview").getByTestId("card-view");
       await expect(preview).toHaveAttribute("data-layout", "bogen");
+      // The line above the names is the couple's own text.
+      await expect(page.getByLabel("Zeile über den Namen")).toHaveValue("Haltet euch den Tag frei");
+      await expect(preview).toContainText("Haltet euch den Tag frei");
       await page.locator("label").filter({ hasText: /^Bogen$/ }).click();
       await page.locator("label").filter({ hasText: /^Ozean$/ }).click();
       await page.locator("label").filter({ hasText: /^Farbfläche$/ }).click();
@@ -94,22 +91,20 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
       await expect(page.getByTestId("page-card-saveTheDate")).toContainText("Einladung folgt im Frühjahr");
     });
 
-    await test.step("the other kinds are created from the dashboard and listed in their tabs", async () => {
-      await createCard(page, "Einladung");
+    await test.step("the other kinds were generated with the wedding and are on its timeline", async () => {
+      cardUrls.invitation = await createCard(page, websiteId, "Einladung");
       await expect(page.getByTestId("card-preview")).toContainText("Wir heiraten");
       await expect(page.getByTestId("card-preview")).toContainText("14:30 Uhr");
       await expect(page.getByTestId("card-preview")).toContainText("Bitte antwortet bis zum 1. Mai 2027");
-      await createCard(page, "Dankeskarte");
+      cardUrls.thankYou = await createCard(page, websiteId, "Dankeskarte");
       await expect(page.getByTestId("card-preview")).toContainText("Von Herzen danke");
-      await createCard(page, "Verlobungsanzeige");
+      cardUrls.engagement = await createCard(page, websiteId, "Verlobungsanzeige");
       await expect(page.getByLabel("Link zur Website auf der Karte zeigen")).toHaveCount(0);
-      await page.goto("/dashboard?tab=engagement");
-      await expect(page.getByTestId("card-item")).toHaveCount(1);
-      await page.goto("/dashboard?tab=thank-you");
-      await expect(page.getByTestId("card-item")).toHaveCount(1);
-      await page.goto("/dashboard?tab=save-the-dates");
-      await expect(page.getByTestId("card-item")).toHaveCount(1);
-      await expect(page.getByTestId("card-item").getByTestId("card-view")).toHaveAttribute("data-layout", "farbe");
+      // Every card kind has the text for WhatsApp, the engagement announcement included.
+      await expect(page.getByLabel("Text für WhatsApp und E-Mail")).toBeVisible();
+      await page.goto(homeUrl(websiteId));
+      await expect(page.getByTestId("timeline-step")).toHaveCount(5);
+      await expect(step(page, "Save the Date").getByTestId("card-view")).toHaveAttribute("data-layout", "farbe");
     });
 
     await test.step("the Save the Date goes by WhatsApp and by email, as the couple, with the household's own link", async () => {
@@ -154,8 +149,8 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
       await page.getByTestId("delivery-filter").getByRole("link", { name: "Save the Date nicht geöffnet" }).click();
       await expect(page.getByTestId("household")).toHaveCount(1);
       await expect(household(page, "Familie Kern")).toBeVisible();
-      await page.goto("/dashboard?tab=save-the-dates");
-      await expect(page.getByTestId("card-counts")).toHaveText("1 von 3 Haushalten geöffnet · 2 gesendet");
+      await page.goto(homeUrl(websiteId));
+      await expect(step(page, "Save the Date").getByTestId("step-status")).toHaveText("1 von 3 Haushalten geöffnet · 2 gesendet");
     });
 
     await test.step("later the same link shows the invitation with the response form, and the Save the Date below", async () => {
@@ -243,25 +238,34 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
     });
 
     await test.step("PDF and PNG exports download and contain the card", async () => {
-      await page.goto("/dashboard?tab=thank-you");
-      const pdf = await exportCard(page, "thankYou", "PDF (A6)");
+      const pdf = await exportCard(page, cardUrls.thankYou!, "PDF (A6)");
       expect(pdf.suggestedFilename()).toBe("dankeskarte-a6.pdf");
       const pdfBytes = await downloaded(pdf);
       expect(new TextDecoder().decode(pdfBytes.slice(0, 5))).toBe("%PDF-");
       expect(new TextDecoder("latin1").decode(pdfBytes)).toContain("/Subtype /Image");
-      const a5 = await exportCard(page, "thankYou", "PDF (A5)");
+      const a5 = await exportCard(page, cardUrls.thankYou!, "PDF (A5)");
       expect(a5.suggestedFilename()).toBe("dankeskarte-a5.pdf");
-      await page.goto("/dashboard?tab=engagement");
-      const png = await exportCard(page, "engagement", "Bild (PNG)");
+      const png = await exportCard(page, cardUrls.engagement!, "Bild (PNG)");
       expect(png.suggestedFilename()).toBe("verlobung.png");
       const pngBytes = await downloaded(png);
       expect([...pngBytes.slice(1, 4)]).toEqual([0x50, 0x4e, 0x47]);
       expect(pngWidth(pngBytes)).toBe(1748);
     });
 
-    await test.step("the engagement announcement is one link for everyone, with a general greeting", async () => {
-      const url = (await page.locator('[data-testid="card-item"][data-kind="engagement"]').getByTestId("card-public-url").getAttribute("href"))!;
-      expect(url).toBe(`http://localhost:3000/${slug}/verlobung`);
+    await test.step("the engagement announcement is one link for everyone, shared with its text by WhatsApp", async () => {
+      await page.goto(homeUrl(websiteId));
+      const engagement = step(page, "Verlobungsanzeige");
+      await expect(engagement.getByTestId("step-status")).toHaveText("Entwurf · noch nicht geteilt");
+      await engagement.getByRole("button", { name: "Teilen" }).click();
+      const dialog = page.getByRole("dialog", { name: "Verlobungsanzeige teilen" });
+      await expect(dialog.getByLabel("Link zur Website")).toHaveValue(`http://localhost:3000/${slug}/verlobung`);
+      await dialog.getByRole("button", { name: "Per WhatsApp teilen" }).click();
+      const shared = decodeURIComponent((await openedUrls(page)).at(-1)!);
+      expect(shared).toContain("Wir haben uns verlobt! Schaut euch unsere Verlobungsanzeige an.");
+      expect(shared).toContain(`http://localhost:3000/${slug}/verlobung`);
+      await page.keyboard.press("Escape");
+      await expect(engagement.getByTestId("step-status")).toHaveText("Geteilt · ein Link für alle");
+      await expect(engagement).toHaveAttribute("data-state", "done");
       await guest.goto(`/${slug}/verlobung`);
       await expect(guest.getByTestId("envelope")).toContainText("Für euch");
       await guest.getByTestId("envelope").click();
@@ -275,14 +279,15 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
       const downloading = page.waitForEvent("download");
       await page.getByRole("link", { name: "ZIP-Datei herunterladen" }).click();
       const files = unzipSync(await downloaded(await downloading));
-      const website = JSON.parse(new TextDecoder().decode(files["data.json"])).websites[0];
-      expect(website.cards.map((c: { kind: string }) => c.kind).sort()).toEqual(["engagement", "invitation", "saveTheDate", "thankYou"]);
-      const std = website.cards.find((c: { kind: string }) => c.kind === "saveTheDate");
+      const wedding = JSON.parse(new TextDecoder().decode(files["data.json"])).weddings[0];
+      expect(wedding.cards.map((c: { kind: string }) => c.kind).sort()).toEqual(["engagement", "invitation", "saveTheDate", "thankYou"]);
+      const std = wedding.cards.find((c: { kind: string }) => c.kind === "saveTheDate");
       expect(std.themeId).toBe("bogen");
       expect(std.photo).toMatch(/^images\//);
-      expect(std.deliveries.find((d: { household: string }) => d.household === "Familie Weber")).toMatchObject({ sharedVia: "whatsapp" });
-      expect(std.deliveries.find((d: { household: string }) => d.household === "Familie Weber").openedAt).toBeTruthy();
-      const weber = website.guests.households.find((h: { name: string }) => h.name === "Familie Weber");
+      const weberStd = (d: { household: string; kind: string }) => d.household === "Familie Weber" && d.kind === "saveTheDate";
+      expect(wedding.deliveries.find(weberStd)).toMatchObject({ sharedVia: "whatsapp" });
+      expect(wedding.opens.find((o: { household: string; cardId: string }) => o.household === "Familie Weber" && o.cardId === std.id).openedAt).toBeTruthy();
+      const weber = wedding.guests.households.find((h: { name: string }) => h.name === "Familie Weber");
       expect(weber).toMatchObject({ email: null, personalLine: "Danke für den Kuchen!" });
       expect(weber.unsubscribedAt).toBeTruthy();
     });
@@ -295,11 +300,12 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
       await page.goto("/konto");
       const downloading = page.waitForEvent("download");
       await page.getByRole("link", { name: "ZIP-Datei herunterladen" }).click();
-      const website = JSON.parse(new TextDecoder().decode(unzipSync(await downloaded(await downloading))["data.json"])).websites[0];
-      expect(website.guests.households).toEqual([]);
-      expect(website.cards).toHaveLength(4);
-      for (const card of website.cards) expect(card.deliveries).toEqual([]);
-      expect(JSON.stringify(website)).not.toContain("Danke für den Kuchen!");
+      const wedding = JSON.parse(new TextDecoder().decode(unzipSync(await downloaded(await downloading))["data.json"])).weddings[0];
+      expect(wedding.guests.households).toEqual([]);
+      expect(wedding.cards).toHaveLength(4);
+      expect(wedding.deliveries).toEqual([]);
+      expect(wedding.opens).toEqual([]);
+      expect(JSON.stringify(wedding)).not.toContain("Danke für den Kuchen!");
     });
 
     await test.step("deleting the account removes the cards too", async () => {

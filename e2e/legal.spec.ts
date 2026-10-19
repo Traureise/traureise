@@ -27,8 +27,8 @@ test("without billing there are no prices, plans or purchases anywhere", async (
   await login(page, uniqueEmail("no-billing"), "Nora");
   await createWebsite(page, `nora-${Date.now()}`);
   await page.goto("/dashboard");
-  await expect(page.getByTestId("website-card")).toBeVisible();
-  await expect(page.getByTestId("website-plan")).toHaveCount(0);
+  await expect(page.getByTestId("wedding-badge")).toBeVisible();
+  await expect(page.getByTestId("wedding-plan")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Paket wählen" })).toHaveCount(0);
 
   await page.getByRole("link", { name: "Konto", exact: true }).click();

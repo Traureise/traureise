@@ -84,7 +84,7 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
               <ShareDialog
                 key={v.id}
                 url={v.publicUrl!}
-                slug={`verlobung-${v.id}`}
+                slug={new URL(v.publicUrl!).pathname.slice(1).replaceAll("/", "-")}
                 title={t("shareTitle", { item: step.versions.length > 1 ? `${name} (${v.label})` : name })}
                 message={step.messages[v.id] ?? ""}
                 onShared={markEngagementSharedAction.bind(null, weddingId, v.id)}
@@ -110,7 +110,7 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
                       {step.versions.length > 1 ? `${t("view")}: ${v.label}` : t("view")}
                     </a>
                   </Button>
-                  <ShareDialog url={v.publicUrl!} slug={`website-${v.id}`} triggerLabel={step.versions.length > 1 ? `${t("share")}: ${v.label}` : t("share")} />
+                  <ShareDialog url={v.publicUrl!} slug={new URL(v.publicUrl!).pathname.slice(1)} triggerLabel={step.versions.length > 1 ? `${t("share")}: ${v.label}` : t("share")} />
                 </span>
               ))}
         </div>

@@ -37,7 +37,7 @@ export class CreateWedding {
     const parsed = parseNewWedding(input);
     if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
     const { title, weddingDate } = parsed.value;
-    const { weddings, websites, cards, themes, clock, cardTexts } = this.deps;
+    const { weddings, websites, cards, themes, cardTexts } = this.deps;
     const slug = await uniqueSlug(this.deps, slugify(title), { wedding: null });
     const wedding = await weddings.create({ ownerId, title, weddingDate, slug, timezone: DEFAULT_TIMEZONE });
     const website = await websites.create(
@@ -59,7 +59,8 @@ export class CreateWedding {
       emptySections(),
     );
     for (const kind of CARD_KINDS) await cards.create(newCardVersion(this.deps, wedding, website, kind, null));
-    return weddings.update(wedding.id, { lastOpenedAt: clock.now() });
+    await weddings.markUsed(wedding.id);
+    return wedding;
   }
 }
 
@@ -117,7 +118,7 @@ export type WeddingHome = {
 export class GetWeddingHome {
   constructor(private deps: Deps) {}
 
-  /** The home screen of a wedding: the timeline of its items, the countdown and the guests. Remembers the visit. */
+  /** The home screen of a wedding: the timeline of its items, the countdown and the guests. */
   async execute(userId: string, weddingId: string): Promise<WeddingHome> {
     const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
     const ctx = await loadGuestContext(this.deps, wedding);
@@ -127,7 +128,6 @@ export class GetWeddingHome {
       this.deps.cards.listOpens(weddingId),
       this.deps.weddings.listByOwner(userId),
     ]);
-    await this.deps.weddings.update(weddingId, { lastOpenedAt: ctx.now });
     const byHousehold = households.map((h) => deliveriesByKind(ctx, records, opens, h.id));
     const counts = (kind: HouseholdCardKind) => cardCounts(byHousehold.map((d) => d[kind]));
 
@@ -172,6 +172,16 @@ export class GetWeddingHome {
       tier: this.deps.billing.enabled ? activeTier(ctx.features.entitlements, ctx.now) : null,
       others: all.filter((w) => w.id !== weddingId).sort(byRecentUse).map(({ id, title }) => ({ id, title })),
     };
+  }
+}
+
+export class MarkWeddingUsed {
+  constructor(private deps: Deps) {}
+
+  /** The couple opened the wedding's home; /dashboard opens the one used last. */
+  async execute(userId: string, weddingId: string): Promise<void> {
+    await loadOwnedWedding(this.deps, userId, weddingId);
+    await this.deps.weddings.markUsed(weddingId);
   }
 }
 

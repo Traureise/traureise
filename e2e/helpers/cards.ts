@@ -1,16 +1,11 @@
 import { expect, type Page } from "@playwright/test";
+import { openCard } from "./weddings";
 
-export const CARD_SLUG = { "Save the Date": "save-the-date", Einladung: "einladung", Dankeskarte: "dankeskarte", Verlobungsanzeige: "verlobung" } as const;
-export type CardName = keyof typeof CARD_SLUG;
+export type CardName = "Save the Date" | "Einladung" | "Dankeskarte" | "Verlobungsanzeige";
 
-/** Erstellen → card kind on the dashboard; with one website it opens the card editor. */
-export async function createCard(page: Page, name: CardName) {
-  await page.goto("/dashboard");
-  await page.getByRole("button", { name: "Erstellen", exact: true }).click();
-  await page.getByRole("menuitem", { name, exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/websites/[0-9a-f-]{36}/karten/${CARD_SLUG[name]}$`));
-  await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
-  return page.url();
+/** Opens the first version of a card kind from the wedding's timeline (every kind exists from the start). */
+export async function createCard(page: Page, weddingId: string, name: CardName) {
+  return openCard(page, weddingId, name);
 }
 
 export async function saveCard(page: Page) {
@@ -45,4 +40,13 @@ export async function openEnvelope(page: Page) {
   const opened = page.waitForResponse((r) => r.url().includes("/geoeffnet") && r.request().method() === "POST");
   await page.getByTestId("envelope").click();
   expect((await opened).status()).toBe(204);
+}
+
+/** Exportieren → a format, in the card editor at `cardUrl`. */
+export async function exportCard(page: Page, cardUrl: string, format: "PDF (A6)" | "PDF (A5)" | "Bild (PNG)") {
+  await page.goto(cardUrl);
+  await page.getByRole("button", { name: "Exportieren" }).click();
+  const downloading = page.waitForEvent("download");
+  await page.getByRole("menuitem", { name: format }).click();
+  return downloading;
 }

@@ -55,7 +55,7 @@ import { DrizzleGuestRepository } from "@/infrastructure/repositories/guests";
 import { AddItem, DeleteItem, MoveItem, UpdateItem, UpdateSection } from "@/application/sections";
 import { GetUpload, UploadImage } from "@/application/uploads";
 import { AddVersion, AssignVersion, DeleteVersion, RenameVersion } from "@/application/versions";
-import { CreateWedding, DeleteWedding, GetRecentWedding, GetWeddingHome, ListWeddings, UpdateWeddingDetails, UpdateWeddingSlug } from "@/application/weddings";
+import { CreateWedding, DeleteWedding, GetRecentWedding, GetWeddingHome, ListWeddings, MarkWeddingUsed, UpdateWeddingDetails, UpdateWeddingSlug } from "@/application/weddings";
 import { GetWebsiteForOwner, SelectTheme, SetCoverImage, SetEventShown, SetPublished, UpdateDesign, UpdateHome, UpdateSlug } from "@/application/websites";
 import { createDatabase } from "@/infrastructure/db/client";
 import { SharpImageProcessor } from "@/infrastructure/images/sharp";
@@ -177,6 +177,7 @@ function build() {
     listWeddings: new ListWeddings(deps),
     getRecentWedding: new GetRecentWedding(deps),
     getWeddingHome: new GetWeddingHome(deps),
+    markWeddingUsed: new MarkWeddingUsed(deps),
     updateWeddingDetails: new UpdateWeddingDetails(deps),
     updateWeddingSlug: new UpdateWeddingSlug(deps),
     deleteWedding: new DeleteWedding(deps),

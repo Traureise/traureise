@@ -53,6 +53,12 @@ export async function updateWeddingDetailsAction(weddingId: string, _prev: unkno
   });
 }
 
+/** From the home page itself (a POST, so link prefetching never counts as a visit). */
+export async function markWeddingUsedAction(weddingId: string): Promise<void> {
+  const user = await requireUser();
+  await runAction(() => container().markWeddingUsed.execute(user.id, weddingId));
+}
+
 export async function deleteWeddingAction(weddingId: string): Promise<ActionResult> {
   const user = await requireUser();
   const result = await runAction(async () => {

@@ -77,7 +77,7 @@ export default async function CardEditorPage({ params }: Props) {
         {data.publicUrl && data.active && (
           <ShareDialog
             url={data.publicUrl}
-            slug={`verlobung-${card.id}`}
+            slug={new URL(data.publicUrl).pathname.slice(1).replaceAll("/", "-")}
             title={tHome("shareTitle", { item: kindName })}
             message={card.message ?? data.defaultMessage}
             onShared={markEngagementSharedAction.bind(null, id, card.id)}

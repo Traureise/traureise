@@ -9,6 +9,7 @@ import { PageShell } from "@/components/app/app-footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteWeddingButton } from "@/components/weddings/delete-wedding-button";
+import { MarkWeddingUsed } from "@/components/weddings/mark-used";
 import { Timeline } from "@/components/weddings/timeline";
 import { WeddingDetailsButton } from "@/components/weddings/wedding-details-dialog";
 import { WeddingNav } from "@/components/weddings/wedding-nav";
@@ -84,6 +85,7 @@ export default async function WeddingHomePage({ params, searchParams }: Props) {
           </div>
         </header>
 
+        <MarkWeddingUsed weddingId={wedding.id} />
         <Timeline home={home} />
 
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4" data-testid="guest-summary">

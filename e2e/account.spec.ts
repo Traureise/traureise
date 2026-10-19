@@ -13,7 +13,7 @@ test("a user exports all their data and deletes the account, after which they st
   const slug = `kim-und-jo-${Date.now()}`;
   let coverUrl = "";
 
-  await test.step("create a website with a cover image", async () => {
+  await test.step("create a wedding whose website has a cover image", async () => {
     await login(page, email, "Kim");
     const editorUrl = await createWebsite(page, slug);
     await openSection(page, editorUrl, "Startseite");
@@ -42,9 +42,11 @@ test("a user exports all their data and deletes the account, after which they st
 
     const data = JSON.parse(new TextDecoder().decode(files["data.json"]));
     expect(data.account).toMatchObject({ email, firstName: "Kim" });
-    expect(data.websites).toHaveLength(1);
-    expect(data.websites[0]).toMatchObject({ slug, title: "Anna & Ben", weddingDate: "2027-06-12", coverImage: `images/${key}` });
-    expect(data.websites[0].sections.length).toBeGreaterThan(0);
+    expect(data.weddings).toHaveLength(1);
+    expect(data.weddings[0]).toMatchObject({ slug, title: "Anna & Ben", weddingDate: "2027-06-12" });
+    expect(data.weddings[0].websites[0]).toMatchObject({ slug, label: "Standard", published: true, coverImage: `images/${key}` });
+    expect(data.weddings[0].websites[0].sections.length).toBeGreaterThan(0);
+    expect(data.weddings[0].cards).toHaveLength(4);
   });
 
   await test.step("deletion needs the account's email address", async () => {
@@ -55,7 +57,7 @@ test("a user exports all their data and deletes the account, after which they st
     await expect(page).toHaveURL(/\/konto$/);
   });
 
-  await test.step("deleting removes the account, its website and its stored files, and logs out", async () => {
+  await test.step("deleting removes the account, its weddings and its stored files, and logs out", async () => {
     const panel = page.getByTestId("account-delete");
     await panel.getByLabel("Gib zur Bestätigung deine E-Mail-Adresse ein").fill(email.toUpperCase());
     await panel.getByRole("button", { name: "Konto endgültig löschen" }).click();
@@ -72,8 +74,8 @@ test("a user exports all their data and deletes the account, after which they st
 
   await test.step("the same email signs up again as a brand-new account", async () => {
     await login(page, email, "Kim");
-    await expect(page.getByRole("heading", { name: "Willkommen, Kim" })).toBeVisible();
-    await expect(page.getByTestId("website-card")).toHaveCount(0);
-    await expect(page.getByTestId("empty-state")).toBeVisible();
+    await expect(page).toHaveURL(/\/hochzeiten\/neu$/);
+    await page.goto("/hochzeiten");
+    await expect(page.getByTestId("wedding")).toHaveCount(0);
   });
 });
