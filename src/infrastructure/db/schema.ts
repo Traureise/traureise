@@ -289,7 +289,6 @@ type CardContentJson = {
   time: string;
   venue: string;
   showReplyBy: boolean;
-  showWebsiteLink: boolean;
 };
 
 // What happened with one card for one household. Emails are claimed (email_claimed_at) before they are sent,

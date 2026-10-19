@@ -51,7 +51,7 @@ describe("parseCardInput", () => {
     layoutId: "bogen",
     envelope: true,
     photoKey: null,
-    content: { heading: " Wir heiraten ", names: "Anna & Ben", text: "Feiert mit uns", place: "", eventId: null, time: "", venue: "", showReplyBy: true, showWebsiteLink: false },
+    content: { heading: " Wir heiraten ", names: "Anna & Ben", text: "Feiert mit uns", place: "", eventId: null, time: "", venue: "", showReplyBy: true },
     message: "Hallo {name}",
     reminderDays: [3, 14, 3],
     reminderMessage: "",
@@ -238,11 +238,9 @@ describe("buildCardModel", () => {
     expect(model).toMatchObject({ heading: "Danke!", text: "Für alles.", personalLine: "Danke für den Kuchen!" });
   });
 
-  it("links the website from an engagement announcement only when asked", () => {
+  it("never shows a website address on the engagement announcement", () => {
     const content = defaultCardContent("engagement", { title: "Anna & Ben", location: null }, { heading: "Wir haben uns verlobt", text: "" });
     expect(buildCardModel({ kind: "engagement", content, design, website, event: null, replyBy: null, household: null, labels, assets }).footer).toBeNull();
-    const linked = buildCardModel({ kind: "engagement", content: { ...content, showWebsiteLink: true }, design, website, event: null, replyBy: null, household: null, labels, assets });
-    expect(linked.footer).toBe("localhost:3000/anna-ben");
   });
 });
 

@@ -102,8 +102,7 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
       await createCard(page, "Dankeskarte");
       await expect(page.getByTestId("card-preview")).toContainText("Von Herzen danke");
       await createCard(page, "Verlobungsanzeige");
-      await page.getByLabel("Link zur Website auf der Karte zeigen").check();
-      await saveCard(page);
+      await expect(page.getByLabel("Link zur Website auf der Karte zeigen")).toHaveCount(0);
       await page.goto("/dashboard?tab=engagement");
       await expect(page.getByTestId("card-item")).toHaveCount(1);
       await page.goto("/dashboard?tab=thank-you");
@@ -267,7 +266,8 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
       await expect(guest.getByTestId("envelope")).toContainText("Für euch");
       await guest.getByTestId("envelope").click();
       await expect(guest.getByTestId("page-card-engagement")).toContainText("Wir haben uns verlobt");
-      await expect(guest.getByTestId("page-card-engagement")).toContainText(`localhost:3000/${slug}`);
+      await expect(guest.getByTestId("page-card-engagement")).not.toContainText(`localhost:3000/${slug}`);
+      await expect(guest.getByRole("link", { name: "Zur Website" })).toHaveCount(0);
     });
 
     await test.step("the account export contains cards, addresses, personal lines and statuses", async () => {

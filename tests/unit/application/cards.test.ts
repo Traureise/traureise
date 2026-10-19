@@ -140,8 +140,7 @@ describe("cards without a website", () => {
   it("never link to the website that does not exist yet", async () => {
     await f.websites.update(websiteId, { siteEnabled: false });
     await create("saveTheDate");
-    const engagement = await create("engagement");
-    await new SaveCard(f.deps).execute(anna.id, websiteId, "engagement", { ...engagement, content: { ...engagement.content, showWebsiteLink: true } });
+    await create("engagement");
     expect((await editor("saveTheDate")).websiteUrl).toBeNull();
     const kern = await household("Kern");
     await share("saveTheDate", kern.id);

@@ -48,5 +48,7 @@ from Mailpit (`e2e/helpers/`). Billing E2E uses the Creem stub in `e2e/creem-stu
 - No runtime third-party requests (fonts via `@fontsource`, no CDNs, no analytics).
 - Legal texts are not in the app: operators supply Markdown via `IMPRINT_FILE`/`PRIVACY_FILE`/`TERMS_FILE`.
 - No skipped tests, Playwright `retries: 0`.
+- No instance holds real data yet (development only): schema changes still get a Drizzle migration, but
+  existing rows need no data migration or backwards compatibility.
 - Workflow: one issue per version, branch `traureise-<n>-<topic>`, commits prefixed `TRAUREISE #<n>: `,
   ADRs in `docs/adr/` (MADR, numbered), PRs left open for the owner to merge.

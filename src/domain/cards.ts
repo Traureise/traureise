@@ -46,14 +46,13 @@ export type CardContent = {
   time: string;
   venue: string;
   showReplyBy: boolean;
-  showWebsiteLink: boolean;
 };
 
 export const CARD_FIELDS = {
   saveTheDate: ["names", "place", "text"],
   invitation: ["heading", "names", "eventId", "time", "venue", "text", "showReplyBy"],
   thankYou: ["heading", "names", "text"],
-  engagement: ["heading", "names", "text", "showWebsiteLink"],
+  engagement: ["heading", "names", "text"],
 } as const satisfies Record<CardKind, readonly (keyof CardContent)[]>;
 
 export const CARD_TEXT_MAX = 800;
@@ -75,7 +74,6 @@ export function defaultCardContent(kind: CardKind, website: { title: string; loc
     time: "",
     venue: "",
     showReplyBy: true,
-    showWebsiteLink: false,
   };
 }
 
@@ -88,7 +86,6 @@ const contentSchema = z.object({
   time: text(60),
   venue: text(160),
   showReplyBy: z.boolean().default(true),
-  showWebsiteLink: z.boolean().default(false),
 });
 
 const cardSchema = z.object({
@@ -202,7 +199,6 @@ export function buildCardModel(input: {
     details.push(content.venue || event?.venueName || null);
     if (content.showReplyBy && input.replyBy) footer = labels.replyBy.replace("{date}", formatDate(input.replyBy, labels.locale));
   }
-  if (kind === "engagement" && content.showWebsiteLink && website.url) footer = website.url.replace(/^https?:\/\//, "");
   const colors = cardColors(design.palette.colors, design.layout, hasPhoto);
   const photoSrc = hasPhoto ? assets.photoSrc : null;
   return {

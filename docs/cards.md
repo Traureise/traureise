@@ -30,7 +30,7 @@ website's. Then the photo and texts:
 | Save the Date | photo, names, date, place, a short text ("Einladung folgt"). Guests get **Zum Kalender hinzufügen** (`.ics`, all-day) and **Zur Website**. |
 | Einladung | "Wir heiraten" (editable), names, date, time and venue of a schedule event (each overridable), the reply-by date, a text. The response form follows below the card. |
 | Dankeskarte | photo, a text for everyone, and an optional **personal line per household**, which you enter in the guest list. |
-| Verlobungsanzeige | photo, names, a text, optionally the link to your website (once you have one). |
+| Verlobungsanzeige | photo, names, a text. No date and no website link: it usually comes before anything is planned. |
 
 **Mit Umschlag öffnen** switches the envelope on or off per card. **Vorschau mit Umschlag** shows the whole
 page as a household sees it; the preview never counts as opened.

@@ -302,7 +302,8 @@ const pageWebsite = ({ title, slug, weddingDate, timezone }: Website): PageWebsi
 
 function pageCard(deps: Deps, ctx: GuestContext, card: Card, household: Pick<Household, "name" | "personalLine"> | null): PageCard {
   const { slug, weddingDate, siteEnabled } = ctx.view.website;
-  const linksSite = siteEnabled && (card.kind === "saveTheDate" || (card.kind === "engagement" && card.content.showWebsiteLink));
+  // Only the Save the Date links the website: an engagement comes before any wedding is planned.
+  const linksSite = siteEnabled && card.kind === "saveTheDate";
   return {
     kind: card.kind,
     model: modelFor(deps, ctx, card, household, pagePhoto(card)),
