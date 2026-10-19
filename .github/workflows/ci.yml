@@ -30,6 +30,20 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:unit
 
+  build-2gb:
+    name: Build in 2 GB of RAM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The image must build on a small VPS: the same `next build` as the Dockerfile (same heap limit), in a
+      # container that gets 2 GB of memory and no swap. Killed for lack of memory means the job fails.
+      - name: next build with 2 GB
+        run: |
+          docker run --rm --memory=2g --memory-swap=2g \
+            -e NEXT_TELEMETRY_DISABLED=1 -e NODE_OPTIONS=--max-old-space-size=1536 \
+            -v "$PWD":/app -w /app node:24-bookworm-slim \
+            sh -c "npm ci --no-audit --no-fund && npm run build && test -f .next/BUILD_ID"
+
   integration:
     name: Integration tests
     runs-on: ubuntu-latest
