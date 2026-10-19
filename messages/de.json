@@ -679,6 +679,7 @@
     "pageTitle": "Eure Antwort · {title}",
     "formLabel": "Antwortformular",
     "greeting": "Hallo {household}!",
+    "answerTitle": "Eure Antwort",
     "replyBy": "Bitte antwortet bis zum {date}.",
     "previewNote": "Vorschau: So sieht das Formular für eure Gäste aus. Hier wird nichts gespeichert.",
     "closed": "Die Antwortfrist ist vorbei. Hier seht ihr eure Antwort. Wenn sich etwas ändert, meldet euch bitte direkt bei {title}.",

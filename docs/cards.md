@@ -21,7 +21,7 @@ first website version's. Then the photo and texts:
 | Card | Content |
 |---|---|
 | Save the Date | photo, the line above the names (default "Haltet euch den Tag frei", editable), names, date ("Datum folgt" while there is none), place, a short text ("Einladung folgt"). Guests get **Zum Kalender hinzufügen** (`.ics`, all-day) and **Zur Website** (the household's website version, once it is online). |
-| Einladung | "Wir heiraten" (editable), names, date, time and venue of a schedule event (each overridable), the reply-by date, a text. The response form follows below the card, and **Zur Website** links the household's website version once it is online. |
+| Einladung | "Wir heiraten" (editable), names, date, time and venue of a schedule event (each overridable), the reply-by date, a text. The response form follows below the card under a small **Eure Antwort** heading (the card already greets the household), and **Zur Website** links the household's website version once it is online. |
 | Dankeskarte | photo, a text for everyone, and an optional **personal line per household**, which you enter in the guest list. |
 | Verlobungsanzeige | photo, names, a text. No date and no website link: it usually comes before anything is planned. |
 

@@ -63,7 +63,7 @@ function PollField({ poll, value, onChange, name, errors }: { poll: Poll; value:
  * One form per household: who is coming, to which events, meal, allergies, polls, requests to bring
  * someone, and a message. The same component is the couple's preview (`token` null, nothing is sent).
  */
-export function GuestForm({ form, token }: { form: GuestFormData; token: string | null }) {
+export function GuestForm({ form, token, belowCards = false }: { form: GuestFormData; token: string | null; belowCards?: boolean }) {
   const t = useTranslations("rsvp");
   const tRequest = useTranslations("rsvp.requestStatus");
   const format = useFormatter();
@@ -112,13 +112,21 @@ export function GuestForm({ form, token }: { form: GuestFormData; token: string 
 
   return (
     <form onSubmit={submit} className="mx-auto max-w-2xl space-y-10 px-6 py-14" aria-label={t("formLabel")} data-testid="guest-form">
-      <header className="space-y-3 text-center">
-        <p className="site-eyebrow">{website.title}</p>
-        <h1 className="text-4xl sm:text-5xl">{t("greeting", { household: household.name })}</h1>
-        {website.weddingDate && <p className="text-lg">{date(website.weddingDate, "full")}</p>}
-        {form.replyBy && !readOnly && <p className="site-muted">{t("replyBy", { date: date(form.replyBy) })}</p>}
-        <div className="site-divider" aria-hidden />
-      </header>
+      {/* Below the household's cards, which already greet and give the date, a small heading is enough. */}
+      {belowCards ? (
+        <header className="space-y-2 text-center">
+          <h2 className="text-3xl">{t("answerTitle")}</h2>
+          {form.replyBy && !readOnly && <p className="site-muted">{t("replyBy", { date: date(form.replyBy) })}</p>}
+        </header>
+      ) : (
+        <header className="space-y-3 text-center">
+          <p className="site-eyebrow">{website.title}</p>
+          <h1 className="text-4xl sm:text-5xl">{t("greeting", { household: household.name })}</h1>
+          {website.weddingDate && <p className="text-lg">{date(website.weddingDate, "full")}</p>}
+          {form.replyBy && !readOnly && <p className="site-muted">{t("replyBy", { date: date(form.replyBy) })}</p>}
+          <div className="site-divider" aria-hidden />
+        </header>
+      )}
 
       {form.state === "preview" && (
         <p className="site-surface rounded-xl p-4 text-sm" role="note" data-testid="preview-note">

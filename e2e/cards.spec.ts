@@ -171,6 +171,9 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
       await expect(cards.nth(1)).toHaveAttribute("data-testid", "page-card-saveTheDate");
       // The invitation links the household's website too.
       await expect(cards.nth(0).getByRole("link", { name: "Zur Website" })).toHaveAttribute("href", `/${slug}`);
+      // Below the cards the form only needs a small heading: the card already greets and dates.
+      await expect(guest.getByTestId("guest-form").getByRole("heading", { level: 2, name: "Eure Antwort" })).toBeVisible();
+      await expect(guest.getByRole("heading", { name: "Hallo Familie Weber!" })).toHaveCount(0);
       await guest.getByRole("link", { name: "Zur Antwort" }).click();
       await guest.getByRole("region", { name: "Clara", exact: true }).getByLabel("Ich komme").check();
       await guest.getByRole("button", { name: "Antwort senden" }).click();

@@ -38,7 +38,7 @@ export default async function HouseholdPage({ params }: Props) {
       </GuestSite>
     );
   }
-  const form = view.form && <GuestForm form={view.form} token={token} />;
+  const form = view.form && <GuestForm form={view.form} token={token} belowCards={view.cards.length > 0} />;
   if (view.cards.length === 0) return <GuestSite design={view.design}>{form}</GuestSite>;
   return (
     <GuestSite design={view.design}>
