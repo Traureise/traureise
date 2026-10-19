@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Lock, PencilLine, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Layers, Lock, PencilLine, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { addVersionAction, deleteVersionAction, renameVersionAction } from "@/app/actions/weddings";
 import { FieldError } from "@/components/forms/field-error";
@@ -17,10 +17,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { FieldErrors } from "@/domain/result";
@@ -78,13 +78,26 @@ export function VersionChips({
   );
 }
 
-/** "+ Version": a name and which version to copy; then opens the new version. */
+/** "+ Version" as a chip that opens the dialog. */
 function AddVersionButton({ weddingId, item, versions }: { weddingId: string; item: VersionItem; versions: Version[] }) {
+  const t = useTranslations("weddings.versions");
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-0.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary">
+        {t("add")}
+      </button>
+      <AddVersionDialog weddingId={weddingId} item={item} versions={versions} open={open} onOpenChange={setOpen} />
+    </>
+  );
+}
+
+/** A name and which version to copy; then opens the new version. */
+function AddVersionDialog({ weddingId, item, versions, open, onOpenChange }: { weddingId: string; item: VersionItem; versions: Version[]; open: boolean; onOpenChange: (open: boolean) => void }) {
   const t = useTranslations("weddings.versions");
   const tItems = useTranslations("weddings.items");
   const tErrors = useTranslations("errors");
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [label, setLabel] = useState("");
   const [copyFrom, setCopyFrom] = useState(versions[0]?.id ?? "");
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -101,129 +114,148 @@ function AddVersionButton({ weddingId, item, versions }: { weddingId: string; it
         return;
       }
       toast.success(t("created"));
-      setOpen(false);
+      onOpenChange(false);
       router.push(versionHref(weddingId, item, result.data.id));
     });
   }
 
   return (
-    <>
-      <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-0.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary">
-        {t("add")}
-      </button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-2xl font-medium">{t("addTitle", { item: tItems(item) })}</DialogTitle>
-            <DialogDescription>{lead}</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={submit} className="min-w-0 space-y-5" aria-label={t("addTitle", { item: tItems(item) })}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-heading text-2xl font-medium">{t("addTitle", { item: tItems(item) })}</DialogTitle>
+          <DialogDescription>{lead}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="min-w-0 space-y-5" aria-label={t("addTitle", { item: tItems(item) })}>
+          <div className="space-y-2">
+            <Label htmlFor={`version-${item}-label`}>{t("name")}</Label>
+            <Input id={`version-${item}-label`} value={label} maxLength={LABEL_MAX} placeholder={t("namePlaceholder")} onChange={(e) => setLabel(e.target.value)} />
+            <FieldError code={errors.label} />
+          </div>
+          {versions.length > 1 && (
             <div className="space-y-2">
-              <Label htmlFor={`version-${item}-label`}>{t("name")}</Label>
-              <Input id={`version-${item}-label`} value={label} maxLength={LABEL_MAX} placeholder={t("namePlaceholder")} onChange={(e) => setLabel(e.target.value)} />
-              <FieldError code={errors.label} />
+              <Label htmlFor={`version-${item}-copy`}>{t("copyFrom")}</Label>
+              <select id={`version-${item}-copy`} value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm">
+                {versions.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
             </div>
-            {versions.length > 1 && (
-              <div className="space-y-2">
-                <Label htmlFor={`version-${item}-copy`}>{t("copyFrom")}</Label>
-                <select id={`version-${item}-copy`} value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm">
-                  {versions.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-                {t("cancel")}
-              </Button>
-              <Button type="submit" disabled={pending}>
-                {t("submit")}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+              {t("cancel")}
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {t("submit")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-/** In an editor: rename this version, or delete it (never the last one). */
-export function VersionActions({ weddingId, item, version, deletable }: { weddingId: string; item: VersionItem; version: Version; deletable: boolean }) {
+/**
+ * In an editor: one button naming the version being edited. Its menu switches versions, adds one (or leads to
+ * the prices without the package), renames this one and deletes it (never the last one).
+ */
+export function VersionMenu({
+  weddingId,
+  item,
+  versions,
+  current,
+  canAdd,
+}: {
+  weddingId: string;
+  item: VersionItem;
+  versions: Version[];
+  current: Version;
+  canAdd: boolean;
+}) {
   const t = useTranslations("weddings.versions");
   const tErrors = useTranslations("errors");
   const router = useRouter();
-  const [renaming, setRenaming] = useState(false);
-  const [label, setLabel] = useState(version.label);
+  const [dialog, setDialog] = useState<"add" | "rename" | "delete" | null>(null);
+  const [label, setLabel] = useState(current.label);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [pending, start] = useTransition();
+  const onOpenChange = (open: boolean) => !open && setDialog(null);
 
   function rename(event: React.FormEvent) {
     event.preventDefault();
     start(async () => {
-      const result = await renameVersionAction(weddingId, item, version.id, label);
+      const result = await renameVersionAction(weddingId, item, current.id, label);
       if (!result.ok) return setErrors(result.fieldErrors ?? {});
       toast.success(t("renamed"));
-      setRenaming(false);
+      setDialog(null);
       router.refresh();
     });
   }
 
   return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      <Button type="button" variant="ghost" size="xs" onClick={() => setRenaming(true)}>
-        <PencilLine aria-hidden />
-        {t("rename")}
-      </Button>
-      {deletable && (
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button type="button" variant="ghost" size="xs" className="text-destructive hover:text-destructive">
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="outline" size="sm" className="max-w-full" aria-label={t("menu", { label: current.label })} data-testid="version-menu">
+            <Layers aria-hidden />
+            <span className="truncate">{current.label}</span>
+            <ChevronDown aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-56">
+          <DropdownMenuLabel className="text-xs text-muted-foreground">{t("label")}</DropdownMenuLabel>
+          {versions.map((v) => (
+            <DropdownMenuItem key={v.id} asChild>
+              <Link href={versionHref(weddingId, item, v.id)} aria-current={v.id === current.id ? "page" : undefined}>
+                <Check className={cn(v.id === current.id ? "opacity-100" : "opacity-0")} aria-hidden />
+                <span className="truncate">{v.label}</span>
+              </Link>
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          {canAdd ? (
+            <DropdownMenuItem onSelect={() => setDialog("add")}>
+              <Plus aria-hidden />
+              {t("addItem")}
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem asChild>
+              <Link href="/preise" title={t("locked")} data-testid="add-version-locked">
+                <Lock aria-hidden />
+                {t("addItem")}
+              </Link>
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem onSelect={() => setDialog("rename")}>
+            <PencilLine aria-hidden />
+            {t("rename")}
+          </DropdownMenuItem>
+          {versions.length > 1 && (
+            <DropdownMenuItem variant="destructive" onSelect={() => setDialog("delete")}>
               <Trash2 aria-hidden />
               {t("delete")}
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t("deleteTitle", { label: version.label })}</AlertDialogTitle>
-              <AlertDialogDescription>{t("deleteBody")}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-              <AlertDialogAction
-                variant="destructive"
-                disabled={pending}
-                onClick={() =>
-                  start(async () => {
-                    const result = await deleteVersionAction(weddingId, item, version.id);
-                    if (!result.ok) return void toast.error(tErrors(result.error ?? Object.values(result.fieldErrors ?? {})[0] ?? "unknown"));
-                    toast.success(t("deleted"));
-                    router.push(`/hochzeiten/${weddingId}`);
-                  })
-                }
-              >
-                {t("deleteConfirm")}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
-      <Dialog open={renaming} onOpenChange={setRenaming}>
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <AddVersionDialog weddingId={weddingId} item={item} versions={versions} open={dialog === "add"} onOpenChange={onOpenChange} />
+      <Dialog open={dialog === "rename"} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="font-heading text-2xl font-medium">{t("renameTitle")}</DialogTitle>
-            <DialogDescription className="sr-only">{version.label}</DialogDescription>
+            <DialogDescription className="sr-only">{current.label}</DialogDescription>
           </DialogHeader>
           <form onSubmit={rename} className="min-w-0 space-y-5" aria-label={t("renameTitle")}>
             <div className="space-y-2">
-              <Label htmlFor={`rename-${version.id}`}>{t("name")}</Label>
-              <Input id={`rename-${version.id}`} value={label} maxLength={LABEL_MAX} onChange={(e) => setLabel(e.target.value)} />
+              <Label htmlFor={`rename-${current.id}`}>{t("name")}</Label>
+              <Input id={`rename-${current.id}`} value={label} maxLength={LABEL_MAX} onChange={(e) => setLabel(e.target.value)} />
               <FieldError code={errors.label} />
             </div>
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setRenaming(false)}>
+              <Button type="button" variant="ghost" onClick={() => setDialog(null)}>
                 {t("cancel")}
               </Button>
               <Button type="submit" disabled={pending}>
@@ -233,6 +265,31 @@ export function VersionActions({ weddingId, item, version, deletable }: { weddin
           </form>
         </DialogContent>
       </Dialog>
-    </span>
+      <AlertDialog open={dialog === "delete"} onOpenChange={onOpenChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("deleteTitle", { label: current.label })}</AlertDialogTitle>
+            <AlertDialogDescription>{t("deleteBody")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={pending}
+              onClick={() =>
+                start(async () => {
+                  const result = await deleteVersionAction(weddingId, item, current.id);
+                  if (!result.ok) return void toast.error(tErrors(result.error ?? Object.values(result.fieldErrors ?? {})[0] ?? "unknown"));
+                  toast.success(t("deleted"));
+                  router.push(`/hochzeiten/${weddingId}`);
+                })
+              }
+            >
+              {t("deleteConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

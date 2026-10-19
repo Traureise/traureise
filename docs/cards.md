@@ -10,7 +10,8 @@ WhatsApp or email, and can export every card as PDF and PNG to print at home.
 
 **Opening.** Every card is generated with the wedding. Its step on the wedding's timeline opens the first
 version; the chips open the others, and **+ Version** adds one. The card editor shows the wedding's names and date
-with **Angaben ändern**, the versions (**Umbenennen**, **Version löschen**), **Vorschau mit Umschlag**,
+with **Angaben ändern**, then one row of buttons: the version menu (named after the version you edit; it switches
+versions and has **Neue Version**, **Umbenennen** and **Version löschen**), **Vorschau mit Umschlag**,
 **Exportieren**, and for the engagement announcement **Teilen**.
 
 **Designing.** The editor (`/hochzeiten/<id>/karten/<version>`) shows the card on the right exactly as guests see

@@ -84,8 +84,12 @@ test("a couple creates their wedding, gets every item, adds versions, chooses wh
       await dialog.getByRole("button", { name: "Version anlegen" }).click();
       await expect(page).toHaveURL(/\/karten\/[0-9a-f-]{36}$/);
       familyUrl = new URL(page.url()).pathname;
-      await expect(page.getByTestId("version-chips").getByRole("link")).toHaveText(["Standard", "Familie"]);
-      await expect(page.getByTestId("version-chips").getByRole("link", { name: "Familie" })).toHaveAttribute("aria-current", "page");
+      // In the editor one menu names the version and switches, adds, renames and deletes versions.
+      await expect(page.getByTestId("version-menu")).toHaveText("Familie");
+      await page.getByTestId("version-menu").click();
+      await expect(page.getByRole("menuitem", { name: "Standard" })).not.toHaveAttribute("aria-current");
+      await expect(page.getByRole("menuitem", { name: "Familie" })).toHaveAttribute("aria-current", "page");
+      await page.keyboard.press("Escape");
       await page.getByLabel("Text", { exact: true }).fill("Für die ganze Familie");
       // "Speichern und schließen" saves and goes back to the wedding.
       await page.getByRole("button", { name: "Weitere Speicher-Optionen" }).click();
@@ -106,6 +110,12 @@ test("a couple creates their wedding, gets every item, adds versions, chooses wh
       expect((await request.get(`/${slug}-freunde`)).status()).toBe(404);
       await publishWebsite(page, new URL(page.url()).pathname);
       expect((await request.get(`/${slug}-freunde`)).status()).toBe(200);
+      await page.getByTestId("version-menu").click();
+      await page.getByRole("menuitem", { name: "Umbenennen" }).click();
+      dialog = page.getByRole("dialog", { name: "Version umbenennen" });
+      await dialog.getByLabel("Name der Version").fill("Freundeskreis");
+      await dialog.getByRole("button", { name: "Speichern" }).click();
+      await expect(page.getByTestId("version-menu")).toHaveText("Freundeskreis");
 
       await page.goto(homeUrl(weddingId));
       await expect(step(page, "Save the Date").getByTestId("version-chips").getByRole("link")).toHaveText(["Standard", "Familie"]);
@@ -121,7 +131,7 @@ test("a couple creates their wedding, gets every item, adds versions, chooses wh
       await expect(versions.getByRole("combobox")).toHaveCount(2);
       await versions.getByLabel("Save the Date").selectOption({ label: "Familie" });
       await expect(page.getByText("Version für Familie Weber gespeichert")).toBeVisible();
-      await versions.getByLabel("Hochzeitswebsite").selectOption({ label: "Freunde" });
+      await versions.getByLabel("Hochzeitswebsite").selectOption({ label: "Freundeskreis" });
       await page.reload();
       await expect(household(page, "Familie Weber").getByTestId("household-versions").getByLabel("Save the Date")).toHaveValue(/[0-9a-f-]{36}/);
       await expect(household(page, "Familie Weber").getByTestId("household-versions").getByLabel("Save the Date").locator("option:checked")).toHaveText("Familie");
@@ -163,7 +173,8 @@ test("a couple creates their wedding, gets every item, adds versions, chooses wh
       await openEnvelope(guest);
       await expect(guest.getByTestId("page-card-saveTheDate")).toContainText("Für die ganze Familie");
       await page.goto(familyUrl);
-      await page.getByRole("button", { name: "Version löschen" }).click();
+      await page.getByTestId("version-menu").click();
+      await page.getByRole("menuitem", { name: "Version löschen" }).click();
       await page.getByRole("alertdialog").getByRole("button", { name: "Endgültig löschen" }).click();
       await expect(page).toHaveURL(new RegExp(`${homeUrl(weddingId)}$`));
       await expect(step(page, "Save the Date").getByTestId("version-chips").getByRole("link")).toHaveText(["Standard"]);

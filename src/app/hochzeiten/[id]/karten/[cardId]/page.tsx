@@ -8,7 +8,8 @@ import { NotFoundError } from "@/application/errors";
 import { CardEditor } from "@/components/card-editor/card-editor";
 import { ExportMenu } from "@/components/cards/export-menu";
 import { ShareDialog } from "@/components/share/share-dialog";
-import { VersionActions, VersionChips } from "@/components/weddings/versions";
+import { Button } from "@/components/ui/button";
+import { VersionMenu } from "@/components/weddings/versions";
 import { WeddingDetailsButton } from "@/components/weddings/wedding-details-dialog";
 import { WeddingNav } from "@/components/weddings/wedding-nav";
 import { container } from "@/composition/container";
@@ -63,18 +64,15 @@ export default async function CardEditorPage({ params }: Props) {
           <WeddingDetailsButton wedding={wedding} appUrl={c.appUrl} timeZones={timeZones} variant="link" />
         </p>
       </div>
-      <div className="space-y-2" data-testid="versions">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-medium">{t("versions")}</p>
-          <VersionActions weddingId={id} item={card.kind} version={{ id: card.id, label: card.label }} deletable={data.versions.length > 1} />
-        </div>
-        <VersionChips weddingId={id} item={card.kind} versions={data.versions} current={card.id} canAdd={data.canAddVersion} />
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Link href={`${base}/vorschau`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-sm text-primary hover:bg-secondary/50">
-          <Eye className="size-4" aria-hidden />
-          {t("openPreview")}
-        </Link>
+      {/* One even toolbar: which version, its preview, export and sharing. */}
+      <div className="grid grid-cols-2 gap-2 [&>*]:w-full" data-testid="versions">
+        <VersionMenu weddingId={id} item={card.kind} versions={data.versions} current={{ id: card.id, label: card.label }} canAdd={data.canAddVersion} />
+        <Button asChild variant="outline" size="sm">
+          <Link href={`${base}/vorschau`}>
+            <Eye aria-hidden />
+            {t("openPreview")}
+          </Link>
+        </Button>
         <ExportMenu exportUrl={`${base}/export`} active={data.active && !data.waitsForDate} />
         {data.publicUrl && data.active && (
           <ShareDialog

@@ -4,7 +4,7 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { ChevronRight, House, Palette, Type, Users } from "lucide-react";
 import { Panel } from "@/components/editor/panel";
 import { PublishControl } from "@/components/editor/publish-control";
-import { VersionActions, VersionChips } from "@/components/weddings/versions";
+import { VersionMenu } from "@/components/weddings/versions";
 import { dateFromIso } from "@/lib/format";
 import { loadEditorView } from "@/lib/editor";
 import { cn } from "@/lib/utils";
@@ -38,7 +38,6 @@ export default async function EditorOverview({ params }: Props) {
   const { website, sections } = view;
   const t = await getTranslations("editor");
   const tTitles = await getTranslations("sections.titles");
-  const tVersions = await getTranslations("weddings.versions");
   const format = await getFormatter();
   const base = `/hochzeiten/${id}/website/${websiteId}`;
 
@@ -50,14 +49,10 @@ export default async function EditorOverview({ params }: Props) {
         </p>
         <p className="break-all text-muted-foreground">{view.publicUrl}</p>
       </div>
-      <PublishControl websiteId={websiteId} published={website.published} online={view.online} />
-      <div className="space-y-2" data-testid="versions">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-medium">{tVersions("label")}</p>
-          <VersionActions weddingId={id} item="website" version={{ id: websiteId, label: website.label }} deletable={view.versions.length > 1} />
-        </div>
-        <VersionChips weddingId={id} item="website" versions={view.versions} current={websiteId} canAdd={view.canAddVersion} />
+      <div data-testid="versions">
+        <VersionMenu weddingId={id} item="website" versions={view.versions} current={{ id: websiteId, label: website.label }} canAdd={view.canAddVersion} />
       </div>
+      <PublishControl websiteId={websiteId} published={website.published} online={view.online} />
       <nav aria-label={t("nav.label")} className="space-y-6">
         <ul className="space-y-2">
           <NavRow href={`${base}/theme`} icon={<Palette className="size-4 text-muted-foreground" aria-hidden />} label={t("nav.theme")} />

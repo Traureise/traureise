@@ -948,7 +948,9 @@
     },
     "versions": {
       "label": "Versionen",
+      "menu": "Version: {label}",
       "add": "+ Version",
+      "addItem": "Neue Version",
       "addTitle": "Neue Version: {item}",
       "addLead": "Zum Beispiel eine für die Familie und eine für Freunde. Wer welche Version bekommt, wählt ihr in der Gästeliste.",
       "addLeadEngagement": "Jede Version hat ihren eigenen Link.",

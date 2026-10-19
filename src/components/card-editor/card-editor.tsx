@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ChevronDown } from "lucide-react";
@@ -48,6 +48,9 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
   const [content, setContent] = useState<CardContent>(card.content);
   const [message, setMessage] = useState(card.message ?? "");
   const [reminders, setReminders] = useState(card.reminderDays.join(", "));
+  // The save options open as wide as the whole save button, like one control.
+  const saveRow = useRef<HTMLDivElement>(null);
+  const [saveWidth, setSaveWidth] = useState<number>();
   const [reminderMessage, setReminderMessage] = useState(card.reminderMessage ?? "");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [pending, start] = useTransition();
@@ -256,18 +259,18 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
           )}
         </section>
 
-        <div className="flex">
+        <div ref={saveRow} className="flex">
           <Button type="button" className="flex-1 rounded-r-none" disabled={pending} onClick={() => save()}>
             {pending ? t("saving") : t("save")}
           </Button>
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={(open) => open && setSaveWidth(saveRow.current?.offsetWidth)}>
             <DropdownMenuTrigger asChild>
               <Button type="button" className="rounded-l-none border-l border-primary-foreground/20 px-2" disabled={pending} aria-label={t("saveOptions")}>
                 <ChevronDown aria-hidden />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-auto min-w-max">
-              <DropdownMenuItem className="whitespace-nowrap" onSelect={() => save(true)}>
+            <DropdownMenuContent align="end" sideOffset={6} style={{ width: saveWidth }} className="p-1">
+              <DropdownMenuItem className="h-9 justify-center font-medium whitespace-nowrap text-primary" onSelect={() => save(true)}>
                 {t("saveAndClose")}
               </DropdownMenuItem>
             </DropdownMenuContent>

@@ -46,7 +46,8 @@ Every page of a wedding has a breadcrumb back to the wedding and to the list of 
 
 Each item can have several **versions**, for example "Familie" and "Freunde". **+ Version** asks for a name and
 which version to copy (the first by default). The first version of every item is called "Standard" until you rename
-it; versions can be renamed and deleted, except the last one of an item.
+it; versions can be renamed and deleted, except the last one of an item. In an editor, the version menu (the button
+named after the version) switches between versions and holds these actions.
 
 - **Who gets what** is chosen on the guest list: with more than one version of an item, each household gets a
   choice. By default every household gets the first version.
