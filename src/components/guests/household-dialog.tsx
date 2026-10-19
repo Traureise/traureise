@@ -29,7 +29,7 @@ let counter = 0;
 const newPerson = (): Person => ({ key: `new-${++counter}`, id: null, name: "", isChild: false });
 
 /** Adds a household, or edits one (`household` set): name, people, and the events it is invited to. */
-export function HouseholdDialog({ websiteId, events, household }: { websiteId: string; events: { id: string; name: string }[]; household?: HouseholdDraft }) {
+export function HouseholdDialog({ weddingId, events, household }: { weddingId: string; events: { id: string; name: string }[]; household?: HouseholdDraft }) {
   const t = useTranslations("guests.household");
   const tErrors = useTranslations("errors");
   const router = useRouter();
@@ -58,7 +58,7 @@ export function HouseholdDialog({ websiteId, events, household }: { websiteId: s
     event.preventDefault();
     start(async () => {
       const allInvited = events.every((e) => invited.includes(e.id));
-      const result = await saveHouseholdAction(websiteId, household?.id ?? null, {
+      const result = await saveHouseholdAction(weddingId, household?.id ?? null, {
         name,
         invitedEventIds: allInvited ? null : invited,
         email,

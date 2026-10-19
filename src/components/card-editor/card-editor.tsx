@@ -8,12 +8,13 @@ import type { CardEditor as CardEditorData } from "@/application/cards";
 import { CardFrame } from "@/components/cards/card-frame";
 import { ImageField } from "@/components/editor/image-field";
 import { FieldError } from "@/components/forms/field-error";
+import { MessageField } from "@/components/forms/message-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { buildCardModel, CARD_FIELDS, type CardContent } from "@/domain/cards";
+import { buildCardModel, CARD_FIELDS, MESSAGE_MAX, type CardContent } from "@/domain/cards";
 import { FONT_PAIRINGS } from "@/domain/fonts";
 import type { FieldErrors } from "@/domain/result";
 import { localize, resolveDesign } from "@/domain/theme";
@@ -33,7 +34,7 @@ const parseDays = (value: string) =>
 export function CardEditor({ data, locale, header }: { data: CardEditorData; locale: string; header: React.ReactNode }) {
   const t = useTranslations("cardEditor");
   const tErrors = useTranslations("errors");
-  const { card, website } = data;
+  const { card, wedding } = data;
   const fields: readonly (keyof CardContent)[] = CARD_FIELDS[card.kind];
   const [themeId, setThemeId] = useState(card.themeId);
   const [paletteId, setPaletteId] = useState(card.paletteId);
@@ -58,7 +59,7 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
       kind: card.kind,
       content,
       design: { ...resolveDesign(option.theme, paletteId, fontPairingId), layout },
-      website: { title: website.title, weddingDate: website.weddingDate, location: website.location, url: data.websiteUrl },
+      website: { title: wedding.title, weddingDate: wedding.weddingDate, location: wedding.location },
       event,
       replyBy: data.replyBy,
       household: card.kind === "thankYou" ? { name: "", personalLine: t("samplePersonalLine") } : null,
@@ -69,7 +70,7 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
         ornamentSvg: layout.ornament ? (option.svgs[layout.ornament] ?? null) : null,
       },
     });
-  }, [card.kind, content, data, fontPairingId, layout, option, paletteId, photoKey, t, website]);
+  }, [card.kind, content, data, fontPairingId, layout, option, paletteId, photoKey, t, wedding]);
 
   function pickTheme(id: string) {
     setThemeId(id);
@@ -79,7 +80,7 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
 
   function save() {
     start(async () => {
-      const result = await saveCardAction(website.id, card.kind, {
+      const result = await saveCardAction(wedding.id, card.id, {
         themeId: option.id,
         paletteId,
         fontPairingId,
@@ -101,9 +102,11 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
     });
   }
 
+  // The Save the Date's heading is the small line above the names ("Haltet euch den Tag frei").
+  const label = (key: keyof CardContent) => (key === "heading" && card.kind === "saveTheDate" ? t("fields.eyebrow") : t(`fields.${key}`));
   const text = (key: "heading" | "names" | "place" | "time" | "venue", placeholder?: string) => (
     <div className="space-y-2" key={key}>
-      <Label htmlFor={`card-${key}`}>{t(`fields.${key}`)}</Label>
+      <Label htmlFor={`card-${key}`}>{label(key)}</Label>
       <Input id={`card-${key}`} value={content[key]} placeholder={placeholder} onChange={(e) => set(key, e.target.value)} />
       <FieldError code={errors[`content.${key}`]} />
     </div>
@@ -172,7 +175,7 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
 
         <section className="space-y-4">
           <h2 className="font-heading text-xl font-medium">{t("content")}</h2>
-          {layout.photo !== "none" && <ImageField websiteId={website.id} label={t("photo")} value={photoKey} onChange={setPhotoKey} error={errors.photoKey} />}
+          {layout.photo !== "none" && <ImageField weddingId={wedding.id} label={t("photo")} value={photoKey} onChange={setPhotoKey} error={errors.photoKey} />}
           {fields.includes("heading") && text("heading")}
           {fields.includes("names") && text("names")}
           {fields.includes("place") && text("place")}
@@ -212,14 +215,17 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
             <Label htmlFor="card-envelope">{t("envelope")}</Label>
             <Switch id="card-envelope" checked={envelope} onCheckedChange={setEnvelope} />
           </div>
-          {card.kind !== "engagement" && (
-            <div className="space-y-2">
-              <Label htmlFor="card-message">{t("message")}</Label>
-              <Textarea id="card-message" rows={4} value={message} placeholder={data.defaultMessage} onChange={(e) => setMessage(e.target.value)} />
-              <p className="text-xs text-muted-foreground">{t("messageHint")}</p>
-              <FieldError code={errors.message} />
-            </div>
-          )}
+          <MessageField
+            id="card-message"
+            label={t("message")}
+            value={message}
+            onChange={setMessage}
+            defaultText={data.defaultMessage}
+            max={MESSAGE_MAX}
+            personalized={card.kind !== "engagement"}
+            hint={card.kind === "engagement" ? t("messageHintEngagement") : t("messageHint")}
+            error={errors.message}
+          />
           {card.kind === "invitation" && (
             <>
               <div className="space-y-2">
@@ -230,11 +236,16 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
                 </p>
                 <FieldError code={errors.reminderDays ?? Object.entries(errors).find(([k]) => k.startsWith("reminderDays."))?.[1]} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="card-reminder-message">{t("reminderMessage")}</Label>
-                <Textarea id="card-reminder-message" rows={3} value={reminderMessage} placeholder={data.defaultReminderMessage} onChange={(e) => setReminderMessage(e.target.value)} />
-                <FieldError code={errors.reminderMessage} />
-              </div>
+              <MessageField
+                id="card-reminder-message"
+                label={t("reminderMessage")}
+                value={reminderMessage}
+                onChange={setReminderMessage}
+                defaultText={data.defaultReminderMessage}
+                max={MESSAGE_MAX}
+                rows={3}
+                error={errors.reminderMessage}
+              />
             </>
           )}
         </section>

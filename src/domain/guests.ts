@@ -66,6 +66,8 @@ export type Household = {
 export type RsvpEvent = { id: string; name: string; startDate: string; startTime: string };
 
 export const NAME_MAX = 120;
+/** The RSVP link's WhatsApp text. */
+export const WHATSAPP_MESSAGE_MAX = 500;
 export const ALLERGIES_MAX = 500;
 export const MESSAGE_MAX = 2000;
 export const OTHER_MAX = 200;
@@ -129,7 +131,7 @@ const settingsSchema = z.object({
     .default(null)
     .transform((m) => (m && m.options.length > 0 ? m : null)),
   notify: z.enum(NOTIFY_MODES, "invalid_option").default("off"),
-  whatsappMessage: optional(z.string().trim().max(500, "too_long")).default(null),
+  whatsappMessage: optional(z.string().trim().max(WHATSAPP_MESSAGE_MAX, "too_long")).default(null),
 });
 export type RsvpSettingsInput = z.infer<typeof settingsSchema>;
 

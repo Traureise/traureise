@@ -9,19 +9,24 @@ import { container } from "@/composition/container";
 
 export const dynamic = "force-dynamic";
 
-const load = cache((slug: string) => container().getEngagementPage.execute(slug));
+const load = cache((slug: string, version?: string) => container().getEngagementPage.execute(slug, version));
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = { params: Promise<{ slug: string; version?: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const page = await load((await params).slug);
+  const { slug, version } = await params;
+  const page = await load(slug, version);
   const t = await getTranslations("letter");
   return { title: page ? { absolute: t("engagementTitle", { title: page.website.title }) } : undefined, robots: { index: false, follow: false } };
 }
 
-/** The engagement announcement: one shareable link for everyone, opened like a letter with a general greeting. */
+/**
+ * The engagement announcement: one shareable link for everyone, opened like a letter with a general greeting.
+ * The first version is at /<slug>/verlobung, others at /<slug>/verlobung/<version>.
+ */
 export default async function EngagementPage({ params }: Props) {
-  const page = await load((await params).slug);
+  const { slug, version } = await params;
+  const page = await load(slug, version);
   if (!page) notFound();
   const t = await getTranslations("letter");
   if (page.state === "inactive") {

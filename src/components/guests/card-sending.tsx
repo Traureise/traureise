@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { BellRing, Mail, MessageCircle, Send } from "lucide-react";
+import { BellRing, Mail, Send } from "lucide-react";
 import { toast } from "sonner";
 import { sendCardEmailsAction, sendRemindersAction, setCardExcludedAction, shareCardAction } from "@/app/actions/cards";
 import {
@@ -19,9 +19,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CopyLinkButton } from "@/components/share/copy-link-button";
+import { WhatsAppButton } from "@/components/share/whatsapp-button";
 import type { HouseholdCardKind } from "@/domain/cards";
-import { whatsappUrl } from "@/domain/guests";
-import { CopyLinkButton } from "./copy-link-button";
 
 type Household = { id: string; name: string; email: string | null; link: string };
 
@@ -43,40 +43,29 @@ function useRun() {
  * Sending one card to one household: WhatsApp (a wa.me link the couple opens), Link kopieren, E-Mail, and
  * leaving the household out. WhatsApp and copied links are recorded as sent.
  */
-export function CardSendButtons({ websiteId, kind, household, message, emailSending, excluded }: { websiteId: string; kind: HouseholdCardKind; household: Household; message: string; emailSending: boolean; excluded: boolean }) {
+export function CardSendButtons({ weddingId, kind, household, message, emailSending, excluded }: { weddingId: string; kind: HouseholdCardKind; household: Household; message: string; emailSending: boolean; excluded: boolean }) {
   const t = useTranslations("guests.sending");
+  const tList = useTranslations("guests.list");
   const { pending, run } = useRun();
-  const share = (via: "whatsapp" | "link") => run(() => shareCardAction(websiteId, kind, household.id, via));
+  const share = (via: "whatsapp" | "link") => run(() => shareCardAction(weddingId, kind, household.id, via));
   if (excluded) {
     return (
-      <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => run(() => setCardExcludedAction(websiteId, kind, household.id, false))}>
+      <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => run(() => setCardExcludedAction(weddingId, kind, household.id, false))}>
         {t("include")}
       </Button>
     );
   }
   return (
     <>
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        onClick={() => {
-          // Opened right away (inside the click) so no popup blocker stops it; the send is recorded alongside.
-          window.open(whatsappUrl(message, household.name, household.link), "_blank", "noopener,noreferrer");
-          share("whatsapp");
-        }}
-      >
-        <MessageCircle aria-hidden />
-        {t("whatsapp")}
-      </Button>
-      <CopyLinkButton url={household.link} household={household.name} onCopied={() => share("link")} />
+      <WhatsAppButton message={message} name={household.name} link={household.link} onOpened={() => share("whatsapp")} />
+      <CopyLinkButton url={household.link} copiedMessage={tList("linkCopied", { household: household.name })} onCopied={() => share("link")} />
       {household.email && emailSending && (
-        <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => run(() => sendCardEmailsAction(websiteId, kind, { householdId: household.id }), () => toast.success(t("emailQueued", { household: household.name })))}>
+        <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => run(() => sendCardEmailsAction(weddingId, kind, { householdId: household.id }), () => toast.success(t("emailQueued", { household: household.name })))}>
           <Mail aria-hidden />
           {t("email")}
         </Button>
       )}
-      <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => run(() => setCardExcludedAction(websiteId, kind, household.id, true))}>
+      <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => run(() => setCardExcludedAction(weddingId, kind, household.id, true))}>
         {t("exclude")}
       </Button>
     </>
@@ -84,7 +73,7 @@ export function CardSendButtons({ websiteId, kind, household, message, emailSend
 }
 
 /** "Per E-Mail an alle senden" after a confirmation that shows the count. */
-export function SendAllButton({ websiteId, kind, count }: { websiteId: string; kind: HouseholdCardKind; count: number }) {
+export function SendAllButton({ weddingId, kind, count }: { weddingId: string; kind: HouseholdCardKind; count: number }) {
   const t = useTranslations("guests.sending");
   const tKinds = useTranslations("cardKinds");
   const { pending, run } = useRun();
@@ -103,7 +92,7 @@ export function SendAllButton({ websiteId, kind, count }: { websiteId: string; k
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-          <AlertDialogAction onClick={() => run(() => sendCardEmailsAction(websiteId, kind, "all"), (data) => toast.success(t("queued", { count: data.queued })))}>
+          <AlertDialogAction onClick={() => run(() => sendCardEmailsAction(weddingId, kind, "all"), (data) => toast.success(t("queued", { count: data.queued })))}>
             {t("sendAllConfirm", { count })}
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -113,19 +102,17 @@ export function SendAllButton({ websiteId, kind, count }: { websiteId: string; k
 }
 
 /** Erinnerung senden for one open household: an email where there is an address, otherwise WhatsApp. */
-export function ReminderButton({ websiteId, household, byEmail, message }: { websiteId: string; household: Household; byEmail: boolean; message: string }) {
+export function ReminderButton({ weddingId, household, byEmail, message }: { weddingId: string; household: Household; byEmail: boolean; message: string }) {
   const t = useTranslations("guests.sending");
   const { pending, run } = useRun();
+  if (!byEmail || !household.email) return <WhatsAppButton message={message} name={household.name} link={household.link} label={t("remind")} variant="outline" />;
   return (
     <Button
       type="button"
       variant="outline"
       size="sm"
       disabled={pending}
-      onClick={() => {
-        if (byEmail && household.email) run(() => sendRemindersAction(websiteId, { householdId: household.id }), () => toast.success(t("reminderQueued", { household: household.name })));
-        else window.open(whatsappUrl(message, household.name, household.link), "_blank", "noopener,noreferrer");
-      }}
+      onClick={() => run(() => sendRemindersAction(weddingId, { householdId: household.id }), () => toast.success(t("reminderQueued", { household: household.name })))}
     >
       <BellRing aria-hidden />
       {t("remind")}
@@ -134,10 +121,10 @@ export function ReminderButton({ websiteId, household, byEmail, message }: { web
 }
 
 /** Erinnerung an alle offenen: emails go out in the background; the rest are WhatsApp links to open one by one. */
-export function RemindAllButton({ websiteId, open, withEmail }: { websiteId: string; open: number; withEmail: number }) {
+export function RemindAllButton({ weddingId, open, withEmail }: { weddingId: string; open: number; withEmail: number }) {
   const t = useTranslations("guests.sending");
   const { pending, run } = useRun();
-  const [whatsapp, setWhatsapp] = useState<{ householdId: string; name: string; url: string }[]>([]);
+  const [whatsapp, setWhatsapp] = useState<{ householdId: string; name: string; message: string; link: string }[]>([]);
   return (
     <>
       <AlertDialog>
@@ -157,7 +144,7 @@ export function RemindAllButton({ websiteId, open, withEmail }: { websiteId: str
             <AlertDialogAction
               onClick={() =>
                 run(
-                  () => sendRemindersAction(websiteId, "all"),
+                  () => sendRemindersAction(weddingId, "all"),
                   (data) => {
                     if (data.queued) toast.success(t("remindersQueued", { count: data.queued }));
                     setWhatsapp(data.whatsapp);
@@ -180,12 +167,7 @@ export function RemindAllButton({ websiteId, open, withEmail }: { websiteId: str
             {whatsapp.map((w) => (
               <li key={w.householdId} className="flex items-center justify-between gap-3 text-sm">
                 <span>{w.name}</span>
-                <Button asChild size="sm" variant="secondary">
-                  <a href={w.url} target="_blank" rel="noopener noreferrer">
-                    <MessageCircle aria-hidden />
-                    {t("whatsapp")}
-                  </a>
-                </Button>
+                <WhatsAppButton message={w.message} name={w.name} link={w.link} />
               </li>
             ))}
           </ul>

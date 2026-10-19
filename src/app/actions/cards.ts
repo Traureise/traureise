@@ -2,80 +2,58 @@
 
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import type { SendTarget } from "@/application/cards";
 import { container } from "@/composition/container";
-import { CARD_SLUGS, type CardKind, type SharedVia } from "@/domain/cards";
+import type { CardKind, SharedVia } from "@/domain/cards";
 import { runAction, type ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/session";
 
-async function cards<T>(websiteId: string, fn: (userId: string) => Promise<T>): Promise<ActionResult<T>> {
+async function cards<T>(weddingId: string, fn: (userId: string) => Promise<T>): Promise<ActionResult<T>> {
   const user = await requireUser();
   const result = await runAction(() => fn(user.id));
-  if (result.ok) {
-    revalidatePath(`/websites/${websiteId}/gaeste`, "layout");
-    revalidatePath(`/websites/${websiteId}/karten`, "layout");
-    revalidatePath("/dashboard");
-  }
+  if (result.ok) revalidatePath(`/hochzeiten/${weddingId}`, "layout");
   return result;
 }
 
 /** Sends what was queued right after the response; the periodic job picks up anything left over. */
-function sendInBackground(websiteId: string) {
+function sendInBackground(weddingId: string) {
   after(async () => {
     try {
       // Only what was just queued; automatic reminders belong to the regular job.
-      await container().runMailJobs({ websiteId, automatic: false });
+      await container().runMailJobs({ weddingId, automatic: false });
     } catch (error) {
       console.error("[traureise] sending emails failed", error);
     }
   });
 }
 
-/** Opens the card editor, creating the website's card of this kind first if there is none. */
-export async function createCardAction(websiteId: string, kind: CardKind) {
-  const user = await requireUser();
-  const result = await runAction(() => container().createCard.execute(user.id, websiteId, kind));
-  if (!result.ok) return result;
-  redirect(`/websites/${websiteId}/karten/${CARD_SLUGS[kind]}`);
+export async function saveCardAction(weddingId: string, cardId: string, input: unknown) {
+  return cards(weddingId, (userId) => container().saveCard.execute(userId, cardId, input));
 }
 
-/** A card as the first step: starts a wedding (names, date) without a website and opens the editor. */
-export async function createCardForNewWeddingAction(kind: CardKind, _prev: unknown, form: FormData): Promise<ActionResult> {
-  const user = await requireUser();
-  const result = await runAction(() =>
-    container().createCardForNewWedding.execute(user.id, kind, { title: String(form.get("title") ?? ""), weddingDate: String(form.get("weddingDate") ?? "") }),
-  );
-  if (!result.ok) return result;
-  redirect(`/websites/${result.data.websiteId}/karten/${CARD_SLUGS[kind]}`);
-}
-
-export async function saveCardAction(websiteId: string, kind: CardKind, input: unknown) {
-  return cards(websiteId, (userId) => container().saveCard.execute(userId, websiteId, kind, input));
-}
-
-export async function deleteCardAction(websiteId: string, kind: CardKind) {
-  return cards(websiteId, (userId) => container().deleteCard.execute(userId, websiteId, kind));
+/** The couple copied the engagement link or opened WhatsApp with it. */
+export async function markEngagementSharedAction(weddingId: string, cardId: string) {
+  return cards(weddingId, (userId) => container().markEngagementShared.execute(userId, cardId));
 }
 
 /** Records that the couple shared a card (WhatsApp or copied link) and returns the link and text. */
-export async function shareCardAction(websiteId: string, kind: CardKind, householdId: string, via: SharedVia) {
-  return cards(websiteId, (userId) => container().shareCard.execute(userId, websiteId, kind, householdId, via));
+export async function shareCardAction(weddingId: string, kind: CardKind, householdId: string, via: SharedVia) {
+  return cards(weddingId, (userId) => container().shareCard.execute(userId, weddingId, kind, householdId, via));
 }
 
-export async function setCardExcludedAction(websiteId: string, kind: CardKind, householdId: string, excluded: boolean) {
-  return cards(websiteId, (userId) => container().setCardExcluded.execute(userId, websiteId, kind, householdId, excluded));
+export async function setCardExcludedAction(weddingId: string, kind: CardKind, householdId: string, excluded: boolean) {
+  return cards(weddingId, (userId) => container().setCardExcluded.execute(userId, weddingId, kind, householdId, excluded));
 }
 
-export async function sendCardEmailsAction(websiteId: string, kind: CardKind, target: SendTarget) {
-  const result = await cards(websiteId, (userId) => container().sendCardEmails.execute(userId, websiteId, kind, target));
-  if (result.ok && result.data.queued > 0) sendInBackground(websiteId);
+export async function sendCardEmailsAction(weddingId: string, kind: CardKind, target: SendTarget) {
+  const result = await cards(weddingId, (userId) => container().sendCardEmails.execute(userId, weddingId, kind, target));
+  if (result.ok && result.data.queued > 0) sendInBackground(weddingId);
   return result;
 }
 
-export async function sendRemindersAction(websiteId: string, target: SendTarget) {
-  const result = await cards(websiteId, (userId) => container().sendReminders.execute(userId, websiteId, target));
-  if (result.ok && result.data.queued > 0) sendInBackground(websiteId);
+export async function sendRemindersAction(weddingId: string, target: SendTarget) {
+  const result = await cards(weddingId, (userId) => container().sendReminders.execute(userId, weddingId, target));
+  if (result.ok && result.data.queued > 0) sendInBackground(weddingId);
   return result;
 }
 

@@ -210,7 +210,7 @@ describe("buildCardModel", () => {
     time: "{time} Uhr",
     dateTbd: "Datum folgt",
   };
-  const website = { title: "Anna & Ben", weddingDate: "2027-06-12", location: "Hamburg", url: "http://localhost:3000/anna-ben" };
+  const website = { title: "Anna & Ben", weddingDate: "2027-06-12", location: "Hamburg" };
   const assets = { photoSrc: "/uploads/p.webp", maskSvg: null, ornamentSvg: '<svg xmlns="http://www.w3.org/2000/svg"/>' };
 
   it("builds a Save the Date from the wedding, with the couple's own line above the names", () => {

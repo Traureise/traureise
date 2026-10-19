@@ -8,10 +8,11 @@ import type { CollectionKind, SectionKind } from "@/domain/sections";
 import { runAction, type ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/session";
 
-async function edit<T>(websiteId: string, fn: (userId: string) => Promise<T>): Promise<ActionResult<T>> {
+/** Website versions live under their wedding; editing one refreshes the wedding's pages (home, editor). */
+async function edit<T>(_websiteId: string, fn: (userId: string) => Promise<T>): Promise<ActionResult<T>> {
   const user = await requireUser();
   const result = await runAction(() => fn(user.id));
-  if (result.ok) revalidatePath(`/websites/${websiteId}/edit`, "layout");
+  if (result.ok) revalidatePath("/hochzeiten", "layout");
   return result;
 }
 
@@ -34,12 +35,13 @@ export async function saveHomeAction(websiteId: string, input: Record<string, un
   });
 }
 
-export async function uploadImageAction(websiteId: string, form: FormData): Promise<ActionResult<string>> {
+/** Photos belong to the wedding: its website versions and cards share them. */
+export async function uploadImageAction(weddingId: string, form: FormData): Promise<ActionResult<string>> {
   const user = await requireUser();
   const file = form.get("file");
   return runAction(async () => {
     if (!(file instanceof File)) throw new ValidationError({ file: "empty" });
-    return container().uploadImage.execute(user.id, websiteId, {
+    return container().uploadImage.execute(user.id, weddingId, {
       bytes: new Uint8Array(await file.arrayBuffer()),
       size: file.size,
       contentType: file.type,
@@ -77,4 +79,12 @@ export async function selectThemeAction(websiteId: string, themeId: string) {
 
 export async function updateDesignAction(websiteId: string, input: { paletteId: string | null; fontPairingId: string | null }) {
   return edit(websiteId, (userId) => container().updateDesign.execute(userId, websiteId, input));
+}
+
+export async function setPublishedAction(websiteId: string, published: boolean) {
+  return edit(websiteId, (userId) => container().setPublished.execute(userId, websiteId, published));
+}
+
+export async function setEventShownAction(websiteId: string, eventId: string, shown: boolean) {
+  return edit(websiteId, (userId) => container().setEventShown.execute(userId, websiteId, eventId, shown));
 }

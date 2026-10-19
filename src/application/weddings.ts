@@ -166,7 +166,7 @@ export class GetWeddingHome {
     const overview = guestOverview({ households, events: ctx.events, meal: ctx.meal, polls: ctx.polls });
     return {
       wedding,
-      steps: steps.map(({ done: _done, ...s }) => ({ ...s, state: states[s.item] })),
+      steps: steps.map(({ item, versions, preview, status, canAddVersion, messages }) => ({ item, versions, preview, status, canAddVersion, messages, state: states[item] })),
       countdown: wedding.weddingDate ? daysUntil(wedding.weddingDate, wedding.timezone, ctx.now) : null,
       guests: { households: households.length, coming: overview.people.coming, open: overview.people.open },
       tier: this.deps.billing.enabled ? activeTier(ctx.features.entitlements, ctx.now) : null,

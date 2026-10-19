@@ -14,6 +14,8 @@ export type WebsiteEditorView = WebsiteView & {
   /** Published and allowed (an extra version without a paid package is offline). */
   online: boolean;
   publicUrl: string;
+  /** "+ Version" is unlocked (canUse). */
+  canAddVersion: boolean;
 };
 
 export class GetWebsiteForOwner {
@@ -27,6 +29,7 @@ export class GetWebsiteForOwner {
       versions: ctx.websites.map(({ id, label }) => ({ id, label })),
       online: ctx.online(website),
       publicUrl: `${this.deps.appUrl}/${website.slug}`,
+      canAddVersion: ctx.can("websiteVersions"),
     };
   }
 }

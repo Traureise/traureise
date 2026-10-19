@@ -10,6 +10,16 @@ import { uniqueSlug } from "./slugs";
 
 type Version = { id: string; label: string; position: number };
 
+/** A version's own fields, without what the database assigns. */
+function fieldsOf<T extends { id: string; createdAt: Date; updatedAt: Date; sharedAt?: Date | null }>(version: T): Omit<T, "id" | "createdAt" | "updatedAt" | "sharedAt"> {
+  const copy: Partial<T> = { ...version };
+  delete copy.id;
+  delete copy.createdAt;
+  delete copy.updatedAt;
+  delete copy.sharedAt;
+  return copy as Omit<T, "id" | "createdAt" | "updatedAt" | "sharedAt">;
+}
+
 function parseLabel(input: unknown): string {
   const parsed = parseVersionLabel(input);
   if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
@@ -51,8 +61,7 @@ export class AddVersion {
     if (item === "website") {
       const site = source as Website;
       const slug = await uniqueSlug(this.deps, `${wedding.slug}-${slugify(label)}`, { wedding: weddingId, website: null });
-      const { id: _id, createdAt: _c, updatedAt: _u, ...copy } = site;
-      const created = await this.deps.websites.create({ ...copy, label, position, slug, published: false }, await this.deps.websites.listSections(site.id));
+      const created = await this.deps.websites.create({ ...fieldsOf(site), label, position, slug, published: false }, await this.deps.websites.listSections(site.id));
       for (const i of await this.deps.websites.listItems(site.id)) await this.deps.websites.addItem(created.id, i.kind, i.data);
       return created;
     }
@@ -62,8 +71,7 @@ export class AddVersion {
     const base = slugify(label);
     let slug = base;
     for (let n = 2; taken.has(slug); n++) slug = `${base}-${n}`;
-    const { id: _id, sharedAt: _s, createdAt: _c, updatedAt: _u, ...copy } = card;
-    return this.deps.cards.create({ ...copy, label, slug, position });
+    return this.deps.cards.create({ ...fieldsOf(card), label, slug, position });
   }
 }
 

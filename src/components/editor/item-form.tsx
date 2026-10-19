@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { saveItemAction } from "@/app/actions/editor";
+import { DateField } from "@/components/forms/date-field";
 import { FieldError } from "@/components/forms/field-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,13 +16,15 @@ import { useSave } from "./use-save";
 
 type Props = {
   websiteId: string;
+  /** Photos belong to the wedding. */
+  weddingId: string;
   kind: CollectionKind;
   itemId: string | null;
   initial: Record<string, unknown>;
   onDone: () => void;
 };
 
-export function ItemForm({ websiteId, kind, itemId, initial, onDone }: Props) {
+export function ItemForm({ websiteId, weddingId, kind, itemId, initial, onDone }: Props) {
   const t = useTranslations();
   const { pending, errors, save } = useSave();
   const [images, setImages] = useState<Record<string, string | null>>(
@@ -43,7 +46,7 @@ export function ItemForm({ websiteId, kind, itemId, initial, onDone }: Props) {
     if (field.type === "image") {
       return (
         <ImageField
-          websiteId={websiteId}
+          weddingId={weddingId}
           label={label}
           value={images[field.name] ?? null}
           onChange={(key) => setImages((prev) => ({ ...prev, [field.name]: key }))}
@@ -51,6 +54,7 @@ export function ItemForm({ websiteId, kind, itemId, initial, onDone }: Props) {
         />
       );
     }
+    if (field.type === "date") return <DateField id={id} name={field.name} label={label} value={(value as string) ?? ""} error={errors[field.name]} />;
     return (
       <div className="space-y-2">
         <Label htmlFor={id}>{label}</Label>

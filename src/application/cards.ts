@@ -17,10 +17,10 @@ import {
   type SharedVia,
 } from "@/domain/cards";
 import { findFontPairing } from "@/domain/fonts";
-import { householdStatus, isReplyOpen, whatsappUrl, type Household } from "@/domain/guests";
+import { householdStatus, isReplyOpen, type Household } from "@/domain/guests";
 import { uploadPath } from "@/domain/images";
 import { cardLayoutsFor, resolveDesign, type CardLayout, type ResolvedDesign, type ThemeManifest } from "@/domain/theme";
-import { firstVersion, needsDate } from "@/domain/weddings";
+import { firstVersion, needsDate, VERSION_FEATURES } from "@/domain/weddings";
 import type { Deps } from "./deps";
 import { LockedError, NotFoundError, ValidationError } from "./errors";
 import { formFor, householdContent, householdDesign, linkUrl, loadByToken, loadGuestContext, type GuestContext, type GuestForm } from "./guest-context";
@@ -66,7 +66,7 @@ function modelFor(deps: Deps, ctx: GuestContext, card: Card, household: Pick<Hou
     kind: card.kind,
     content: card.content,
     design,
-    website: { title: wedding.title, weddingDate: wedding.weddingDate, location: wedding.location, url: null },
+    website: { title: wedding.title, weddingDate: wedding.weddingDate, location: wedding.location },
     event: event ? { startDate: event.data.startDate, startTime: event.data.startTime, venueName: event.data.venueName } : null,
     replyBy: ctx.settings.replyBy,
     household,
@@ -138,6 +138,10 @@ export type CardEditor = {
   offlineWebsites: boolean;
   /** Save the Date and invitation without a wedding date: sending waits for one. */
   waitsForDate: boolean;
+  /** "+ Version" is unlocked (canUse). */
+  canAddVersion: boolean;
+  /** The engagement version's public link. */
+  publicUrl: string | null;
   /** Links, export and sending are unlocked. */
   active: boolean;
   billingEnabled: boolean;
@@ -174,6 +178,8 @@ export class GetCardEditor {
       replyBy: ctx.settings.replyBy,
       offlineWebsites: kind === "saveTheDate" && ctx.websites.some((w) => !ctx.online(w)),
       waitsForDate: needsDate(kind) && !wedding.weddingDate,
+      canAddVersion: ctx.can(VERSION_FEATURES[kind]),
+      publicUrl: kind === "engagement" ? engagementUrl(this.deps, wedding, card, ctx.versionsOf(kind)) : null,
       active: ctx.cardActive(kind),
       billingEnabled: this.deps.billing.enabled,
       defaultMessage: this.deps.cardTexts.defaults[kind].message,
@@ -463,9 +469,9 @@ export class SendReminders {
 
   /**
    * "Erinnerung senden" for one household or every open one: an email where there is an address (Einladungen
-   * tier), otherwise a WhatsApp link for the couple to open (RSVP tier). The text is the household's invitation version's.
+   * tier), otherwise the text and link for the couple to open in WhatsApp (RSVP tier). The text is the household's invitation version's.
    */
-  async execute(userId: string, weddingId: string, target: SendTarget): Promise<{ queued: number; whatsapp: { householdId: string; name: string; url: string }[] }> {
+  async execute(userId: string, weddingId: string, target: SendTarget): Promise<{ queued: number; whatsapp: { householdId: string; name: string; message: string; link: string }[] }> {
     const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
     const ctx = await loadGuestContext(this.deps, wedding);
     const byEmail = ctx.can("emailReminders");
@@ -483,7 +489,7 @@ export class SendReminders {
     const whatsapp = ctx.sending
       ? households
           .filter((h) => !emailIds.includes(h.id))
-          .map((h) => ({ householdId: h.id, name: h.name, url: whatsappUrl(reminderMessage(this.deps, ctx.cardFor(h.id, "invitation")), h.name, linkUrl(this.deps, h.id)) }))
+          .map((h) => ({ householdId: h.id, name: h.name, message: reminderMessage(this.deps, ctx.cardFor(h.id, "invitation")), link: linkUrl(this.deps, h.id) }))
       : [];
     return { queued, whatsapp };
   }

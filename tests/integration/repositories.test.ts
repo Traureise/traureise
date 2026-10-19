@@ -130,7 +130,7 @@ describe("DrizzleWebsiteRepository", () => {
     const { wedding, website } = await seedWebsite();
     expect(website).toMatchObject({ slug: "anna-und-ben", label: "Standard", position: 0, published: false, hiddenEventIds: [], showCountdown: false, paletteId: null });
     expect(await websiteRepo.findBySlug("anna-und-ben")).toMatchObject({ id: website.id });
-    const { id: _id, createdAt: _c, updatedAt: _u, ...copy } = website;
+    const copy = { ...website, id: undefined, createdAt: undefined, updatedAt: undefined };
     const friends = await websiteRepo.create({ ...copy, label: "Freunde", position: 1, slug: "anna-und-ben-freunde" }, []);
     expect((await websiteRepo.listByWedding(wedding.id)).map((w) => w.label)).toEqual(["Standard", "Freunde"]);
     expect((await websiteRepo.listSections(website.id)).map((s) => s.kind).sort()).toEqual([...SECTION_KINDS].sort());

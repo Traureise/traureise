@@ -392,7 +392,7 @@ describe("reminders", () => {
     const result = await new SendReminders(f.deps).execute(anna.id, weddingId, "all");
     expect(result.queued).toBe(1);
     expect(result.whatsapp.map((w) => w.householdId)).toEqual([roth.id]);
-    expect(result.whatsapp[0]!.url).toContain(encodeURIComponent(`link-${roth.id}`));
+    expect(result.whatsapp[0]).toMatchObject({ link: `http://localhost:3000/antwort/link-${roth.id}`, message: "Hallo {name}, denkt an eure Antwort." });
     await runMail();
     expect(f.mailer.sent.map((m) => m.to)).toEqual(["weber@example.org"]);
     const entry = (await new GetGuestPage(f.deps).execute(anna.id, weddingId)).households.find((h) => h.id === weber.id)!;

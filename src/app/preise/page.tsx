@@ -26,7 +26,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
   const { fehler } = await searchParams;
   const t = await getTranslations("pricing");
   const user = await getCurrentUser();
-  const plans = user ? await c.listWebsitePlans.execute(user.id) : [];
+  const plans = user ? await c.listWeddingPlans.execute(user.id) : [];
 
   return (
     <PageShell header={user ? <AppHeader email={user.email} /> : <div className="mx-auto w-full max-w-5xl px-4 pt-8 sm:px-6"><Logo /></div>}>
@@ -80,9 +80,9 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
                     <input type="hidden" name="tier" value={row.tier} />
                     <label className="block space-y-1 text-sm">
                       <span>{t("websiteLabel")}</span>
-                      <select name="websiteId" className="block h-10 w-full rounded-md border border-input bg-background px-2">
+                      <select name="weddingId" className="block h-10 w-full rounded-md border border-input bg-background px-2">
                         {buyable.map((plan) => (
-                          <option key={plan.websiteId} value={plan.websiteId}>
+                          <option key={plan.weddingId} value={plan.weddingId}>
                             {plan.title}
                           </option>
                         ))}

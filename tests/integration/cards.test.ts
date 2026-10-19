@@ -89,7 +89,7 @@ async function firstCard(kind: CardKind = "saveTheDate"): Promise<Card> {
 describe("DrizzleCardRepository", () => {
   it("keeps several versions per wedding and kind, first first, and updates, renames and deletes them", async () => {
     const card = await firstCard();
-    const { id: _id, sharedAt: _s, createdAt: _c, updatedAt: _u, ...copy } = card;
+    const copy = { ...card, id: undefined, sharedAt: undefined, createdAt: undefined, updatedAt: undefined };
     const family = await repo.create({ ...copy, label: "Familie", slug: "familie", position: 1 });
     await expect(repo.create({ ...copy, label: "Doppelt", position: 2 })).rejects.toThrow();
     expect((await repo.listByWedding(weddingId)).filter((c) => c.kind === "saveTheDate").map((c) => c.label)).toEqual(["Standard", "Familie"]);
@@ -195,7 +195,7 @@ describe("SatoriCardRenderer", () => {
       kind: "invitation",
       content: defaultCardContent("invitation", { title: "Anna & Łukasz", location: null }, texts.defaults.invitation),
       design: { ...resolveDesign(theme, null, null), layout },
-      website: { title: "Anna & Łukasz", weddingDate: "2027-06-12", location: null, url: "http://localhost:3000/anna" },
+      website: { title: "Anna & Łukasz", weddingDate: "2027-06-12", location: null },
       event: { startDate: "2027-06-12", startTime: "14:30", venueName: "Gut Kaden" },
       replyBy: "2027-05-01",
       household: null,

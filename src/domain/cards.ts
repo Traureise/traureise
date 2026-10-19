@@ -182,8 +182,7 @@ export function buildCardModel(input: {
   kind: CardKind;
   content: CardContent;
   design: CardDesign;
-  /** `url` is null while the wedding has no website. */
-  website: { title: string; weddingDate: string | null; location: string | null; url: string | null };
+  website: { title: string; weddingDate: string | null; location: string | null };
   event: { startDate: string; startTime: string; venueName: string } | null;
   replyBy: string | null;
   household: { name: string; personalLine: string } | null;
