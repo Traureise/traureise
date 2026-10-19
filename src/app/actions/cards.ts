@@ -40,6 +40,16 @@ export async function createCardAction(websiteId: string, kind: CardKind) {
   redirect(`/websites/${websiteId}/karten/${CARD_SLUGS[kind]}`);
 }
 
+/** A card as the first step: starts a wedding (names, date) without a website and opens the editor. */
+export async function createCardForNewWeddingAction(kind: CardKind, _prev: unknown, form: FormData): Promise<ActionResult> {
+  const user = await requireUser();
+  const result = await runAction(() =>
+    container().createCardForNewWedding.execute(user.id, kind, { title: String(form.get("title") ?? ""), weddingDate: String(form.get("weddingDate") ?? "") }),
+  );
+  if (!result.ok) return result;
+  redirect(`/websites/${result.data.websiteId}/karten/${CARD_SLUGS[kind]}`);
+}
+
 export async function saveCardAction(websiteId: string, kind: CardKind, input: unknown) {
   return cards(websiteId, (userId) => container().saveCard.execute(userId, websiteId, kind, input));
 }

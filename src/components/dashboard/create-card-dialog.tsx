@@ -1,22 +1,27 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { createCardAction } from "@/app/actions/cards";
+import { createCardAction, createCardForNewWeddingAction } from "@/app/actions/cards";
+import { FieldError } from "@/components/forms/field-error";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { CardKind } from "@/domain/cards";
 
 export type WebsiteChoice = { id: string; title: string };
 
 /**
- * Creates a card (or opens the existing one: one per kind and website). With one website it goes straight to
- * the editor; with several the couple picks the website; without one they are asked to create it first.
+ * Creates a card (or opens the existing one: one per kind and wedding). With one wedding it goes straight to
+ * the editor; with several the couple picks the wedding; without one they enter names and date, which starts
+ * the wedding without a website.
  */
-export function useCreateCard(websites: WebsiteChoice[], onNeedWebsite: () => void) {
+export function useCreateCard(websites: WebsiteChoice[]) {
   const t = useTranslations("errors");
   const [kind, setKind] = useState<CardKind | null>(null);
+  const [newKind, setNewKind] = useState<CardKind | null>(null);
   const [pending, start] = useTransition();
 
   function create(websiteId: string, cardKind: CardKind) {
@@ -27,12 +32,17 @@ export function useCreateCard(websites: WebsiteChoice[], onNeedWebsite: () => vo
   }
 
   function choose(cardKind: CardKind) {
-    if (websites.length === 0) onNeedWebsite();
+    if (websites.length === 0) setNewKind(cardKind);
     else if (websites.length === 1) create(websites[0]!.id, cardKind);
     else setKind(cardKind);
   }
 
-  const dialog = <PickWebsiteDialog kind={kind} websites={websites} pending={pending} onClose={() => setKind(null)} onPick={(id) => kind && create(id, kind)} />;
+  const dialog = (
+    <>
+      <PickWebsiteDialog kind={kind} websites={websites} pending={pending} onClose={() => setKind(null)} onPick={(id) => kind && create(id, kind)} />
+      {newKind && <NewWeddingDialog key={newKind} kind={newKind} onClose={() => setNewKind(null)} />}
+    </>
+  );
   return { choose, dialog, pending };
 }
 
@@ -64,6 +74,46 @@ function PickWebsiteDialog({ kind, websites, pending, onClose, onPick }: { kind:
             {t("submit")}
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** The couple's first step is a card: names and date are all it needs; the website can follow any time. */
+function NewWeddingDialog({ kind, onClose }: { kind: CardKind; onClose: () => void }) {
+  const t = useTranslations("dashboard.newWedding");
+  const tKinds = useTranslations("cardKinds");
+  const tErrors = useTranslations("errors");
+  const [state, action, pending] = useActionState(createCardForNewWeddingAction.bind(null, kind), null);
+  const errors = state && !state.ok ? (state.fieldErrors ?? {}) : {};
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-heading text-2xl font-medium">{t("title", { kind: tKinds(kind) })}</DialogTitle>
+          <DialogDescription>{t("lead")}</DialogDescription>
+        </DialogHeader>
+        <form action={action} className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="new-wedding-title">{t("titleLabel")}</Label>
+            <Input id="new-wedding-title" name="title" required placeholder={t("titlePlaceholder")} />
+            <FieldError code={errors.title} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="new-wedding-date">{t("dateLabel")}</Label>
+            <Input id="new-wedding-date" name="weddingDate" type="date" />
+            <FieldError code={errors.weddingDate} />
+          </div>
+          {state && !state.ok && state.error && <p role="alert" className="text-sm text-destructive">{tErrors(state.error)}</p>}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              {t("cancel")}
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {t("submit")}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

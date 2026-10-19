@@ -27,7 +27,7 @@ export class ExportAccount {
     const exported = [];
     for (const website of await websites.listByOwner(userId)) {
       const households = await guests.listHouseholds(website.id);
-      const { id, slug, title, weddingDate, location, welcomeMessage, hashtag, showCountdown, timezone, themeId, paletteId, fontPairingId } = website;
+      const { id, slug, title, weddingDate, location, welcomeMessage, hashtag, showCountdown, timezone, themeId, siteEnabled, paletteId, fontPairingId } = website;
       exported.push({
         id,
         slug,
@@ -39,6 +39,7 @@ export class ExportAccount {
         showCountdown,
         timezone,
         themeId,
+        siteEnabled,
         paletteId,
         fontPairingId,
         createdAt: website.createdAt,

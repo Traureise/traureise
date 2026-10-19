@@ -19,9 +19,11 @@ export default async function GuestsLayout({ children, params }: { children: Rea
             <ChevronLeft className="size-4" aria-hidden />
             {t("backToDashboard")}
           </Link>
-          <Link href={`/websites/${id}/edit`} className="text-primary hover:underline">
-            {t("editWebsite")}
-          </Link>
+          {page.website.siteEnabled && (
+            <Link href={`/websites/${id}/edit`} className="text-primary hover:underline">
+              {t("editWebsite")}
+            </Link>
+          )}
         </div>
         <div>
           <h1 className="font-heading text-5xl font-medium tracking-tight">{t("title")}</h1>

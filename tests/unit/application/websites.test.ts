@@ -3,6 +3,7 @@ import { NotFoundError, ValidationError } from "@/application/errors";
 import {
   CreateWebsite,
   DeleteWebsite,
+  EnableSite,
   GetWebsiteForOwner,
   ListWebsites,
   SelectTheme,
@@ -10,6 +11,7 @@ import {
   UpdateDesign,
   UpdateHome,
   UpdateSlug,
+  UpdateWeddingDetails,
 } from "@/application/websites";
 import { UploadImage } from "@/application/uploads";
 import { SECTION_KINDS } from "@/domain/sections";
@@ -57,6 +59,40 @@ describe("CreateWebsite", () => {
   });
 });
 
+describe("a wedding without a website", () => {
+  const cardsOnly = (ownerId = anna) => new CreateWebsite(f.deps).execute(ownerId, { title: "Anna & Ben", weddingDate: "2027-06-12", siteEnabled: false });
+
+  it("can be created with the website switched off", async () => {
+    const website = await cardsOnly();
+    expect(website).toMatchObject({ siteEnabled: false, slug: "anna-und-ben", themeId: "salbei" });
+    expect((await create(ben)).siteEnabled).toBe(true);
+  });
+
+  it("gets its website switched on, keeping the wedding, with names, date, address and theme chosen then", async () => {
+    const { id } = await cardsOnly();
+    const enabled = await new EnableSite(f.deps).execute(anna, id, { title: "Anna & Ben heiraten", weddingDate: "2027-06-19", slug: "unser-fest", themeId: "terrakotta" });
+    expect(enabled).toMatchObject({ id, siteEnabled: true, title: "Anna & Ben heiraten", weddingDate: "2027-06-19", slug: "unser-fest", themeId: "terrakotta" });
+    expect(await new ListWebsites(f.deps).execute(anna)).toHaveLength(1);
+  });
+
+  it("keeps its generated address when none is chosen, and validates like creating a website", async () => {
+    const { id } = await cardsOnly();
+    await create(ben, { slug: "vergeben" });
+    await expect(new EnableSite(f.deps).execute(anna, id, { title: "Anna & Ben", slug: "vergeben" })).rejects.toMatchObject({ fieldErrors: { slug: "taken" } });
+    await expect(new EnableSite(f.deps).execute(anna, id, { title: "" })).rejects.toBeInstanceOf(ValidationError);
+    await expect(new EnableSite(f.deps).execute(anna, id, { title: "Anna & Ben", themeId: "nope" })).rejects.toMatchObject({ fieldErrors: { themeId: "unknown_theme" } });
+    expect(await new EnableSite(f.deps).execute(anna, id, { title: "Anna & Ben" })).toMatchObject({ siteEnabled: true, slug: "anna-und-ben", weddingDate: null, themeId: "salbei" });
+  });
+
+  it("has its names, date and place edited without the website editor", async () => {
+    const { id } = await cardsOnly();
+    const updated = await new UpdateWeddingDetails(f.deps).execute(anna, id, { title: "Anna & Ben", weddingDate: "2027-07-03", location: "Beispielstadt" });
+    expect(updated).toMatchObject({ title: "Anna & Ben", weddingDate: "2027-07-03", location: "Beispielstadt", siteEnabled: false });
+    await expect(new UpdateWeddingDetails(f.deps).execute(anna, id, { title: "", weddingDate: "", location: "" })).rejects.toBeInstanceOf(ValidationError);
+    expect(await new UpdateWeddingDetails(f.deps).execute(anna, id, { title: "A & B", weddingDate: "", location: "" })).toMatchObject({ weddingDate: null, location: null });
+  });
+});
+
 describe("ownership", () => {
   it("lists only the owner's websites", async () => {
     await create(anna);
@@ -75,6 +111,8 @@ describe("ownership", () => {
       () => new UpdateDesign(f.deps).execute(ben, id, { paletteId: "dunkel", fontPairingId: "modern" }),
       () => new SetCoverImage(f.deps).execute(ben, id, null),
       () => new DeleteWebsite(f.deps).execute(ben, id),
+      () => new EnableSite(f.deps).execute(ben, id, { title: "Hijack" }),
+      () => new UpdateWeddingDetails(f.deps).execute(ben, id, { title: "Hijack" }),
       () => new GetWebsiteForOwner(f.deps).execute(anna, "00000000-0000-0000-0000-000000000000"),
     ];
     for (const attempt of attempts) await expect(attempt()).rejects.toBeInstanceOf(NotFoundError);

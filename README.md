@@ -25,7 +25,8 @@ backups, themes, architecture and design decisions. The sources are in [`docs/`]
   WhatsApp), a themed answer form (attendance, events, meal, allergies, polls, requests to bring someone,
   a message), an overview with a pie chart and counts, email notifications, CSV export, and automatic
   deletion of guest data 12 months after the wedding ([how](https://docs.traureise.de/guests/)).
-- Save the Dates, invitations, thank-you cards and an engagement announcement: card layouts from the
+- Save the Dates, invitations, thank-you cards and an engagement announcement, with or without a
+  website (start with any of them; the website can follow for the same wedding): card layouts from the
   themes, a live-preview editor, an envelope that opens on the household's page, sending by link,
   WhatsApp or email (with one-click unsubscribe), automatic and manual reminders, "opened" per household
   without tracking, and export as PDF (A6, A5) and PNG, rendered on the instance

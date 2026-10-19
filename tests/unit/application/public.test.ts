@@ -31,6 +31,13 @@ describe("GetPublicWebsite", () => {
     expect(view?.design.palette.id).toBe("hell");
     expect(await new GetPublicWebsite(f.deps).execute("unknown")).toBeNull();
   });
+
+  it("is null while the couple only has cards, and so are its calendar events", async () => {
+    const item = await new AddItem(f.deps).execute(anna, websiteId, "schedule", event);
+    await f.websites.update(websiteId, { siteEnabled: false });
+    expect(await new GetPublicWebsite(f.deps).execute("anna-und-ben")).toBeNull();
+    expect(await new GetEventIcs(f.deps).execute("anna-und-ben", item.id)).toBeNull();
+  });
 });
 
 describe("renderableSections", () => {
@@ -72,5 +79,12 @@ describe("GetWeddingIcs", () => {
     expect(ics?.filename).toBe(`${other.slug}.ics`);
     expect(ics?.content).toContain("SUMMARY:Hochzeit von Clara & Dan");
     expect(ics?.content).toContain("DTSTART;VALUE=DATE:20270612");
+  });
+
+  it("works for the Save the Date of a wedding without a website, without linking to it", async () => {
+    const other = await new CreateWebsite(f.deps).execute(anna, { title: "Clara & Dan", weddingDate: "2027-06-12", siteEnabled: false });
+    const ics = await new GetWeddingIcs(f.deps).execute(other.slug);
+    expect(ics?.content).toContain("DTSTART;VALUE=DATE:20270612");
+    expect(ics?.content).not.toContain(`/${other.slug}`);
   });
 });

@@ -33,6 +33,7 @@ import {
 import { createGuestMailTemplates } from "@/infrastructure/mail/guest-templates";
 import {
   CreateCard,
+  CreateCardForNewWedding,
   DeleteCard,
   ExportCard,
   GetCardEditor,
@@ -59,6 +60,7 @@ import { GetUpload, UploadImage } from "@/application/uploads";
 import {
   CreateWebsite,
   DeleteWebsite,
+  EnableSite,
   GetWebsiteForOwner,
   ListWebsites,
   SelectTheme,
@@ -66,6 +68,7 @@ import {
   UpdateDesign,
   UpdateHome,
   UpdateSlug,
+  UpdateWeddingDetails,
 } from "@/application/websites";
 import { createDatabase } from "@/infrastructure/db/client";
 import { SharpImageProcessor } from "@/infrastructure/images/sharp";
@@ -183,6 +186,8 @@ function build() {
     updateProfile: new UpdateProfile(deps),
     createWebsite: new CreateWebsite(deps),
     listWebsites: new ListWebsites(deps),
+    enableSite: new EnableSite(deps),
+    updateWeddingDetails: new UpdateWeddingDetails(deps),
     getWebsiteForOwner: new GetWebsiteForOwner(deps),
     updateHome: new UpdateHome(deps),
     updateSlug: new UpdateSlug(deps),
@@ -219,6 +224,7 @@ function build() {
     submitGuestResponse: new SubmitGuestResponse(deps),
     runGuestJobs: new RunGuestJobs(deps),
     createCard: new CreateCard(deps),
+    createCardForNewWedding: new CreateCardForNewWedding(deps),
     getCardEditor: new GetCardEditor(deps),
     saveCard: new SaveCard(deps),
     deleteCard: new DeleteCard(deps),

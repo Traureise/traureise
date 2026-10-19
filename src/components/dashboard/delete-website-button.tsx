@@ -18,7 +18,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 
-export function DeleteWebsiteButton({ websiteId, title }: { websiteId: string; title: string }) {
+/** Deletes the whole wedding: website, cards, guest list and photos. `cardsOnly` words it for a wedding without a website. */
+export function DeleteWebsiteButton({ websiteId, title, cardsOnly = false }: { websiteId: string; title: string; cardsOnly?: boolean }) {
   const t = useTranslations("dashboard");
   const [pending, start] = useTransition();
   return (
@@ -31,8 +32,8 @@ export function DeleteWebsiteButton({ websiteId, title }: { websiteId: string; t
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{t("deleteDialog.title")}</AlertDialogTitle>
-          <AlertDialogDescription>{t("deleteDialog.body", { title })}</AlertDialogDescription>
+          <AlertDialogTitle>{t(cardsOnly ? "deleteDialog.weddingTitle" : "deleteDialog.title")}</AlertDialogTitle>
+          <AlertDialogDescription>{t(cardsOnly ? "deleteDialog.weddingBody" : "deleteDialog.body", { title })}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{t("deleteDialog.cancel")}</AlertDialogCancel>
@@ -42,7 +43,7 @@ export function DeleteWebsiteButton({ websiteId, title }: { websiteId: string; t
             onClick={() =>
               start(async () => {
                 const result = await deleteWebsiteAction(websiteId);
-                if (result.ok) toast.success(t("deleteDialog.done"));
+                if (result.ok) toast.success(t(cardsOnly ? "deleteDialog.weddingDone" : "deleteDialog.done"));
               })
             }
           >

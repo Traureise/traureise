@@ -46,7 +46,7 @@ test.describe("checkout", () => {
       await card.getByRole("link", { name: "Paket wählen" }).click();
       await expect(page).toHaveURL(/\/preise$/);
       const rsvp = page.getByTestId("tier-rsvp");
-      await expect(rsvp.getByLabel("Für welche Website?")).toHaveValue(/[0-9a-f-]{36}/);
+      await expect(rsvp.getByLabel("Für welche Hochzeit?")).toHaveValue(/[0-9a-f-]{36}/);
       await rsvp.getByRole("button", { name: "Jetzt kaufen" }).click();
       await expect(page).toHaveURL(new RegExp(`^${STUB_URL}/checkout/ch_`));
       await expect(page.getByText("prod_e2e_rsvp")).toBeVisible();

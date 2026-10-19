@@ -78,6 +78,8 @@ export const websites = pgTable(
     coverImageKey: text("cover_image_key"),
     timezone: text("timezone").notNull().default("Europe/Berlin"),
     themeId: text("theme_id").notNull(),
+    // false = a wedding with cards only: the public website at /<slug> is not created yet.
+    siteEnabled: boolean("site_enabled").notNull().default(true),
     paletteId: text("palette_id"),
     fontPairingId: text("font_pairing_id"),
     createdAt: createdAt(),

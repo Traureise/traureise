@@ -1,19 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getLocale, getTranslations } from "next-intl/server";
+import { getFormatter, getLocale, getTranslations } from "next-intl/server";
 import { ChevronLeft, Eye, Lock } from "lucide-react";
 import { NotFoundError } from "@/application/errors";
 import { CardEditor } from "@/components/card-editor/card-editor";
+import { WeddingDetailsButton } from "@/components/dashboard/wedding-details-button";
 import { container } from "@/composition/container";
 import { cardKindFromSlug, CARD_SLUGS, type CardKind } from "@/domain/cards";
+import { dateFromIso } from "@/lib/format";
 import { requireProfile } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ id: string; kind: string }> };
 
-const DASHBOARD_TAB: Record<CardKind, string> = { saveTheDate: "save-the-dates", invitation: "invitations", thankYou: "cards", engagement: "cards" };
+const DASHBOARD_TAB: Record<CardKind, string> = { engagement: "engagement", saveTheDate: "save-the-dates", invitation: "invitations", thankYou: "thank-you" };
 
 async function load(id: string, slug: string) {
   const user = await requireProfile();
@@ -39,6 +41,8 @@ export default async function CardEditorPage({ params }: Props) {
   const data = await load(id, slug);
   const t = await getTranslations("cardEditor");
   const tKinds = await getTranslations("cardKinds");
+  const format = await getFormatter();
+  const { website } = data;
   const header = (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
@@ -53,7 +57,13 @@ export default async function CardEditorPage({ params }: Props) {
       </div>
       <div>
         <h1 className="font-heading text-3xl font-medium tracking-tight">{tKinds(data.card.kind)}</h1>
-        <p className="text-sm text-muted-foreground">{data.website.title}</p>
+        {/* Names and date come from the wedding, so they can be changed here even without a website. */}
+        <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground" data-testid="wedding-details">
+          <span>
+            {website.title} · {website.weddingDate ? format.dateTime(dateFromIso(website.weddingDate), { dateStyle: "long", timeZone: "UTC" }) : t("dateOpen")}
+          </span>
+          <WeddingDetailsButton wedding={website} variant="link" />
+        </p>
       </div>
       {data.billingEnabled && !data.active && (
         <p className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm" data-testid="card-editor-locked">

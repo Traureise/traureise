@@ -104,8 +104,10 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
       await createCard(page, "Verlobungsanzeige");
       await page.getByLabel("Link zur Website auf der Karte zeigen").check();
       await saveCard(page);
-      await page.goto("/dashboard?tab=cards");
-      await expect(page.getByTestId("card-item")).toHaveCount(2);
+      await page.goto("/dashboard?tab=engagement");
+      await expect(page.getByTestId("card-item")).toHaveCount(1);
+      await page.goto("/dashboard?tab=thank-you");
+      await expect(page.getByTestId("card-item")).toHaveCount(1);
       await page.goto("/dashboard?tab=save-the-dates");
       await expect(page.getByTestId("card-item")).toHaveCount(1);
       await expect(page.getByTestId("card-item").getByTestId("card-view")).toHaveAttribute("data-layout", "farbe");
@@ -242,7 +244,7 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
     });
 
     await test.step("PDF and PNG exports download and contain the card", async () => {
-      await page.goto("/dashboard?tab=cards");
+      await page.goto("/dashboard?tab=thank-you");
       const pdf = await exportCard(page, "thankYou", "PDF (A6)");
       expect(pdf.suggestedFilename()).toBe("dankeskarte-a6.pdf");
       const pdfBytes = await downloaded(pdf);
@@ -250,6 +252,7 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
       expect(new TextDecoder("latin1").decode(pdfBytes)).toContain("/Subtype /Image");
       const a5 = await exportCard(page, "thankYou", "PDF (A5)");
       expect(a5.suggestedFilename()).toBe("dankeskarte-a5.pdf");
+      await page.goto("/dashboard?tab=engagement");
       const png = await exportCard(page, "engagement", "Bild (PNG)");
       expect(png.suggestedFilename()).toBe("verlobung.png");
       const pngBytes = await downloaded(png);

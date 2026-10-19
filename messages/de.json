@@ -149,16 +149,18 @@
       "engagement": "Verlobungsanzeige"
     },
     "tabs": {
-      "websites": "Hochzeitswebsites",
+      "engagement": "Verlobung",
       "saveTheDates": "Save the Dates",
+      "websites": "Hochzeitswebsites",
       "invitations": "Einladungen",
-      "cards": "Karten"
+      "thankYou": "Dankeskarten"
     },
     "empty": {
-      "websites": "Hier erscheint eure Hochzeitswebsite",
+      "engagement": "Deine Verlobungsanzeige erscheint hier",
       "saveTheDates": "Deine Save the Dates erscheinen hier",
+      "websites": "Hier erscheint eure Hochzeitswebsite",
       "invitations": "Deine Einladungen erscheinen hier",
-      "cards": "Deine Karten erscheinen hier"
+      "thankYou": "Deine Dankeskarte erscheint hier"
     },
     "createFirst": "Hochzeitswebsite erstellen",
     "card": {
@@ -171,14 +173,19 @@
       "coverAlt": "Titelbild von {title}",
       "plan": "Paket: {tier}",
       "upgrade": "Paket wählen",
-      "guests": "Gäste"
+      "guests": "Gäste",
+      "noWebsite": "Noch keine Website. Karten und Gästeliste funktionieren auch ohne; die Website könnt ihr jederzeit dazu erstellen.",
+      "createWebsite": "Website erstellen"
     },
     "deleteDialog": {
       "title": "Website löschen?",
-      "body": "„{title}“ wird mit allen Inhalten und Bildern endgültig gelöscht. Gäste erreichen die Seite danach nicht mehr.",
+      "body": "„{title}“ wird mit allen Inhalten, Karten, der Gästeliste und Bildern endgültig gelöscht. Gäste erreichen die Seite danach nicht mehr.",
       "cancel": "Abbrechen",
       "confirm": "Endgültig löschen",
-      "done": "Website gelöscht"
+      "done": "Website gelöscht",
+      "weddingTitle": "Hochzeit löschen?",
+      "weddingBody": "„{title}“ wird mit allen Karten, der Gästeliste und Bildern endgültig gelöscht. Gäste erreichen ihre Links danach nicht mehr.",
+      "weddingDone": "Hochzeit gelöscht"
     },
     "share": {
       "title": "Website teilen",
@@ -201,17 +208,38 @@
       "slugHint": "Leer lassen, dann schlagen wir eine Adresse aus euren Namen vor.",
       "themeLabel": "Theme",
       "submit": "Website erstellen",
-      "cancel": "Abbrechen"
+      "cancel": "Abbrechen",
+      "forLabel": "Für welche Hochzeit?",
+      "newWedding": "Neue Hochzeit",
+      "forHint": "Die Website gehört dann zu dieser Hochzeit, mit ihrer Gästeliste, ihren Karten und Paketen."
     },
     "purchaseThanks": "Danke für deinen Kauf! Sobald die Zahlung bestätigt ist, ist dein Paket bei der Website freigeschaltet.",
     "createCard": {
       "title": "{kind} erstellen",
-      "lead": "Für welche Hochzeitswebsite? Jede Website hat eine Karte jeder Art.",
-      "website": "Hochzeitswebsite",
+      "lead": "Für welche Hochzeit? Jede Hochzeit hat eine Karte jeder Art.",
+      "website": "Hochzeit",
       "cancel": "Abbrechen",
       "submit": "Weiter",
-      "needWebsite": "Legt zuerst eure Hochzeitswebsite an. Die Karten übernehmen Namen, Datum und Design von ihr.",
       "button": "{kind} erstellen"
+    },
+    "newWedding": {
+      "title": "{kind} erstellen",
+      "lead": "Mehr braucht ihr dafür nicht. Eine Hochzeitswebsite könnt ihr jederzeit dazu erstellen.",
+      "titleLabel": "Eure Namen",
+      "titlePlaceholder": "Anna & Ben",
+      "dateLabel": "Hochzeitsdatum (optional)",
+      "cancel": "Abbrechen",
+      "submit": "Weiter"
+    },
+    "details": {
+      "open": "Angaben ändern",
+      "title": "Eure Hochzeit",
+      "lead": "Namen, Datum und Ort gelten für eure Karten und eure Website.",
+      "titleLabel": "Eure Namen",
+      "dateLabel": "Hochzeitsdatum (optional)",
+      "locationLabel": "Ort (optional)",
+      "cancel": "Abbrechen",
+      "submit": "Speichern"
     },
     "cardItem": {
       "previewAlt": "{kind} von {title}",
@@ -446,9 +474,9 @@
     "included": "Immer dabei",
     "comingSoon": "bald verfügbar",
     "buy": "Jetzt kaufen",
-    "websiteLabel": "Für welche Website?",
+    "websiteLabel": "Für welche Hochzeit?",
     "loginToBuy": "Anmelden, um zu kaufen",
-    "createWebsiteFirst": "Lege zuerst eine Hochzeitswebsite an.",
+    "createWebsiteFirst": "Erstellt zuerst eine Karte oder eure Hochzeitswebsite.",
     "owned": "Deine Websites haben dieses Paket schon.",
     "checkoutFailed": "Die Bezahlseite konnte nicht geöffnet werden. Bitte versuch es noch einmal.",
     "tiers": {
@@ -875,7 +903,7 @@
       "venue": "Ort der Feier",
       "text": "Text"
     },
-    "noEvent": "Kein Event (Datum der Website)",
+    "noEvent": "Kein Event (Hochzeitsdatum)",
     "fromSchedule": "aus dem Tagesablauf",
     "showReplyBy": "Antwortfrist auf der Karte zeigen",
     "showReplyByUnset": "Antwortfrist zeigen (in den Gäste-Einstellungen festlegen)",
@@ -891,6 +919,7 @@
     "reminderMessage": "Text der Erinnerung",
     "save": "Speichern",
     "saving": "Speichert …",
-    "saved": "Gespeichert"
+    "saved": "Gespeichert",
+    "dateOpen": "Datum noch offen"
   }
 }

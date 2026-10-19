@@ -96,6 +96,14 @@ describe("DrizzleWebsiteRepository", () => {
     expect(await websiteRepo.findById("not-a-uuid")).toBeNull();
   });
 
+  it("creates a wedding with cards only, whose website is switched on later", async () => {
+    const user = await userRepo.create("clara@example.org");
+    const wedding = await websiteRepo.create({ ownerId: user.id, slug: "clara-und-dan", title: "Clara & Dan", weddingDate: null, themeId: "salbei", timezone: "Europe/Berlin", siteEnabled: false }, sections);
+    expect(wedding.siteEnabled).toBe(false);
+    expect((await websiteRepo.update(wedding.id, { siteEnabled: true })).siteEnabled).toBe(true);
+    expect((await seedWebsite()).website.siteEnabled).toBe(true);
+  });
+
   it("enforces unique slugs and reports them as taken", async () => {
     const { website } = await seedWebsite();
     expect(await websiteRepo.slugTaken("anna-und-ben")).toBe(true);

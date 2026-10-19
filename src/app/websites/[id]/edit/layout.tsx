@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { ExternalLink } from "lucide-react";
 import { WeddingSite } from "@/components/site/wedding-site";
@@ -6,6 +7,8 @@ import { loadEditorView } from "@/lib/editor";
 export default async function EditorLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
   const view = await loadEditorView(id);
+  // A wedding with cards only has no website to edit yet; it is created from the dashboard.
+  if (!view.website.siteEnabled) redirect("/dashboard?tab=websites");
   const t = await getTranslations("editor");
   return (
     <div className="grid min-h-dvh lg:h-dvh lg:grid-cols-[420px_1fr]">

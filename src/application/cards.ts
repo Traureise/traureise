@@ -28,6 +28,7 @@ import { formFor, householdContent, linkUrl, loadByToken, loadGuestContext, type
 import { assertOwnImage, loadOwnedWebsite } from "./owned";
 import type { Card, MailMessage, PaperFormat, QueuedMail, Website } from "./ports";
 import { itemsOf } from "./views";
+import { CreateWebsite } from "./websites";
 
 const PNG_EXPORT_WIDTH = 1748; // A5 width at 300 dpi
 const EMAIL_IMAGE_WIDTH = 900;
@@ -55,6 +56,9 @@ function cardDesign(deps: Deps, choice: DesignChoice, kind: CardKind): CardDesig
   return { ...resolveDesign(theme, choice.paletteId, choice.fontPairingId), layout: layouts.find((l) => l.id === choice.layoutId) ?? layouts[0] ?? FALLBACK_LAYOUT };
 }
 
+/** The public website, or null while the wedding has cards only. */
+const siteUrl = (deps: Deps, website: Website) => (website.siteEnabled ? `${deps.appUrl}/${website.slug}` : null);
+
 /** Builds what CardView draws. `photoSrc` is a URL on the page; for the exporter any non-null marker (the bytes come separately). */
 function modelFor(deps: Deps, ctx: GuestContext, card: Card, household: Pick<Household, "name" | "personalLine"> | null, photoSrc: string | null): CardModel {
   const design = cardDesign(deps, card, card.kind);
@@ -65,7 +69,7 @@ function modelFor(deps: Deps, ctx: GuestContext, card: Card, household: Pick<Hou
     kind: card.kind,
     content: card.content,
     design,
-    website: { title: website.title, weddingDate: website.weddingDate, location: website.location, url: `${deps.appUrl}/${website.slug}` },
+    website: { title: website.title, weddingDate: website.weddingDate, location: website.location, url: siteUrl(deps, website) },
     event: schedule ? { startDate: schedule.data.startDate, startTime: schedule.data.startTime, venueName: schedule.data.venueName } : null,
     replyBy: ctx.settings.replyBy,
     household,
@@ -92,6 +96,16 @@ const cardMessage = (deps: Deps, card: Card) => card.message ?? deps.cardTexts.d
 const reminderMessage = (deps: Deps, card: Card | undefined) => card?.reminderMessage ?? deps.cardTexts.reminderMessage;
 
 // ---- the couple: creating and designing ----
+
+export class CreateCardForNewWedding {
+  constructor(private deps: Deps) {}
+
+  /** A card as the couple's first step: starts the wedding (names, date) without a website. */
+  async execute(userId: string, kind: CardKind, input: { title: string; weddingDate?: string }): Promise<Card> {
+    const wedding = await new CreateWebsite(this.deps).execute(userId, { title: input.title, weddingDate: input.weddingDate || undefined, siteEnabled: false });
+    return new CreateCard(this.deps).execute(userId, wedding.id, kind);
+  }
+}
 
 export class CreateCard {
   constructor(private deps: Deps) {}
@@ -133,7 +147,8 @@ export type CardEditor = {
   /** Schedule items an invitation can show. */
   events: { id: string; name: string; startDate: string; startTime: string; venueName: string }[];
   replyBy: string | null;
-  websiteUrl: string;
+  /** Null while the wedding has no website. */
+  websiteUrl: string | null;
   /** Links, export and sending are unlocked. */
   active: boolean;
   billingEnabled: boolean;
@@ -166,7 +181,7 @@ export class GetCardEditor {
       themes,
       events: itemsOf(ctx.view, "schedule").map((i) => ({ id: i.id, name: i.data.name, startDate: i.data.startDate, startTime: i.data.startTime, venueName: i.data.venueName })),
       replyBy: ctx.settings.replyBy,
-      websiteUrl: `${this.deps.appUrl}/${website.slug}`,
+      websiteUrl: siteUrl(this.deps, website),
       active: ctx.cardActive(kind),
       billingEnabled: this.deps.billing.enabled,
       defaultMessage: this.deps.cardTexts.defaults[kind].message,
@@ -286,13 +301,14 @@ export type HouseholdPageView =
 const pageWebsite = ({ title, slug, weddingDate, timezone }: Website): PageWebsite => ({ title, slug, weddingDate, timezone });
 
 function pageCard(deps: Deps, ctx: GuestContext, card: Card, household: Pick<Household, "name" | "personalLine"> | null): PageCard {
-  const { slug, weddingDate } = ctx.view.website;
+  const { slug, weddingDate, siteEnabled } = ctx.view.website;
+  const linksSite = siteEnabled && (card.kind === "saveTheDate" || (card.kind === "engagement" && card.content.showWebsiteLink));
   return {
     kind: card.kind,
     model: modelFor(deps, ctx, card, household, pagePhoto(card)),
     envelope: card.envelope,
     icsUrl: card.kind === "saveTheDate" && weddingDate ? `/${slug}/hochzeit.ics` : null,
-    websiteUrl: card.kind === "saveTheDate" || (card.kind === "engagement" && card.content.showWebsiteLink) ? `/${slug}` : null,
+    websiteUrl: linksSite ? `/${slug}` : null,
   };
 }
 

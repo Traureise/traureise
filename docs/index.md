@@ -10,8 +10,9 @@ instance.
 ## What it does
 
 - **Passwordless login.** Enter your email, click the link, done. An account is created on first login.
-- **Dashboard** with your websites, a share dialog (QR code to download or copy, link to copy) and
-  deletion. Save the Dates, invitations and cards have placeholder tabs for now.
+- **Dashboard** with your weddings, websites and cards in the order you need them, a share dialog (QR code
+  to download or copy, link to copy) and deletion. Cards work with or without a website; see
+  [Save the Dates, invitations and cards](cards.md).
 - **Editor with live preview** for the home section (cover photo, date, location, welcome text,
   hashtag, countdown, web address, time zone) and eight sections: Unsere Geschichte, Tagesablauf,
   Anreise, Empfehlungen, Geschenkideen, Hochzeitsgesellschaft, Galerie and Häufige Fragen. Each section can be

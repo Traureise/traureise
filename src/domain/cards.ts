@@ -169,7 +169,8 @@ export function buildCardModel(input: {
   kind: CardKind;
   content: CardContent;
   design: CardDesign;
-  website: { title: string; weddingDate: string | null; location: string | null; url: string };
+  /** `url` is null while the wedding has no website. */
+  website: { title: string; weddingDate: string | null; location: string | null; url: string | null };
   event: { startDate: string; startTime: string; venueName: string } | null;
   replyBy: string | null;
   household: { name: string; personalLine: string } | null;
@@ -188,7 +189,7 @@ export function buildCardModel(input: {
     details.push(content.venue || event?.venueName || null);
     if (content.showReplyBy && input.replyBy) footer = labels.replyBy.replace("{date}", formatDate(input.replyBy, labels.locale));
   }
-  if (kind === "engagement" && content.showWebsiteLink) footer = website.url.replace(/^https?:\/\//, "");
+  if (kind === "engagement" && content.showWebsiteLink && website.url) footer = website.url.replace(/^https?:\/\//, "");
   const colors = cardColors(design.palette.colors, design.layout, hasPhoto);
   const photoSrc = hasPhoto ? assets.photoSrc : null;
   return {

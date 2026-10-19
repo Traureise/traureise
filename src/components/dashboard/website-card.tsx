@@ -7,11 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { LogoMark } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { dateFromIso, uploadUrl } from "@/lib/format";
+import { CreateFirstButton } from "./create-first-button";
+import type { ThemeOption } from "./create-website-dialog";
 import { DeleteWebsiteButton } from "./delete-website-button";
 import { ShareDialog } from "./share-dialog";
+import { WeddingDetailsButton } from "./wedding-details-button";
 
-/** `tier` is only passed when billing is on. */
-export async function WebsiteCard({ website, appUrl, tier }: { website: Website; appUrl: string; tier?: Tier }) {
+/** `tier` is only passed when billing is on. A wedding with cards only offers "Website erstellen" instead of its website. */
+export async function WebsiteCard({ website, appUrl, tier, themes }: { website: Website; appUrl: string; tier?: Tier; themes: ThemeOption[] }) {
   const t = await getTranslations("dashboard.card");
   const tTiers = await getTranslations("pricing.tiers");
   const format = await getFormatter();
@@ -56,33 +59,61 @@ export async function WebsiteCard({ website, appUrl, tier }: { website: Website;
             <dd>{website.location ?? t("locationOpen")}</dd>
           </div>
         </dl>
-        <a href={publicUrl} className="truncate text-sm text-primary underline-offset-4 hover:underline" data-testid="public-url">
-          {publicUrl}
-        </a>
-        <div className="mt-auto flex flex-wrap gap-2">
-          <Button asChild variant="secondary">
-            <Link href={`/${website.slug}`} target="_blank">
-              <Eye aria-hidden />
-              {t("view")}
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href={`/websites/${website.id}/edit`}>
-              <PencilLine aria-hidden />
-              {t("edit")}
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href={`/websites/${website.id}/gaeste`}>
-              <Users aria-hidden />
-              {t("guests")}
-            </Link>
-          </Button>
-          <ShareDialog url={publicUrl} slug={website.slug} />
-          <div className="sm:ml-auto">
-            <DeleteWebsiteButton websiteId={website.id} title={website.title} />
-          </div>
-        </div>
+        {website.siteEnabled ? (
+          <>
+            <a href={publicUrl} className="truncate text-sm text-primary underline-offset-4 hover:underline" data-testid="public-url">
+              {publicUrl}
+            </a>
+            <div className="mt-auto flex flex-wrap gap-2">
+              <Button asChild variant="secondary">
+                <Link href={`/${website.slug}`} target="_blank">
+                  <Eye aria-hidden />
+                  {t("view")}
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href={`/websites/${website.id}/edit`}>
+                  <PencilLine aria-hidden />
+                  {t("edit")}
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href={`/websites/${website.id}/gaeste`}>
+                  <Users aria-hidden />
+                  {t("guests")}
+                </Link>
+              </Button>
+              <ShareDialog url={publicUrl} slug={website.slug} />
+              <div className="sm:ml-auto">
+                <DeleteWebsiteButton websiteId={website.id} title={website.title} />
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground" data-testid="no-website">
+              {t("noWebsite")}
+            </p>
+            <div className="mt-auto flex flex-wrap gap-2">
+              <CreateFirstButton
+                themes={themes}
+                appUrl={appUrl}
+                wedding={{ id: website.id, title: website.title, weddingDate: website.weddingDate, slug: website.slug }}
+                label={t("createWebsite")}
+              />
+              <WeddingDetailsButton wedding={website} />
+              <Button asChild variant="outline">
+                <Link href={`/websites/${website.id}/gaeste`}>
+                  <Users aria-hidden />
+                  {t("guests")}
+                </Link>
+              </Button>
+              <div className="sm:ml-auto">
+                <DeleteWebsiteButton websiteId={website.id} title={website.title} cardsOnly />
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </article>
   );

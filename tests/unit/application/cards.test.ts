@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { DeleteAccount, ExportAccount } from "@/application/account";
 import {
   CreateCard,
+  CreateCardForNewWedding,
   DeleteCard,
   ExportCard,
   GetCardEditor,
@@ -114,6 +115,30 @@ describe("creating and editing cards", () => {
       ["engagement", null],
     ]);
     expect(cards[1]!.publicUrl).toMatch(/\/verlobung$/);
+  });
+});
+
+describe("cards without a website", () => {
+  it("start a new wedding with the website switched off", async () => {
+    const card = await new CreateCardForNewWedding(f.deps).execute(anna.id, "engagement", { title: "Clara & Dan", weddingDate: "" });
+    const wedding = (await f.websites.findById(card.websiteId))!;
+    expect(wedding).toMatchObject({ title: "Clara & Dan", weddingDate: null, siteEnabled: false, themeId: "salbei" });
+    expect(card).toMatchObject({ kind: "engagement", content: { names: "Clara & Dan" } });
+    await expect(new CreateCardForNewWedding(f.deps).execute(anna.id, "engagement", { title: "" })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("never link to the website that does not exist yet", async () => {
+    await f.websites.update(websiteId, { siteEnabled: false });
+    await create("saveTheDate");
+    const engagement = await create("engagement");
+    await new SaveCard(f.deps).execute(anna.id, websiteId, "engagement", { ...engagement, content: { ...engagement.content, showWebsiteLink: true } });
+    expect((await editor("saveTheDate")).websiteUrl).toBeNull();
+    const kern = await household("Kern");
+    await share("saveTheDate", kern.id);
+    const view = await page(kern.id);
+    expect(view?.state === "page" && view.cards.map((c) => [c.kind, c.websiteUrl, c.icsUrl])).toEqual([["saveTheDate", null, "/anna-und-ben/hochzeit.ics"]]);
+    const engagementPage = await new GetEngagementPage(f.deps).execute("anna-und-ben");
+    expect(engagementPage?.state === "active" && [engagementPage.card.websiteUrl, engagementPage.card.model.footer]).toEqual([null, null]);
   });
 });
 

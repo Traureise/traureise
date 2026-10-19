@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { ChevronDown, Plus } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,22 +12,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { CardKind } from "@/domain/cards";
 import { useCreateCard, type WebsiteChoice } from "./create-card-dialog";
-import { CreateWebsiteDialog, type ThemeOption } from "./create-website-dialog";
+import { CreateWebsiteDialog, type ThemeOption, type WeddingDraft } from "./create-website-dialog";
 
-const CARD_ENTRIES: { key: string; kind: CardKind }[] = [
-  { key: "invitation", kind: "invitation" },
-  { key: "saveTheDate", kind: "saveTheDate" },
-  { key: "thankYou", kind: "thankYou" },
+/** In the order a couple needs them (my call); each can be created first, in any order. */
+const ENTRIES: ({ key: string; kind: CardKind } | { key: "website"; kind: null })[] = [
   { key: "engagement", kind: "engagement" },
+  { key: "saveTheDate", kind: "saveTheDate" },
+  { key: "website", kind: null },
+  { key: "invitation", kind: "invitation" },
+  { key: "thankYou", kind: "thankYou" },
 ];
 
-export function CreateMenu({ themes, appUrl, websites }: { themes: ThemeOption[]; appUrl: string; websites: WebsiteChoice[] }) {
+export function CreateMenu({ themes, appUrl, websites, drafts }: { themes: ThemeOption[]; appUrl: string; websites: WebsiteChoice[]; drafts: WeddingDraft[] }) {
   const t = useTranslations("dashboard");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { choose, dialog, pending } = useCreateCard(websites, () => {
-    toast.info(t("createCard.needWebsite"));
-    setDialogOpen(true);
-  });
+  const { choose, dialog, pending } = useCreateCard(websites);
   return (
     <>
       <DropdownMenu>
@@ -40,35 +38,28 @@ export function CreateMenu({ themes, appUrl, websites }: { themes: ThemeOption[]
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem onSelect={() => setDialogOpen(true)}>{t("createMenu.website")}</DropdownMenuItem>
-          {CARD_ENTRIES.map((entry) => (
-            <DropdownMenuItem key={entry.key} onSelect={() => choose(entry.kind)}>
+          {ENTRIES.map((entry) => (
+            <DropdownMenuItem key={entry.key} onSelect={() => (entry.kind ? choose(entry.kind) : setDialogOpen(true))}>
               {t(`createMenu.${entry.key}`)}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
-      <CreateWebsiteDialog open={dialogOpen} onOpenChange={setDialogOpen} themes={themes} appUrl={appUrl} />
+      <CreateWebsiteDialog open={dialogOpen} onOpenChange={setDialogOpen} themes={themes} appUrl={appUrl} drafts={drafts} />
       {dialog}
     </>
   );
 }
 
 /** "Save the Date erstellen" in an empty tab. */
-export function CreateCardButton({ kind, label, websites, themes, appUrl }: { kind: CardKind; label: string; websites: WebsiteChoice[]; themes: ThemeOption[]; appUrl: string }) {
-  const t = useTranslations("dashboard");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const { choose, dialog, pending } = useCreateCard(websites, () => {
-    toast.info(t("createCard.needWebsite"));
-    setDialogOpen(true);
-  });
+export function CreateCardButton({ kind, label, websites }: { kind: CardKind; label: string; websites: WebsiteChoice[] }) {
+  const { choose, dialog, pending } = useCreateCard(websites);
   return (
     <>
       <Button variant="secondary" disabled={pending} onClick={() => choose(kind)}>
         <Plus aria-hidden />
         {label}
       </Button>
-      <CreateWebsiteDialog open={dialogOpen} onOpenChange={setDialogOpen} themes={themes} appUrl={appUrl} />
       {dialog}
     </>
   );

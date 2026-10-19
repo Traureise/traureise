@@ -19,13 +19,15 @@ export type Website = {
   coverImageKey: string | null;
   timezone: string;
   themeId: string;
+  /** False while the couple only has cards: the public website is not created yet (/<slug> is a 404). */
+  siteEnabled: boolean;
   paletteId: string | null;
   fontPairingId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
 
-export type NewWebsite = Pick<Website, "ownerId" | "slug" | "title" | "weddingDate" | "themeId" | "timezone">;
+export type NewWebsite = Pick<Website, "ownerId" | "slug" | "title" | "weddingDate" | "themeId" | "timezone"> & { siteEnabled?: boolean };
 export type WebsitePatch = Partial<Omit<Website, "id" | "ownerId" | "createdAt" | "updatedAt">>;
 
 export type Section = { kind: SectionKind; title: string | null; visible: boolean; body: string };

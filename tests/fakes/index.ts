@@ -169,6 +169,7 @@ export class InMemoryWebsites implements WebsiteRepository {
       createdAt: now,
       updatedAt: now,
       ...input,
+      siteEnabled: input.siteEnabled ?? true,
     };
     this.websites.push(website);
     this.sections.set(website.id, sections.map((s) => ({ ...s })));

@@ -29,6 +29,13 @@
       "when": 1792357422371,
       "tag": "0003_cards",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792385890935,
+      "tag": "0004_site_enabled",
+      "breakpoints": true
     }
   ]
 }

@@ -7,8 +7,8 @@ requests to bring someone else, and a message. The couple sees the answers on th
 
 ## For couples
 
-The **Gäste** page (`/websites/<id>/gaeste`) is linked from the website card on the dashboard and from the
-editor. It has three tabs:
+The **Gäste** page (`/websites/<id>/gaeste`) is linked from the wedding's card on the dashboard (also for a
+wedding without a website) and from the editor. It has three tabs:
 
 - **Übersicht**: a pie chart of everyone (kommen, kommen nicht, offen), how many households have answered,
   the headcount per event, counts per dish and per poll answer, the allergy list, and pending requests for

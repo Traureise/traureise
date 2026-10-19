@@ -1,0 +1,1 @@
+ALTER TABLE "websites" ADD COLUMN "site_enabled" boolean DEFAULT true NOT NULL;

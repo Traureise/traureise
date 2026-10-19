@@ -293,9 +293,10 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
   await test.step("card tabs show empty states until a card exists; there is no archive", async () => {
     await page.goto("/dashboard");
     const expectations: [string, string][] = [
+      ["Verlobung", "Deine Verlobungsanzeige erscheint hier"],
       ["Save the Dates", "Deine Save the Dates erscheinen hier"],
       ["Einladungen", "Deine Einladungen erscheinen hier"],
-      ["Karten", "Deine Karten erscheinen hier"],
+      ["Dankeskarten", "Deine Dankeskarte erscheint hier"],
     ];
     for (const [tab, text] of expectations) {
       await page.getByRole("link", { name: tab, exact: true }).click();

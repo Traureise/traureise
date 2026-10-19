@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useTranslations } from "next-intl";
 import { createWebsiteAction } from "@/app/actions/websites";
 import { FieldError } from "@/components/forms/field-error";
@@ -10,21 +10,36 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export type ThemeOption = { id: string; name: string; preview: string };
+/** A wedding that has cards but no website yet. */
+export type WeddingDraft = { id: string; title: string; weddingDate: string | null; slug: string };
 
+const NEW = "new";
+
+/**
+ * Creates a website. If the couple already started a wedding with cards, the website is created for that wedding
+ * (same guests, cards and packages), preselected; "Neue Hochzeit" starts another one.
+ */
 export function CreateWebsiteDialog({
   open,
   onOpenChange,
   themes,
   appUrl,
+  drafts = [],
+  fixed = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   themes: ThemeOption[];
   appUrl: string;
+  drafts?: WeddingDraft[];
+  /** For the one wedding in `drafts`, without offering a new one. */
+  fixed?: boolean;
 }) {
   const t = useTranslations("dashboard.createDialog");
   const tErrors = useTranslations("errors");
   const [state, action, pending] = useActionState(createWebsiteAction, null);
+  const [choice, setChoice] = useState(drafts[0]?.id ?? NEW);
+  const draft = drafts.find((d) => d.id === choice);
   const errors = state && !state.ok ? state.fieldErrors ?? {} : {};
 
   return (
@@ -35,21 +50,37 @@ export function CreateWebsiteDialog({
           <DialogDescription>{t("lead")}</DialogDescription>
         </DialogHeader>
         <form action={action} className="space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="create-title">{t("titleLabel")}</Label>
-            <Input id="create-title" name="title" required placeholder={t("titlePlaceholder")} />
-            <FieldError code={errors.title} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="create-date">{t("dateLabel")}</Label>
-            <Input id="create-date" name="weddingDate" type="date" />
-            <FieldError code={errors.weddingDate} />
+          {drafts.length > 0 && !fixed && (
+            <fieldset className="space-y-2" data-testid="website-for">
+              <legend className="text-sm font-medium">{t("forLabel")}</legend>
+              {[...drafts.map((d) => ({ id: d.id, label: d.title })), { id: NEW, label: t("newWedding") }].map((o) => (
+                <label key={o.id} className="flex items-center gap-3 rounded-lg border border-border p-3 text-sm has-checked:border-primary">
+                  <input type="radio" name="for" value={o.id} checked={choice === o.id} onChange={() => setChoice(o.id)} className="size-4 accent-primary" />
+                  {o.label}
+                </label>
+              ))}
+              {draft && <p className="text-xs text-muted-foreground">{t("forHint")}</p>}
+            </fieldset>
+          )}
+          {draft && <input type="hidden" name="websiteId" value={draft.id} />}
+          {/* Keyed by the choice, so the fields refill with the chosen wedding's names and date. */}
+          <div key={choice} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="create-title">{t("titleLabel")}</Label>
+              <Input id="create-title" name="title" required placeholder={t("titlePlaceholder")} defaultValue={draft?.title} />
+              <FieldError code={errors.title} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-date">{t("dateLabel")}</Label>
+              <Input id="create-date" name="weddingDate" type="date" defaultValue={draft?.weddingDate ?? undefined} />
+              <FieldError code={errors.weddingDate} />
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="create-slug">{t("slugLabel")}</Label>
             <div className="flex items-center rounded-lg border border-input focus-within:ring-3 focus-within:ring-ring/50">
               <span className="pl-3 text-sm whitespace-nowrap text-muted-foreground">{appUrl.replace(/^https?:\/\//, "")}/</span>
-              <Input id="create-slug" name="slug" className="border-0 pl-0.5 focus-visible:ring-0" aria-describedby="create-slug-hint" />
+              <Input key={choice} id="create-slug" name="slug" defaultValue={draft?.slug} className="border-0 pl-0.5 focus-visible:ring-0" aria-describedby="create-slug-hint" />
             </div>
             <p id="create-slug-hint" className="text-xs text-muted-foreground">
               {t("slugHint")}

@@ -203,7 +203,7 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
               {data.replyBy ? t("showReplyBy") : t("showReplyByUnset")}
             </label>
           )}
-          {fields.includes("showWebsiteLink") && (
+          {fields.includes("showWebsiteLink") && data.websiteUrl && (
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={content.showWebsiteLink} onChange={(e) => set("showWebsiteLink", e.target.checked)} className="size-4 accent-primary" />
               {t("showWebsiteLink")}

@@ -8,7 +8,8 @@ export class GetPublicWebsite {
 
   async execute(slug: string): Promise<WebsiteView | null> {
     const website = await this.deps.websites.findBySlug(slug);
-    return website ? loadView(this.deps, website) : null;
+    // A wedding with cards only has no website yet.
+    return website?.siteEnabled ? loadView(this.deps, website) : null;
   }
 }
 
@@ -51,7 +52,7 @@ export class GetWeddingIcs {
         title: this.deps.cardTexts.calendarTitle.replace("{couple}", website.title),
         location: website.location ?? undefined,
         date: website.weddingDate,
-        url: `${this.deps.appUrl}/${website.slug}`,
+        url: website.siteEnabled ? `${this.deps.appUrl}/${website.slug}` : undefined,
       },
       this.deps.clock.now(),
     );

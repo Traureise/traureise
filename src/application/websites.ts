@@ -18,6 +18,12 @@ const createSchema = z.object({
   themeId: optional(z.string()).default(null),
 });
 
+const detailsSchema = z.object({
+  title: requiredText(120),
+  weddingDate: optional(isoDate).default(null),
+  location: optional(z.string().trim().max(200, "too_long")).default(null),
+});
+
 async function assertSlugAvailable(deps: Deps, slug: string, exceptWebsiteId?: string) {
   const error = validateSlug(slug);
   if (error) throw new ValidationError({ slug: error });
@@ -35,7 +41,8 @@ async function uniqueSlug(deps: Deps, base: string): Promise<string> {
 export class CreateWebsite {
   constructor(private deps: Deps) {}
 
-  async execute(ownerId: string, input: { title: string; weddingDate?: string; slug?: string; themeId?: string }): Promise<Website> {
+  /** `siteEnabled: false` starts a wedding with cards only; its website is switched on later (EnableSite). */
+  async execute(ownerId: string, input: { title: string; weddingDate?: string; slug?: string; themeId?: string; siteEnabled?: boolean }): Promise<Website> {
     const parsed = parseWith(createSchema, input);
     if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
     const { title, weddingDate, slug, themeId } = parsed.value;
@@ -51,9 +58,38 @@ export class CreateWebsite {
         slug: slug ?? (await uniqueSlug(this.deps, slugify(title))),
         themeId: themeId ?? this.deps.themes.defaultThemeId(),
         timezone: DEFAULT_TIMEZONE,
+        siteEnabled: input.siteEnabled ?? true,
       },
       SECTION_KINDS.map((kind) => ({ kind, title: null, visible: true, body: "" })),
     );
+  }
+}
+
+export class EnableSite {
+  constructor(private deps: Deps) {}
+
+  /** Creates the website of a wedding that so far only had cards: same guests, cards and packages. */
+  async execute(userId: string, websiteId: string, input: { title: string; weddingDate?: string; slug?: string; themeId?: string }): Promise<Website> {
+    const website = await loadOwnedWebsite(this.deps, userId, websiteId);
+    const parsed = parseWith(createSchema, input);
+    if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
+    const { title, weddingDate, slug, themeId } = parsed.value;
+    if (themeId && !this.deps.themes.get(themeId)) throw new ValidationError({ themeId: "unknown_theme" });
+    if (slug && slug !== website.slug) await assertSlugAvailable(this.deps, slug, websiteId);
+    const theme = themeId && themeId !== website.themeId ? { themeId, paletteId: null, fontPairingId: null } : {};
+    return this.deps.websites.update(websiteId, { title, weddingDate, slug: slug ?? website.slug, ...theme, siteEnabled: true });
+  }
+}
+
+export class UpdateWeddingDetails {
+  constructor(private deps: Deps) {}
+
+  /** Names, date and place, which cards and website share; for couples who have no website yet. */
+  async execute(userId: string, websiteId: string, input: unknown): Promise<Website> {
+    await loadOwnedWebsite(this.deps, userId, websiteId);
+    const parsed = parseWith(detailsSchema, input);
+    if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
+    return this.deps.websites.update(websiteId, parsed.value);
   }
 }
 

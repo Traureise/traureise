@@ -80,15 +80,19 @@ test.describe("Einladungen and Komplett packages", () => {
     await test.step("the thank-you card and the engagement announcement need Komplett", async () => {
       await createCard(page, "Dankeskarte");
       await createCard(page, "Verlobungsanzeige");
-      await page.goto("/dashboard?tab=cards");
-      await expect(page.getByTestId("card-locked")).toHaveCount(2);
+      for (const tab of ["engagement", "thank-you"]) {
+        await page.goto(`/dashboard?tab=${tab}`);
+        await expect(page.getByTestId("card-locked")).toHaveCount(1);
+      }
       expect((await page.request.get(`/${slug}/verlobung`)).status()).toBe(200);
       await page.goto(`/${slug}/verlobung`);
       await expect(page.getByTestId("engagement-inactive")).toBeVisible();
 
       await buy(page, "complete");
-      await page.goto("/dashboard?tab=cards");
-      await expect(page.getByTestId("card-locked")).toHaveCount(0);
+      for (const tab of ["engagement", "thank-you"]) {
+        await page.goto(`/dashboard?tab=${tab}`);
+        await expect(page.getByTestId("card-item").getByTestId("card-locked")).toHaveCount(0);
+      }
       await page.goto(`/${slug}/verlobung`);
       await expect(page.getByTestId("envelope")).toContainText("Für euch");
     });

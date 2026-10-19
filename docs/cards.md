@@ -1,15 +1,24 @@
 # Save the Dates, invitations and cards
 
-Each wedding website can have four cards: an **engagement announcement** (Verlobungsanzeige), a **Save the
+Each wedding can have four cards: an **engagement announcement** (Verlobungsanzeige), a **Save the
 Date**, an **invitation** (Einladung) and a **thank-you card** (Dankeskarte), one of each. They open like a
 letter: a sealed envelope addressed to the household, and the card slides out. Couples send them by link,
 WhatsApp or email, and can export every card as PDF and PNG to print at home.
 
 ## For couples
 
-**Creating.** The dashboard's **Erstellen** menu creates a card for your website (with several websites you
-pick one) and opens the card editor. The tabs **Save the Dates**, **Einladungen** and **Karten** list the
-cards with a preview, how many households opened them ("23 von 31 Haushalten geöffnet"), and **Bearbeiten**,
+**Creating.** The dashboard's **Erstellen** menu lists everything in the order you need it:
+Verlobungsanzeige, Save the Date, Hochzeitswebsite, Einladung, Dankeskarte. Any of them can come first, and
+you don't need a website for cards. With no wedding yet, a card asks only for your names and an optional
+date; with several weddings you pick one. The card editor opens. **Angaben ändern** next to the names changes
+names, date and place for all cards (and the website, once there is one).
+
+A wedding without a website shows on the **Hochzeitswebsites** tab with **Website erstellen**, **Angaben
+ändern**, **Gäste** and **Löschen**. **Website erstellen** (there or in the menu) creates the website for that
+wedding, keeping its guest list, cards and packages; until then nothing is public at its address, and cards
+don't link to a website. See [ADR 0023](adr/0023-cards-without-a-website.md).
+
+The tabs **Verlobung**, **Save the Dates**, **Einladungen** and **Dankeskarten** list the cards with a preview, how many households opened them ("23 von 31 Haushalten geöffnet"), and **Bearbeiten**,
 **Ansehen**, **Teilen**, **Exportieren** and **Löschen**.
 
 **Designing.** The editor (`/websites/<id>/karten/<art>`) shows the card on the right exactly as guests see
@@ -21,7 +30,7 @@ website's. Then the photo and texts:
 | Save the Date | photo, names, date, place, a short text ("Einladung folgt"). Guests get **Zum Kalender hinzufügen** (`.ics`, all-day) and **Zur Website**. |
 | Einladung | "Wir heiraten" (editable), names, date, time and venue of a schedule event (each overridable), the reply-by date, a text. The response form follows below the card. |
 | Dankeskarte | photo, a text for everyone, and an optional **personal line per household**, which you enter in the guest list. |
-| Verlobungsanzeige | photo, names, a text, optionally the link to your website. |
+| Verlobungsanzeige | photo, names, a text, optionally the link to your website (once you have one). |
 
 **Mit Umschlag öffnen** switches the envelope on or off per card. **Vorschau mit Umschlag** shows the whole
 page as a household sees it; the preview never counts as opened.

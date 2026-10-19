@@ -14,12 +14,15 @@ import { themeAssetUrl } from "@/lib/format";
 import { requireProfile } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
+/** In the order a couple goes through them (my call). */
 const TABS: { id: string; label: string; kinds: CardKind[] }[] = [
-  { id: "websites", label: "websites", kinds: [] },
+  { id: "engagement", label: "engagement", kinds: ["engagement"] },
   { id: "save-the-dates", label: "saveTheDates", kinds: ["saveTheDate"] },
+  { id: "websites", label: "websites", kinds: [] },
   { id: "invitations", label: "invitations", kinds: ["invitation"] },
-  { id: "cards", label: "cards", kinds: ["thankYou", "engagement"] },
+  { id: "thank-you", label: "thankYou", kinds: ["thankYou"] },
 ];
+const WEBSITES = TABS[2]!;
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations("dashboard"))("title") };
@@ -28,13 +31,18 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ tab?: string; kauf?: string }> }) {
   const user = await requireProfile();
   const { tab: tabParam, kauf } = await searchParams;
-  const tab = TABS.find((x) => x.id === tabParam) ?? TABS[0]!;
   const t = await getTranslations("dashboard");
   const locale = await getLocale();
   const c = container();
   const websites = await c.listWebsites.execute(user.id);
   const choices = websites.map((w) => ({ id: w.id, title: w.title }));
-  const cards = tab.kinds.length ? (await c.listCards.execute(user.id)).filter((card) => tab.kinds.includes(card.kind)) : [];
+  const drafts = websites.filter((w) => !w.siteEnabled).map((w) => ({ id: w.id, title: w.title, weddingDate: w.weddingDate, slug: w.slug }));
+  const allCards = await c.listCards.execute(user.id);
+  // Without a choice: the websites if there is one, else the first tab with a card, else the websites.
+  const tab =
+    TABS.find((x) => x.id === tabParam) ??
+    (websites.some((w) => w.siteEnabled) ? WEBSITES : (TABS.find((x) => allCards.some((card) => x.kinds.includes(card.kind))) ?? WEBSITES));
+  const cards = allCards.filter((card) => tab.kinds.includes(card.kind));
   const tKinds = await getTranslations("cardKinds");
   // Plans exist only with billing on; self-hosted instances never show tiers.
   const plans = new Map((await c.listWebsitePlans.execute(user.id)).map((p) => [p.websiteId, p.tier]));
@@ -57,7 +65,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         )}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <h1 className="font-heading text-5xl font-medium tracking-tight sm:text-6xl">{t("greeting", { name: user.firstName })}</h1>
-          <CreateMenu themes={themes} appUrl={c.appUrl} websites={choices} />
+          <CreateMenu themes={themes} appUrl={c.appUrl} websites={choices} drafts={drafts} />
         </div>
 
         <nav aria-label={t("title")} className="-mx-1 flex gap-1 overflow-x-auto border-b border-border">
@@ -79,7 +87,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         {tab.id === "websites" && websites.length > 0 ? (
           <div className="space-y-6">
             {websites.map((website) => (
-              <WebsiteCard key={website.id} website={website} appUrl={c.appUrl} tier={plans.get(website.id)} />
+              <WebsiteCard key={website.id} website={website} appUrl={c.appUrl} tier={plans.get(website.id)} themes={themes} />
             ))}
           </div>
         ) : cards.length > 0 ? (
@@ -96,7 +104,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             ) : (
               <div className="flex flex-wrap gap-2">
                 {tab.kinds.map((kind) => (
-                  <CreateCardButton key={kind} kind={kind} label={t("createCard.button", { kind: tKinds(kind) })} websites={choices} themes={themes} appUrl={c.appUrl} />
+                  <CreateCardButton key={kind} kind={kind} label={t("createCard.button", { kind: tKinds(kind) })} websites={choices} />
                 ))}
               </div>
             )}
