@@ -83,7 +83,7 @@ export function CreateWebsiteDialog({
               <Input key={choice} id="create-slug" name="slug" defaultValue={draft?.slug} className="border-0 pl-0.5 focus-visible:ring-0" aria-describedby="create-slug-hint" />
             </div>
             <p id="create-slug-hint" className="text-xs text-muted-foreground">
-              {t("slugHint")}
+              {t(draft ? "slugHintWedding" : "slugHint")}
             </p>
             <FieldError code={errors.slug} />
           </div>

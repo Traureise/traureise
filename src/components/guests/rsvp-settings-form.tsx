@@ -47,12 +47,15 @@ export function RsvpSettingsForm({
   schedule,
   whatsappDefault,
   notificationsLocked,
+  hasSite,
 }: {
   websiteId: string;
   settings: RsvpSettings;
   schedule: { id: string; name: string }[];
   whatsappDefault: string;
   notificationsLocked: boolean;
+  /** Events come from the website's schedule; without a website guests only answer whether they come. */
+  hasSite: boolean;
 }) {
   const t = useTranslations("guests.settings");
   const router = useRouter();
@@ -91,7 +94,7 @@ export function RsvpSettingsForm({
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">{t("events")}</legend>
         {schedule.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("noSchedule")}</p>
+          <p className="text-sm text-muted-foreground">{t(hasSite ? "noSchedule" : "noScheduleNoSite")}</p>
         ) : (
           schedule.map((e) => (
             <label key={e.id} className="flex items-center gap-2 text-sm">

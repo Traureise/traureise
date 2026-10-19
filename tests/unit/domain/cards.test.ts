@@ -7,6 +7,7 @@ import {
   defaultCardContent,
   deliveryStatus,
   emailRecipients,
+  followWeddingDetails,
   householdPageContent,
   parseCardInput,
   personalize,
@@ -242,5 +243,15 @@ describe("buildCardModel", () => {
     expect(buildCardModel({ kind: "engagement", content, design, website, event: null, replyBy: null, household: null, labels, assets }).footer).toBeNull();
     const linked = buildCardModel({ kind: "engagement", content: { ...content, showWebsiteLink: true }, design, website, event: null, replyBy: null, household: null, labels, assets });
     expect(linked.footer).toBe("localhost:3000/anna-ben");
+  });
+});
+
+describe("followWeddingDetails", () => {
+  const content = { ...defaultCardContent("saveTheDate", { title: "A & B", location: null }, { heading: "", text: "" }) };
+  it("updates names and an empty or unchanged place, and keeps the couple's own texts", () => {
+    expect(followWeddingDetails("saveTheDate", content, { title: "A & B", location: null }, { title: "A & B", location: "Ort" })).toMatchObject({ names: "A & B", place: "Ort" });
+    expect(followWeddingDetails("saveTheDate", { ...content, place: "Eigener Ort" }, { title: "A & B", location: null }, { title: "C & D", location: "Ort" })).toMatchObject({ names: "C & D", place: "Eigener Ort" });
+    expect(followWeddingDetails("thankYou", { ...content, names: "Wir" }, { title: "A & B", location: null }, { title: "C & D", location: "Ort" })).toBeNull();
+    expect(followWeddingDetails("saveTheDate", content, { title: "A & B", location: null }, { title: "A & B", location: null })).toBeNull();
   });
 });

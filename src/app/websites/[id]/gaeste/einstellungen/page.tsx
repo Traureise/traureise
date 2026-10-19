@@ -25,6 +25,7 @@ export default async function GuestSettingsPage({ params }: Props) {
           schedule={page.schedule.map(({ id, name }) => ({ id, name }))}
           whatsappDefault={t("list.whatsappDefault", { title: page.website.title })}
           notificationsLocked={page.billingEnabled && !page.sending}
+          hasSite={page.website.siteEnabled}
         />
       </section>
       <section className="space-y-4 rounded-2xl border border-border bg-card p-6" data-testid="rsvp-polls">

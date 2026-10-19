@@ -76,5 +76,6 @@ export default async function CardEditorPage({ params }: Props) {
       )}
     </div>
   );
-  return <CardEditor data={data} locale={await getLocale()} header={header} />;
+  // "Angaben ändern" may change the card's names and place: start the form again from the saved card.
+  return <CardEditor key={`${website.title}|${website.weddingDate}|${website.location}`} data={data} locale={await getLocale()} header={header} />;
 }

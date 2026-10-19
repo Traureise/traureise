@@ -113,6 +113,19 @@ export function parseCardInput(input: unknown): Parsed<CardInput> {
   return parseWith(cardSchema, input);
 }
 
+type WeddingDetails = { title: string; location: string | null };
+
+/**
+ * Names and place are copied into a card when it is created. When the wedding's change, the card follows
+ * where it still shows the old value (or no place); what the couple wrote themselves stays. Null: unchanged.
+ */
+export function followWeddingDetails(kind: CardKind, content: CardContent, before: WeddingDetails, after: WeddingDetails): CardContent | null {
+  const next = { ...content };
+  if (content.names === before.title) next.names = after.title;
+  if (kind === "saveTheDate" && (content.place === "" || content.place === (before.location ?? ""))) next.place = after.location ?? "";
+  return next.names === content.names && next.place === content.place ? null : next;
+}
+
 /** `{name}` in the couple's texts becomes the household's name. */
 export function personalize(message: string, householdName: string): string {
   return message.replaceAll("{name}", householdName);

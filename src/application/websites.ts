@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { followWeddingDetails } from "@/domain/cards";
 import { findFontPairing } from "@/domain/fonts";
 import { isoDate, optional, requiredText } from "@/domain/fields";
 import { parseWith } from "@/domain/result";
@@ -84,12 +85,19 @@ export class EnableSite {
 export class UpdateWeddingDetails {
   constructor(private deps: Deps) {}
 
-  /** Names, date and place, which cards and website share; for couples who have no website yet. */
+  /** Names, date and place, which cards and website share; cards follow unless their text was changed. */
   async execute(userId: string, websiteId: string, input: unknown): Promise<Website> {
-    await loadOwnedWebsite(this.deps, userId, websiteId);
+    const before = await loadOwnedWebsite(this.deps, userId, websiteId);
     const parsed = parseWith(detailsSchema, input);
     if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
-    return this.deps.websites.update(websiteId, parsed.value);
+    const after = await this.deps.websites.update(websiteId, parsed.value);
+    for (const card of await this.deps.cards.listByWebsite(websiteId)) {
+      const content = followWeddingDetails(card.kind, card.content, before, after);
+      if (!content) continue;
+      const { themeId, paletteId, fontPairingId, layoutId, envelope, photoKey, message, reminderDays, reminderMessage } = card;
+      await this.deps.cards.update(websiteId, card.kind, { themeId, paletteId, fontPairingId, layoutId, envelope, photoKey, content, message, reminderDays, reminderMessage });
+    }
+    return after;
   }
 }
 

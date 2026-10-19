@@ -113,7 +113,7 @@ async function Overview({ page }: { page: GuestPage }) {
           </p>
         </Card>
         <Card title={t("events")} testId="overview-events">
-          <Counts rows={overview.events.map((e) => ({ key: e.id, label: e.name, count: e.count }))} empty={t("noEvents")} />
+          <Counts rows={overview.events.map((e) => ({ key: e.id, label: e.name, count: e.count }))} empty={t(website.siteEnabled ? "noEvents" : "noEventsNoSite")} />
         </Card>
         <Card title={t("meals")} testId="overview-meals">
           <Counts rows={overview.meals.map((m) => ({ key: m.id, label: m.label, count: m.count }))} empty={t("noMeal")} />

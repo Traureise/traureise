@@ -23,7 +23,7 @@ import {
 import { LockedError, NotFoundError, ValidationError } from "@/application/errors";
 import { GetGuestPage, RunGuestJobs, SaveHousehold, SaveRsvpSettings, SubmitGuestResponse } from "@/application/guests";
 import { AddItem } from "@/application/sections";
-import { CreateWebsite, DeleteWebsite } from "@/application/websites";
+import { CreateWebsite, DeleteWebsite, UpdateWeddingDetails } from "@/application/websites";
 import type { PaidTier } from "@/domain/billing";
 import type { CardKind } from "@/domain/cards";
 import { FakeArchive, FakeCardRenderer, createFakes } from "../../fakes";
@@ -125,6 +125,16 @@ describe("cards without a website", () => {
     expect(wedding).toMatchObject({ title: "Clara & Dan", weddingDate: null, siteEnabled: false, themeId: "salbei" });
     expect(card).toMatchObject({ kind: "engagement", content: { names: "Clara & Dan" } });
     await expect(new CreateCardForNewWedding(f.deps).execute(anna.id, "engagement", { title: "" })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("follow changed names and place unless the couple wrote their own", async () => {
+    const saveTheDate = await create("saveTheDate");
+    expect(saveTheDate.content).toMatchObject({ names: "Anna & Ben", place: "" });
+    const thankYou = await create("thankYou");
+    await new SaveCard(f.deps).execute(anna.id, websiteId, "thankYou", { ...thankYou, content: { ...thankYou.content, names: "Anna und Ben" } });
+    await new UpdateWeddingDetails(f.deps).execute(anna.id, websiteId, { title: "Anna & Ben Kern", weddingDate: "2027-06-12", location: "Beispielstadt" });
+    expect((await f.cards.find(websiteId, "saveTheDate"))!.content).toMatchObject({ names: "Anna & Ben Kern", place: "Beispielstadt" });
+    expect((await f.cards.find(websiteId, "thankYou"))!.content.names).toBe("Anna und Ben");
   });
 
   it("never link to the website that does not exist yet", async () => {

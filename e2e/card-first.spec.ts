@@ -34,6 +34,7 @@ test("a couple can start with any card; the website follows later for the same w
     await expect(dialog).toBeHidden();
     await expect(page.getByTestId("wedding-details")).toContainText("3. Juli 2027");
     await expect(page.getByTestId("card-preview")).toContainText("3. Juli 2027");
+    await expect(page.getByTestId("card-preview")).toContainText("Beispielstadt");
   });
 
   await test.step("the dashboard opens on the Save the Dates; the wedding has no website, and none is public", async () => {
