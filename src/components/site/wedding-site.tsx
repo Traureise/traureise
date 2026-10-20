@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
-import type { RenderableSection, WebsiteView } from "@/application/views";
+import type { WebsiteView } from "@/application/views";
 import { renderableSections } from "@/application/views";
 import { dateFromIso, daysUntil, uploadUrl } from "@/lib/format";
 import { LEGAL_HREFS } from "@/components/app/app-footer";
@@ -14,13 +14,11 @@ type Props = { view: WebsiteView; now: Date; mode: "public" | "preview" };
 export async function WeddingSite({ view, now, mode }: Props) {
   const t = await getTranslations("site");
   const legal = await container().legalPages.available();
-  const tSections = await getTranslations("sections.titles");
   const format = await getFormatter();
   const { website, design } = view;
   const sections = renderableSections(view);
   const frame = design.theme.assets.heroFrame ? undefined : "none";
   const divider = design.theme.assets.divider ? undefined : "none";
-  const titleOf = (s: RenderableSection) => s.title ?? tSections(s.kind);
   const days = website.weddingDate ? daysUntil(website.weddingDate, now, website.timezone) : null;
 
   return (
@@ -31,8 +29,8 @@ export async function WeddingSite({ view, now, mode }: Props) {
             <a href="#start">{t("home")}</a>
           </li>
           {sections.map((s) => (
-            <li key={s.kind}>
-              <a href={`#${s.kind}`}>{titleOf(s)}</a>
+            <li key={s.id}>
+              <a href={`#s-${s.id}`}>{s.title}</a>
             </li>
           ))}
         </ul>
@@ -63,8 +61,8 @@ export async function WeddingSite({ view, now, mode }: Props) {
       </header>
 
       {sections.map((s) => (
-        <section key={s.kind} id={s.kind} className="mx-auto max-w-3xl scroll-mt-16 px-6 py-14" data-testid={`site-section-${s.kind}`}>
-          <h2 className="mb-3 text-center text-4xl">{titleOf(s)}</h2>
+        <section key={s.id} id={`s-${s.id}`} className="mx-auto max-w-3xl scroll-mt-16 px-6 py-14" data-testid="site-section" data-section-id={s.id}>
+          <h2 className="mb-3 text-center text-4xl">{s.title}</h2>
           <div className="site-divider mb-10" data-frame={divider} aria-hidden />
           <SectionBody section={s} website={website} />
         </section>

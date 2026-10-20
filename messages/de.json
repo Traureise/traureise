@@ -268,10 +268,11 @@
       "brunch": "Brunch",
       "other": "Sonstiges"
     },
-    "travelTypes": {
+    "placeTypes": {
       "hotel": "Hotel",
-      "arrival": "Anreise",
       "parking": "Parken",
+      "arrival": "Anreise",
+      "activity": "Ausflug",
       "other": "Sonstiges"
     },
     "roles": {
