@@ -114,7 +114,7 @@ export function RsvpSettingsForm({
         {schedule.length > 0 && mealOptions.length > 0 && (
           <div className="space-y-2">
             <Label htmlFor="rsvp-meal-event">{t("mealEvent")}</Label>
-            <select id="rsvp-meal-event" value={mealEvent} onChange={(e) => setMealEvent(e.target.value)} className="h-9 rounded-lg border border-input bg-transparent px-3 text-sm">
+            <select id="rsvp-meal-event" value={mealEvent} onChange={(e) => setMealEvent(e.target.value)} className="h-9 rounded-lg border border-input bg-card px-3 text-sm">
               <option value="">{t("mealEveryEvent")}</option>
               {schedule.map((e) => (
                 <option key={e.id} value={e.id}>

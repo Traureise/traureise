@@ -262,6 +262,12 @@
       "text": "Text",
       "chooseOption": "Bitte wählen"
     },
+    "fieldGroups": {
+      "what": "Was",
+      "when": "Wann",
+      "where": "Wo",
+      "more": "Mehr"
+    },
     "publish": {
       "published": "Veröffentlicht",
       "draft": "Entwurf: noch nicht öffentlich",
@@ -358,7 +364,8 @@
     "deleted": "Termin gelöscht",
     "empty": "Noch keine Termine.",
     "summary": "{count, plural, =0 {Noch keine Termine} one {# Termin} other {# Termine}}",
-    "editSchedule": "Ablauf bearbeiten"
+    "editSchedule": "Ablauf bearbeiten",
+    "until": "bis {time} Uhr"
   },
   "site": {
     "home": "Start",

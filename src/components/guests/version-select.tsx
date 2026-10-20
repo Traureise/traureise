@@ -39,7 +39,7 @@ export function VersionSelects({
                 router.refresh();
               })
             }
-            className="h-8 rounded-lg border border-input bg-transparent px-2"
+            className="h-8 rounded-lg border border-input bg-card px-2"
           >
             {versions.map((v) => (
               <option key={v.id} value={v.id}>

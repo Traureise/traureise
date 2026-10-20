@@ -5,6 +5,7 @@ import { CalendarClock, ChevronRight, Download, Lock, Mail, MessageCircle } from
 import type { GuestListEntry, GuestPage } from "@/application/guests";
 import { CardShareButtons, HouseholdMenu, MarkAllSentButton, RemindAllButton, SendAllButton } from "@/components/guests/card-sending";
 import { RequestActions } from "@/components/guests/guest-actions";
+import { CardPicker, Segmented } from "@/components/guests/card-picker";
 import { HouseholdDialog, QuickAddPerson } from "@/components/guests/household-dialog";
 import { ResponseBar } from "@/components/guests/response-bar";
 import { VersionSelects } from "@/components/guests/version-select";
@@ -281,29 +282,49 @@ export default async function GuestsPage({ params, searchParams }: Props) {
             <HouseholdDialog weddingId={id} events={page.events} />
           </div>
         </div>
-        <QuickAddPerson weddingId={id} />
-
-        {page.cards.length > 0 && (
-          <nav aria-label={tSending("choose")} className="flex flex-wrap items-center gap-2 text-sm" data-testid="card-picker">
-            <span className="text-muted-foreground">{tSending("choose")}</span>
-            {[null, ...page.cards.map((c) => c.kind)].map((kind) => (
-              <Link
-                key={kind ?? "rsvp"}
-                href={query({ karte: kind ?? undefined, versand: undefined })}
-                aria-current={(card?.kind ?? null) === kind ? "page" : undefined}
-                className={cn("rounded-full border px-3 py-1", (card?.kind ?? null) === kind ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary/40")}
-              >
-                {kind ? tKinds(kind) : tSending("rsvpLink")}
-              </Link>
-            ))}
-          </nav>
-        )}
-
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Segmented
+            label={t("list.filter")}
+            items={[undefined, ...STATUSES].map((s) => {
+              const count = s ? page.households.filter((h) => h.status === s).length : page.households.length;
+              const label = s ? tStatus(s) : t("list.all");
+              return { key: s ?? "all", label, count, ariaLabel: t("list.filterItem", { label, count }), href: query({ status: s }), current: s === status };
+            })}
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            {remindable && (!card || card.kind === "invitation") && (
+              <RemindAllButton weddingId={id} open={openHouseholds.length} withEmail={page.emailReminders && page.cards.some((c) => c.kind === "invitation") ? openHouseholds.filter((h) => h.email).length : 0} />
+            )}
+            {page.cards.length > 0 && (
+              <CardPicker
+                label={tSending("choose")}
+                options={[null, ...page.cards.map((c) => c.kind)].map((kind) => ({
+                  key: kind ?? "rsvp",
+                  label: kind ? tKinds(kind) : tSending("rsvpLink"),
+                  href: query({ karte: kind ?? undefined, versand: undefined }),
+                  current: (card?.kind ?? null) === kind,
+                }))}
+              />
+            )}
+          </div>
+        </div>
         {card && counts && (
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-4" data-testid="card-sending">
-            <p className="text-sm" data-testid="card-sending-counts">
-              {tSending("counts", counts)}
-            </p>
+            <div className="space-y-3">
+              <p className="text-sm" data-testid="card-sending-counts">
+                {tSending("counts", counts)}
+              </p>
+              <Segmented
+                label={tSending("filter")}
+                testId="delivery-filter"
+                items={[undefined, ...(Object.keys(DELIVERY_FILTERS) as DeliveryFilter[])].map((f) => ({
+                  key: f ?? "all",
+                  label: f ? tSending(`filters.${f}`, { kind: tKinds(card.kind) }) : t("list.all"),
+                  href: query({ versand: f }),
+                  current: f === (deliveryFilter ?? undefined),
+                }))}
+              />
+            </div>
             <div className="ml-auto flex flex-wrap gap-2">
               {card.waitsForDate ? (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="card-waits-for-date">
@@ -339,40 +360,6 @@ export default async function GuestsPage({ params, searchParams }: Props) {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <nav aria-label={t("list.filter")} className="flex flex-wrap gap-2 text-sm">
-            {[undefined, ...STATUSES].map((s) => {
-              const count = s ? page.households.filter((h) => h.status === s).length : page.households.length;
-              return (
-                <Link
-                  key={s ?? "all"}
-                  href={query({ status: s })}
-                  aria-current={s === status ? "page" : undefined}
-                  className={cn("rounded-full border px-3 py-1", s === status ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary/40")}
-                >
-                  {t("list.filterItem", { label: s ? tStatus(s) : t("list.all"), count })}
-                </Link>
-              );
-            })}
-          </nav>
-          {remindable && (!card || card.kind === "invitation") && (
-            <RemindAllButton weddingId={id} open={openHouseholds.length} withEmail={page.emailReminders && page.cards.some((c) => c.kind === "invitation") ? openHouseholds.filter((h) => h.email).length : 0} />
-          )}
-        </div>
-        {card && (
-          <nav aria-label={tSending("filter")} className="flex flex-wrap gap-2 text-sm" data-testid="delivery-filter">
-            {[undefined, ...(Object.keys(DELIVERY_FILTERS) as DeliveryFilter[])].map((f) => (
-              <Link
-                key={f ?? "all"}
-                href={query({ versand: f })}
-                aria-current={f === (deliveryFilter ?? undefined) ? "page" : undefined}
-                className={cn("rounded-full border px-3 py-1", f === (deliveryFilter ?? undefined) ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary/40")}
-              >
-                {f ? tSending(`filters.${f}`, { kind: tKinds(card.kind) }) : t("list.all")}
-              </Link>
-            ))}
-          </nav>
-        )}
         {shown.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-border px-6 py-10 text-muted-foreground" data-testid="guests-empty">
             {page.households.length === 0 ? t("list.empty") : t("list.emptyFilter")}
@@ -464,6 +451,9 @@ export default async function GuestsPage({ params, searchParams }: Props) {
             })}
           </ul>
         )}
+        <div className="rounded-2xl border border-dashed border-border p-3">
+          <QuickAddPerson weddingId={id} />
+        </div>
       </section>
     </div>
   );

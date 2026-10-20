@@ -70,7 +70,7 @@ export function EventBlockForm({ weddingId, events, initialEventId, idPrefix, la
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
           aria-describedby={`${id}-error`}
-          className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+          className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm"
         >
           <option value="">{t("blocks.allEvents")}</option>
           {events.map((event) => (

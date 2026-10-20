@@ -150,7 +150,7 @@ function AddVersionDialog({ weddingId, item, versions, open, onOpenChange }: { w
           {(versions.length > 1 || item === "website") && (
             <div className="space-y-2">
               <Label htmlFor={`version-${item}-copy`}>{fromTemplate ? t("designFrom") : t("copyFrom")}</Label>
-              <select id={`version-${item}-copy`} value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm">
+              <select id={`version-${item}-copy`} value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm">
                 {versions.map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.label}
