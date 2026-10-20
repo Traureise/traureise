@@ -16,9 +16,14 @@ instance.
   See [Weddings, the timeline and versions](weddings.md) and [Save the Dates, invitations and cards](cards.md).
 - **Share dialog** with a QR code to download or copy and the link to copy (and WhatsApp for the engagement link).
 - **Editor with live preview** for the home section (cover photo, date, location, welcome text,
-  hashtag, countdown, web address, time zone) and eight sections: Unsere Geschichte, Tagesablauf,
-  Anreise, Empfehlungen, Geschenkideen, Hochzeitsgesellschaft, Galerie and Häufige Fragen. Each section can be
-  shown, hidden and renamed; items can be added, edited, deleted and moved up or down.
+  hashtag, countdown, web address, time zone) and free sections built from blocks. A section is a title plus
+  blocks of seven types: Text, Termin, Person, Ort, Link, Frage & Antwort and Bild, each with its own designed
+  layout. Sections can be added, renamed, moved, hidden and deleted; blocks can be added, edited, moved and
+  deleted. The standard template (Unsere Geschichte, Tagesablauf, Anreise, Empfehlungen, Geschenkideen,
+  Hochzeitsgesellschaft, Galerie, Häufige Fragen) starts every new website, and a new website version can start
+  from it too ([ADR 0025](adr/0025-sections-built-from-typed-blocks.md)).
+- **Ablauf**: the wedding's events in one place, always chronological. Websites show them through Termin blocks
+  ("Alle Termine" or one event), the invitations and the response form pick from them.
 - **Public website** at `/<web-address>`: anchor navigation, OpenStreetMap links, "add to calendar"
   (`.ics`) per event, Open Graph previews, and a `noindex` tag so search engines leave it alone.
 - **Themes are data.** A theme is a folder with a JSON manifest, palettes and ornaments. Add a folder,

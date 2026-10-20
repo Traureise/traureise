@@ -12,6 +12,7 @@ import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing"
 import { DrizzleCardRepository } from "@/infrastructure/repositories/cards";
 import { DrizzleGuestRepository } from "@/infrastructure/repositories/guests";
 import { createCardTexts } from "@/infrastructure/mail/card-templates";
+import { createSiteTexts } from "@/infrastructure/site-texts";
 import { DrizzleUploadRepository } from "@/infrastructure/repositories/uploads";
 import { DrizzleUserRepository } from "@/infrastructure/repositories/users";
 import { DrizzleWebsiteRepository } from "@/infrastructure/repositories/websites";
@@ -51,6 +52,7 @@ function deps(clock = new FakeClock()) {
     guests: repo,
     cards: new DrizzleCardRepository(db),
     cardTexts: createCardTexts(),
+    siteTexts: createSiteTexts(),
     mailRate: { batchSize: 10, intervalMs: 0 },
     guestLinks: hmacGuestLinks("integration-secret-integration-secret"),
     guestMail: createGuestMailTemplates(),
