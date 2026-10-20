@@ -18,6 +18,7 @@ import type {
   Mailer,
   RateLimiter,
   SessionRepository,
+  SiteTexts,
   ThemeCatalog,
   TokenGenerator,
   UploadRepository,
@@ -54,6 +55,7 @@ export type Deps = {
   cardRenderer: CardRenderer;
   cardMail: CardMailTemplates;
   cardTexts: CardTexts;
+  siteTexts: SiteTexts;
   /** Emails per job run, and the pause between two (rate limit for the SMTP server). */
   mailRate: { batchSize: number; intervalMs: number };
   appUrl: string;

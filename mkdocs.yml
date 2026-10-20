@@ -56,6 +56,7 @@ nav:
           - Opened status without tracking: adr/0022-opened-status-without-tracking.md
           - Everything belongs to the wedding: adr/0023-everything-belongs-to-the-wedding.md
           - Versions for audiences: adr/0024-versions-for-audiences.md
+          - Sections built from typed blocks: adr/0025-sections-built-from-typed-blocks.md
 
 theme:
   name: material

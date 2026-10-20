@@ -3,15 +3,14 @@ import path from "node:path";
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { login, uniqueEmail } from "./helpers/auth";
-import { addItem, fillForm, openSection } from "./helpers/editor";
+import { addBlock, fillForm, openNewBlock, openSection, scheduleUrl, siteSection } from "./helpers/editor";
 import { createWeddingWithWebsite } from "./helpers/weddings";
 
 const PHOTO = path.join(import.meta.dirname, "assets/photo.jpg");
 
-/** Opens the "new item" form, fills it and submits, leaving the form open (for error cases). */
-async function submitNewItem(page: Page, values: Parameters<typeof fillForm>[1]): Promise<Locator> {
-  await page.getByRole("button", { name: "Hinzufügen" }).click();
-  const form = page.getByRole("form", { name: "Neuer Eintrag" });
+/** Opens a "new block" form, fills it and submits, leaving the form open (for error cases). */
+async function submitNewBlock(page: Page, type: string, values: Parameters<typeof fillForm>[1]): Promise<Locator> {
+  const form = await openNewBlock(page, type);
   await fillForm(form, values);
   await form.getByRole("button", { name: "Speichern" }).click();
   return form;
@@ -28,10 +27,12 @@ test("every editor field reaches the public website, and invalid input explains 
   const slug = `clara-und-dev-${Date.now()}`;
   const preview = page.getByTestId("site-preview");
   let editorUrl = "";
+  let weddingId = "";
+  const sectionIds: Record<string, string> = {};
 
   await test.step("log in and create a website", async () => {
     await login(page, uniqueEmail("clara"), "Clara");
-    ({ editorUrl } = await createWeddingWithWebsite(page, slug, { names: "Clara & Dev" }));
+    ({ editorUrl, weddingId } = await createWeddingWithWebsite(page, slug, { names: "Clara & Dev" }));
   });
 
   await test.step("wedding details: names are required; the time zone is the wedding's", async () => {
@@ -88,17 +89,26 @@ test("every editor field reaches the public website, and invalid input explains 
     await expect(preview.locator("img.site-cover")).toHaveCount(0);
   });
 
-  await test.step("schedule: image, multi-day end, website, and validation errors", async () => {
-    await openSection(page, editorUrl, "Tagesablauf");
-
-    const missing = await submitNewItem(page, { "Beginn (Datum)": "2027-06-12", "Beginn (Uhrzeit)": "22:00" });
+  await test.step("Ablauf: image, multi-day end, website, and validation errors", async () => {
+    await page.goto(scheduleUrl(weddingId));
+    await page.getByRole("button", { name: "Termin hinzufügen" }).click();
+    const missing = page.getByRole("form", { name: "Neuer Termin" });
+    // Empty start: asked for, not called invalid; a message goes away once its field changes.
+    await missing.getByRole("button", { name: "Speichern" }).click();
+    await expect(await fieldError(missing, "Beginn (Datum)")).toHaveText("Bitte fülle dieses Feld aus.");
+    await expect(await fieldError(missing, "Beginn (Uhrzeit)")).toHaveText("Bitte fülle dieses Feld aus.");
+    await fillForm(missing, { "Beginn (Datum)": "12.06.2027", "Beginn (Uhrzeit)": "22:00" });
+    await missing.getByRole("button", { name: "Speichern" }).click();
     await expect(await fieldError(missing, "Name")).toHaveText("Bitte fülle dieses Feld aus.");
     await expect(await fieldError(missing, "Art")).toHaveText("Bitte wähle einen Eintrag aus der Liste.");
+    await expect(await fieldError(missing, "Beginn (Datum)")).toHaveCount(0);
+    await missing.getByLabel("Name", { exact: true }).fill("P");
+    await expect(await fieldError(missing, "Name")).toHaveCount(0);
 
     await fillForm(missing, {
       Art: { select: "Feier" },
       Name: "Party",
-      "Ende (Datum, optional)": "2027-06-12",
+      "Ende (Datum, optional)": "12.06.2027",
       "Ende (Uhrzeit, optional)": "21:00",
       Website: "nicht eine url",
     });
@@ -106,30 +116,38 @@ test("every editor field reaches the public website, and invalid input explains 
     await expect(await fieldError(missing, "Ende (Uhrzeit, optional)")).toHaveText("Das Ende muss nach dem Beginn liegen.");
     await expect(await fieldError(missing, "Website")).toHaveText("Bitte gib eine gültige Webadresse ein (z. B. https://beispiel.de).");
 
+    // German fields: the calendar picks a day (week starts on Monday), a time can be typed without the colon.
+    await missing.getByLabel("Ende (Datum, optional)").locator("xpath=following-sibling::button").click();
+    const calendar = page.getByRole("dialog", { name: "Juni 2027" });
+    await expect(calendar.getByRole("columnheader")).toHaveText(["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]);
+    await calendar.getByRole("button", { name: "Sonntag, 13. Juni 2027" }).click();
+    await expect(missing.getByLabel("Ende (Datum, optional)")).toHaveValue("13.06.2027");
+    await missing.getByLabel("Ende (Uhrzeit, optional)").fill("200");
+    await missing.getByLabel("Ende (Uhrzeit, optional)").blur();
+    await expect(missing.getByLabel("Ende (Uhrzeit, optional)")).toHaveValue("02:00");
     await fillForm(missing, {
-      "Ende (Datum, optional)": "2027-06-13",
-      "Ende (Uhrzeit, optional)": "02:00",
       Website: "seehaus.example",
       Bild: { file: PHOTO },
       Veranstaltungsort: "Seehaus",
     });
     await missing.getByRole("button", { name: "Speichern" }).click();
     await expect(missing).toBeHidden();
-    await expect(preview.getByTestId("site-section-schedule")).toContainText("Party");
+    const schedule = await openSection(page, editorUrl, "Tagesablauf");
+    await expect(siteSection(preview, schedule)).toContainText("Party");
   });
 
   await test.step("travel, things to do and FAQ: the remaining optional fields", async () => {
-    await openSection(page, editorUrl, "Anreise");
-    await addItem(page, { Name: "Bahnhof", Art: { select: "Anreise" }, Beschreibung: "Vom Bahnhof fährt ein Shuttle." });
+    sectionIds.travel = await openSection(page, editorUrl, "Anreise");
+    await addBlock(page, "Ort", { Name: "Bahnhof", Art: { select: "Anreise" }, Beschreibung: "Vom Bahnhof fährt ein Shuttle." });
 
-    await openSection(page, editorUrl, "Empfehlungen");
-    await addItem(page, { Name: "Seerundweg", Website: "https://seerundweg.example/route", Beschreibung: "Zwei Stunden, flach." });
+    sectionIds.tips = await openSection(page, editorUrl, "Empfehlungen");
+    await addBlock(page, "Ort", { Name: "Seerundweg", Art: { select: "Ausflug" }, Website: "https://seerundweg.example/route", Beschreibung: "Zwei Stunden, flach." });
 
-    await openSection(page, editorUrl, "Häufige Fragen");
-    await addItem(page, { Frage: "Wo ist der Eingang?", Antwort: "Hinter dem Tor links.", Bild: { file: PHOTO } });
+    sectionIds.faqs = await openSection(page, editorUrl, "Häufige Fragen");
+    await addBlock(page, "Frage & Antwort", { Frage: "Wo ist der Eingang?", Antwort: "Hinter dem Tor links.", Bild: { file: PHOTO } });
 
     await openSection(page, editorUrl, "Geschenkideen");
-    const registry = await submitNewItem(page, { Name: "Kasse" });
+    const registry = await submitNewBlock(page, "Link", { Name: "Kasse" });
     await expect(await fieldError(registry, "Link")).toHaveText("Bitte gib eine gültige Webadresse ein (z. B. https://beispiel.de).");
     await registry.getByRole("button", { name: "Abbrechen" }).click();
 
@@ -149,15 +167,16 @@ test("every editor field reaches the public website, and invalid input explains 
     await expect(party.getByRole("link", { name: "Website" })).toHaveAttribute("href", "https://seehaus.example");
     await expect(party.locator('img[src^="/uploads/"]')).toBeVisible();
 
-    const travel = page.getByTestId("site-section-travel");
+    const travel = siteSection(page, sectionIds.travel!);
     await expect(travel).toContainText("Anreise");
     await expect(travel).toContainText("Vom Bahnhof fährt ein Shuttle.");
 
-    const tips = page.getByTestId("site-section-things-to-do");
+    const tips = siteSection(page, sectionIds.tips!);
+    await expect(tips).toContainText("Ausflug");
     await expect(tips).toContainText("Zwei Stunden, flach.");
     await expect(tips.getByRole("link", { name: "Website" })).toHaveAttribute("href", "https://seerundweg.example/route");
 
-    const faq = page.getByTestId("site-section-faqs");
+    const faq = siteSection(page, sectionIds.faqs!);
     await expect(faq).toContainText("Hinter dem Tor links.");
     await expect(faq.locator('img[src^="/uploads/"]')).toBeVisible();
 

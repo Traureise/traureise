@@ -26,16 +26,19 @@ import type {
   ImageProcessor,
   NewPoll,
   PollRecord,
-  Item,
+  Block,
   MagicLinkMailTemplate,
   MagicLinkRecord,
   MagicLinkRepository,
   MailMessage,
   Mailer,
   RateLimiter,
+  NewSection,
   Section,
+  SectionPatch,
   SessionRecord,
   SessionRepository,
+  SiteTexts,
   StoredFile,
   ThemeCatalog,
   TokenGenerator,
@@ -48,11 +51,12 @@ import type {
   Website,
   WebsiteRepository,
   Wedding,
+  WeddingEvent,
   WeddingPatch,
   WeddingRepository,
 } from "@/application/ports";
 import type { Deps } from "@/application/deps";
-import type { CollectionKind } from "@/domain/sections";
+import { compareEvents, type BlockData, type EventData } from "@/domain/sections";
 import { DEFAULT_RSVP_SETTINGS, type Household, type HouseholdResponse, type RsvpSettings } from "@/domain/guests";
 import { parseThemeManifest, type ThemeManifest } from "@/domain/theme";
 import type { CardInput, CardKind, Delivery, HouseholdCardKind, SharedVia } from "@/domain/cards";
@@ -157,7 +161,7 @@ function omit<T extends object, K extends keyof T>(value: T, key: K): Omit<T, K>
 
 export class InMemoryWeddings implements WeddingRepository {
   weddings: Wedding[] = [];
-  events: (Item<"schedule"> & { weddingId: string })[] = [];
+  events: (WeddingEvent & { weddingId: string })[] = [];
   /** Stands in for ON DELETE CASCADE from weddings. */
   cascades: ((weddingId: string) => void)[] = [];
   constructor(private websites: InMemoryWebsites) {}
@@ -201,45 +205,41 @@ export class InMemoryWeddings implements WeddingRepository {
     };
   }
   async listEvents(weddingId: string) {
-    return copy(this.events.filter((e) => e.weddingId === weddingId).sort((a, b) => a.position - b.position)).map((e) => omit(e, "weddingId"));
+    return copy(this.events.filter((e) => e.weddingId === weddingId))
+      .map((e) => omit(e, "weddingId"))
+      .sort(compareEvents);
   }
   async findEvent(weddingId: string, eventId: string) {
     const event = this.events.find((e) => e.weddingId === weddingId && e.id === eventId);
     return event ? omit(copy(event), "weddingId") : null;
   }
-  async addEvent(weddingId: string, data: Item<"schedule">["data"]) {
-    const position = Math.max(-1, ...this.events.filter((e) => e.weddingId === weddingId).map((e) => e.position)) + 1;
-    const event = { id: randomUUID(), weddingId, kind: "schedule" as const, position, data: copy(data) };
+  async addEvent(weddingId: string, data: EventData) {
+    const event = { id: randomUUID(), weddingId, data: copy(data) };
     this.events.push(event);
     return omit(copy(event), "weddingId");
   }
-  async updateEvent(eventId: string, data: Item<"schedule">["data"]) {
+  async updateEvent(eventId: string, data: EventData) {
     this.events.find((e) => e.id === eventId)!.data = copy(data);
   }
   async deleteEvent(eventId: string) {
     this.events = this.events.filter((e) => e.id !== eventId);
-  }
-  async setEventOrder(weddingId: string, orderedIds: string[]) {
-    orderedIds.forEach((id, position) => {
-      const event = this.events.find((e) => e.id === id && e.weddingId === weddingId);
-      if (event) event.position = position;
-    });
+    this.websites.blocks = this.websites.blocks.filter((b) => !(b.data.type === "event" && b.data.eventId === eventId));
   }
 }
 
 export class InMemoryWebsites implements WebsiteRepository {
   websites: Website[] = [];
-  sections = new Map<string, Section[]>();
-  items: (Item & { websiteId: string })[] = [];
+  sections: (Section & { websiteId: string })[] = [];
+  blocks: (Block & { websiteId: string })[] = [];
   /** Stands in for ON DELETE CASCADE from websites. */
   cascades: ((websiteId: string) => void)[] = [];
 
-  async create(input: NewWebsite, sections: Section[]) {
+  async create(input: NewWebsite, sections: NewSection[]) {
     if (this.websites.some((w) => w.slug === input.slug)) throw new Error("duplicate slug");
     const now = new Date();
     const website: Website = { ...copy(input), id: randomUUID(), createdAt: now, updatedAt: now };
     this.websites.push(website);
-    this.sections.set(website.id, sections.map((s) => ({ ...s })));
+    for (const section of sections) await this.addSection(website.id, section);
     return copy(website);
   }
   async findById(id: string) {
@@ -258,40 +258,67 @@ export class InMemoryWebsites implements WebsiteRepository {
   }
   async delete(id: string) {
     this.websites = this.websites.filter((w) => w.id !== id);
-    this.sections.delete(id);
-    this.items = this.items.filter((i) => i.websiteId !== id);
+    this.sections = this.sections.filter((s) => s.websiteId !== id);
+    this.blocks = this.blocks.filter((b) => b.websiteId !== id);
     for (const cascade of this.cascades) cascade(id);
   }
+
   async listSections(websiteId: string) {
-    return copy(this.sections.get(websiteId) ?? []);
+    return copy(this.sections.filter((s) => s.websiteId === websiteId))
+      .sort((a, b) => a.position - b.position)
+      .map((s) => omit(s, "websiteId"));
   }
-  async updateSection(websiteId: string, kind: Section["kind"], patch: Partial<Section>) {
-    const section = this.sections.get(websiteId)!.find((s) => s.kind === kind)!;
-    Object.assign(section, patch);
+  async findSection(websiteId: string, sectionId: string) {
+    const section = this.sections.find((s) => s.websiteId === websiteId && s.id === sectionId);
+    return section ? omit(copy(section), "websiteId") : null;
   }
-  async listItems(websiteId: string) {
-    return copy(this.items.filter((i) => i.websiteId === websiteId).sort((a, b) => a.position - b.position)).map((i) => omit(i, "websiteId") as Item);
+  async addSection(websiteId: string, { blocks, ...input }: NewSection) {
+    const position = Math.max(-1, ...this.sections.filter((s) => s.websiteId === websiteId).map((s) => s.position)) + 1;
+    const section = { ...copy(input), id: randomUUID(), websiteId, position };
+    this.sections.push(section);
+    for (const data of blocks) await this.addBlock(websiteId, section.id, data);
+    return omit(copy(section), "websiteId");
   }
-  async findItem(websiteId: string, itemId: string) {
-    const item = this.items.find((i) => i.websiteId === websiteId && i.id === itemId);
-    return item ? (omit(copy(item), "websiteId") as Item) : null;
+  async updateSection(sectionId: string, patch: SectionPatch) {
+    Object.assign(this.sections.find((s) => s.id === sectionId)!, copy(patch));
   }
-  async addItem<K extends CollectionKind>(websiteId: string, kind: K, data: Item<K>["data"]) {
-    const position = Math.max(-1, ...this.items.filter((i) => i.websiteId === websiteId && i.kind === kind).map((i) => i.position)) + 1;
-    const item = { id: randomUUID(), websiteId, kind, position, data: copy(data) } as Item<K> & { websiteId: string };
-    this.items.push(item as never);
-    return omit(copy(item), "websiteId") as Item<K>;
+  async deleteSection(sectionId: string) {
+    this.sections = this.sections.filter((s) => s.id !== sectionId);
+    this.blocks = this.blocks.filter((b) => b.sectionId !== sectionId);
   }
-  async updateItem(itemId: string, data: Item["data"]) {
-    this.items.find((i) => i.id === itemId)!.data = copy(data);
-  }
-  async deleteItem(itemId: string) {
-    this.items = this.items.filter((i) => i.id !== itemId);
-  }
-  async setItemOrder(websiteId: string, kind: CollectionKind, orderedIds: string[]) {
+  async setSectionOrder(websiteId: string, orderedIds: string[]) {
     orderedIds.forEach((id, position) => {
-      const item = this.items.find((i) => i.id === id && i.websiteId === websiteId && i.kind === kind);
-      if (item) item.position = position;
+      const section = this.sections.find((s) => s.id === id && s.websiteId === websiteId);
+      if (section) section.position = position;
+    });
+  }
+
+  async listBlocks(websiteId: string) {
+    const sectionPosition = new Map(this.sections.map((s) => [s.id, s.position]));
+    return copy(this.blocks.filter((b) => b.websiteId === websiteId))
+      .sort((a, b) => sectionPosition.get(a.sectionId)! - sectionPosition.get(b.sectionId)! || a.position - b.position)
+      .map((b) => omit(b, "websiteId"));
+  }
+  async findBlock(websiteId: string, blockId: string) {
+    const block = this.blocks.find((b) => b.websiteId === websiteId && b.id === blockId);
+    return block ? omit(copy(block), "websiteId") : null;
+  }
+  async addBlock(websiteId: string, sectionId: string, data: BlockData) {
+    const position = Math.max(-1, ...this.blocks.filter((b) => b.sectionId === sectionId).map((b) => b.position)) + 1;
+    const block = { id: randomUUID(), websiteId, sectionId, position, data: copy(data) };
+    this.blocks.push(block);
+    return omit(copy(block), "websiteId");
+  }
+  async updateBlock(blockId: string, data: BlockData) {
+    this.blocks.find((b) => b.id === blockId)!.data = copy(data);
+  }
+  async deleteBlock(blockId: string) {
+    this.blocks = this.blocks.filter((b) => b.id !== blockId);
+  }
+  async setBlockOrder(sectionId: string, orderedIds: string[]) {
+    orderedIds.forEach((id, position) => {
+      const block = this.blocks.find((b) => b.id === id && b.sectionId === sectionId);
+      if (block) block.position = position;
     });
   }
 }
@@ -574,6 +601,20 @@ export const fakeGuestLinks: GuestLinks = {
 export const fakeCardMail: CardMailTemplates = {
   card: (m) => ({ subject: `${m.kind}: ${m.couple}`, text: JSON.stringify(m), html: `<img src="cid:${m.imageCid}">` }),
   reminder: (m) => ({ subject: `Erinnerung: ${m.couple}`, text: JSON.stringify(m), html: "" }),
+};
+
+export const fakeSiteTexts: SiteTexts = {
+  sectionTitles: {
+    "our-story": "Unsere Geschichte",
+    schedule: "Tagesablauf",
+    travel: "Anreise",
+    "things-to-do": "Empfehlungen",
+    registry: "Geschenkideen",
+    "wedding-party": "Hochzeitsgesellschaft",
+    gallery: "Galerie",
+    faqs: "Häufige Fragen",
+  },
+  newSectionTitle: "Neuer Abschnitt",
 };
 
 export const fakeCardTexts: CardTexts = {
@@ -892,6 +933,7 @@ export function createFakes() {
     cardRenderer: new FakeCardRenderer(),
     cardMail: fakeCardMail,
     cardTexts: fakeCardTexts,
+    siteTexts: fakeSiteTexts,
     mailRate: { batchSize: 50, intervalMs: 0 },
     appUrl: "http://localhost:3000",
   };

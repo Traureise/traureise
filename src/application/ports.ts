@@ -1,4 +1,4 @@
-import type { CollectionKind, ItemData, SectionKind } from "@/domain/sections";
+import type { BlockData, BlockType, EventData, SectionTemplate } from "@/domain/sections";
 import type { Entitlement, PaidTier, Tier, TierOffer } from "@/domain/billing";
 import type { ThemeManifest } from "@/domain/theme";
 import type { Household, HouseholdInput, HouseholdResponse, Poll, PollInput, RequestStatus, RsvpSettings } from "@/domain/guests";
@@ -35,8 +35,6 @@ export type Website = {
   position: number;
   slug: string;
   published: boolean;
-  /** Wedding events this version leaves out of its schedule. */
-  hiddenEventIds: string[];
   welcomeMessage: string;
   hashtag: string;
   showCountdown: boolean;
@@ -54,15 +52,22 @@ export type WebsitePatch = Partial<Omit<Website, "id" | "weddingId" | "createdAt
 /** A website version with the wedding's names, date, place and time zone: what the site shows. */
 export type SiteData = Website & Pick<Wedding, "title" | "weddingDate" | "location" | "timezone">;
 
-export type Section = { kind: SectionKind; title: string | null; visible: boolean; body: string };
-export type SectionPatch = Partial<Omit<Section, "kind">>;
-
-export type Item<K extends CollectionKind = CollectionKind> = {
+/** A section of a website version: a title plus an ordered list of blocks. */
+export type Section = {
   id: string;
-  kind: K;
   position: number;
-  data: ItemData<K>;
+  title: string;
+  visible: boolean;
+  /** The block type a template section offers first while it is empty. */
+  suggestedType: BlockType | null;
 };
+export type NewSection = { title: string; visible: boolean; suggestedType: BlockType | null; blocks: BlockData[] };
+export type SectionPatch = Partial<Pick<Section, "title" | "visible">>;
+
+export type Block<T extends BlockType = BlockType> = { id: string; sectionId: string; position: number; data: BlockData<T> };
+
+/** An event of the wedding's Ablauf. */
+export type WeddingEvent = { id: string; data: EventData };
 
 export interface UserRepository {
   findById(id: string): Promise<User | null>;
@@ -113,34 +118,45 @@ export interface WeddingRepository {
   delete(id: string): Promise<void>;
   slugOwners(slug: string): Promise<SlugOwners>;
 
-  /** The schedule: events belong to the wedding, website versions choose which they show. */
-  listEvents(weddingId: string): Promise<Item<"schedule">[]>;
-  findEvent(weddingId: string, eventId: string): Promise<Item<"schedule"> | null>;
-  /** Appends at the end. */
-  addEvent(weddingId: string, data: ItemData<"schedule">): Promise<Item<"schedule">>;
-  updateEvent(eventId: string, data: ItemData<"schedule">): Promise<void>;
+  /** The Ablauf: events belong to the wedding; website versions show them through event blocks. Chronological. */
+  listEvents(weddingId: string): Promise<WeddingEvent[]>;
+  findEvent(weddingId: string, eventId: string): Promise<WeddingEvent | null>;
+  addEvent(weddingId: string, data: EventData): Promise<WeddingEvent>;
+  updateEvent(eventId: string, data: EventData): Promise<void>;
+  /** Deletes the event and, in the same transaction, every event block pointing to it, in any website version. */
   deleteEvent(eventId: string): Promise<void>;
-  setEventOrder(weddingId: string, orderedIds: string[]): Promise<void>;
 }
 
 export interface WebsiteRepository {
-  create(website: NewWebsite, sections: Section[]): Promise<Website>;
+  create(website: NewWebsite, sections: NewSection[]): Promise<Website>;
   findById(id: string): Promise<Website | null>;
   findBySlug(slug: string): Promise<Website | null>;
   /** First version first. */
   listByWedding(weddingId: string): Promise<Website[]>;
   update(id: string, patch: WebsitePatch): Promise<Website>;
   delete(id: string): Promise<void>;
+
+  /** By position. */
   listSections(websiteId: string): Promise<Section[]>;
-  updateSection(websiteId: string, kind: SectionKind, patch: SectionPatch): Promise<void>;
-  listItems(websiteId: string): Promise<Item[]>;
-  findItem(websiteId: string, itemId: string): Promise<Item | null>;
-  /** Appends at the end of the section. */
-  addItem<K extends CollectionKind>(websiteId: string, kind: K, data: ItemData<K>): Promise<Item<K>>;
-  updateItem<K extends CollectionKind>(itemId: string, data: ItemData<K>): Promise<void>;
-  deleteItem(itemId: string): Promise<void>;
+  /** Null for an unknown id, a malformed id or another website's section. */
+  findSection(websiteId: string, sectionId: string): Promise<Section | null>;
+  /** Appends at the end, with its blocks. */
+  addSection(websiteId: string, section: NewSection): Promise<Section>;
+  updateSection(sectionId: string, patch: SectionPatch): Promise<void>;
+  /** Deletes the section with its blocks. */
+  deleteSection(sectionId: string): Promise<void>;
   /** Rewrites positions so that `orderedIds` are 0..n-1. */
-  setItemOrder(websiteId: string, kind: CollectionKind, orderedIds: string[]): Promise<void>;
+  setSectionOrder(websiteId: string, orderedIds: string[]): Promise<void>;
+
+  /** By section position, then block position. */
+  listBlocks(websiteId: string): Promise<Block[]>;
+  findBlock(websiteId: string, blockId: string): Promise<Block | null>;
+  /** Appends at the end of the section. */
+  addBlock(websiteId: string, sectionId: string, data: BlockData): Promise<Block>;
+  updateBlock(blockId: string, data: BlockData): Promise<void>;
+  deleteBlock(blockId: string): Promise<void>;
+  /** Rewrites positions within the section so that `orderedIds` are 0..n-1. */
+  setBlockOrder(sectionId: string, orderedIds: string[]): Promise<void>;
 }
 
 export type UploadRecord = { key: string; weddingId: string | null; contentType: string; size: number; createdAt: Date };
@@ -410,6 +426,9 @@ export interface CardRenderer {
   png(model: CardModel, photo: Uint8Array | null, width: number): Promise<Uint8Array>;
   pdf(model: CardModel, photo: Uint8Array | null, format: PaperFormat): Promise<Uint8Array>;
 }
+
+/** Translated texts for websites: the standard template's section titles and a new section's title. */
+export type SiteTexts = { sectionTitles: Record<SectionTemplate, string>; newSectionTitle: string };
 
 /** Translated texts for cards (labels on the card, defaults for new cards). */
 export type CardTexts = {

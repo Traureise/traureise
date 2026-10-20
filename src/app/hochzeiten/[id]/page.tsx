@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { CalendarHeart, Users } from "lucide-react";
+import { CalendarClock, CalendarHeart, Users } from "lucide-react";
 import { NotFoundError } from "@/application/errors";
 import { AppHeader } from "@/components/app/app-header";
 import { PageShell } from "@/components/app/app-footer";
@@ -15,7 +15,7 @@ import { WeddingDetailsButton } from "@/components/weddings/wedding-details-dial
 import { WeddingNav } from "@/components/weddings/wedding-nav";
 import { WeddingSwitcher } from "@/components/weddings/wedding-switcher";
 import { container } from "@/composition/container";
-import { dateFromIso } from "@/lib/format";
+import { dateFromIso, timeZoneOptions } from "@/lib/format";
 import { requireProfile } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,8 @@ type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ kauf?: s
 async function load(id: string) {
   const user = await requireProfile();
   try {
-    return { user, home: await container().getWeddingHome.execute(user.id, id) };
+    const [home, { events }] = await Promise.all([container().getWeddingHome.execute(user.id, id), container().listEvents.execute(user.id, id)]);
+    return { user, home, events };
   } catch (error) {
     if (error instanceof NotFoundError) notFound();
     throw error;
@@ -39,9 +40,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 /** A wedding's home: the welcome, the countdown, the timeline of its items and the guests. */
 export default async function WeddingHomePage({ params, searchParams }: Props) {
-  const { user, home } = await load((await params).id);
+  const { user, home, events } = await load((await params).id);
   const { kauf } = await searchParams;
   const t = await getTranslations("weddings.home");
+  const tSchedule = await getTranslations("schedule");
   const tTiers = await getTranslations("pricing.tiers");
   const format = await getFormatter();
   const { wedding } = home;
@@ -68,7 +70,7 @@ export default async function WeddingHomePage({ params, searchParams }: Props) {
               <CalendarHeart aria-hidden />
               {badge}
             </Badge>
-            <WeddingDetailsButton wedding={wedding} appUrl={c.appUrl} timeZones={Intl.supportedValuesOf("timeZone")} variant="link" />
+            <WeddingDetailsButton wedding={wedding} appUrl={c.appUrl} timeZones={timeZoneOptions()} variant="link" />
             {home.tier && (
               <span className="text-sm text-muted-foreground" data-testid="wedding-plan">
                 · {t("plan", { tier: tTiers(`${home.tier}.name`) })}
@@ -97,6 +99,19 @@ export default async function WeddingHomePage({ params, searchParams }: Props) {
             <Link href={`/hochzeiten/${wedding.id}/gaeste`}>
               <Users aria-hidden />
               {t("guestList")}
+            </Link>
+          </Button>
+        </section>
+
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4" data-testid="schedule-summary">
+          <div>
+            <h2 className="font-heading text-xl font-medium">{tSchedule("title")}</h2>
+            <p className="text-sm text-muted-foreground">{tSchedule("summary", { count: events.length })}</p>
+          </div>
+          <Button asChild variant="outline">
+            <Link href={`/hochzeiten/${wedding.id}/ablauf`}>
+              <CalendarClock aria-hidden />
+              {tSchedule("editSchedule")}
             </Link>
           </Button>
         </section>

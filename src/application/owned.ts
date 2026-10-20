@@ -35,13 +35,13 @@ export async function deleteImage(deps: Deps, key: string | null | undefined) {
   await deps.uploads.delete(key);
 }
 
-/** Every photo the wedding still shows somewhere: website covers and items, events, cards. */
+/** Every photo the wedding still shows somewhere: website covers and blocks, events, cards. */
 async function imagesInUse(deps: Deps, weddingId: string): Promise<Set<string>> {
   const [websites, events, cards] = await Promise.all([deps.websites.listByWedding(weddingId), deps.weddings.listEvents(weddingId), deps.cards.listByWedding(weddingId)]);
   const keys = new Set<string>();
   for (const website of websites) {
     if (website.coverImageKey) keys.add(website.coverImageKey);
-    for (const item of await deps.websites.listItems(website.id)) for (const key of imageKeysOf(item.data)) keys.add(key);
+    for (const block of await deps.websites.listBlocks(website.id)) for (const key of imageKeysOf(block.data)) keys.add(key);
   }
   for (const event of events) for (const key of imageKeysOf(event.data)) keys.add(key);
   for (const card of cards) if (card.photoKey) keys.add(card.photoKey);

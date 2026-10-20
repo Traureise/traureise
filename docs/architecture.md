@@ -19,7 +19,7 @@ only the composition root knows which adapter implements which port.
 
 | Layer | Folder | Contains |
 |---|---|---|
-| Domain | `src/domain` | Pure rules and zod schemas: slugs, sections and item fields, ordering, calendar export, themes, fonts, uploads |
+| Domain | `src/domain` | Pure rules and zod schemas: slugs, block types and the standard template, events, ordering, calendar export, themes, fonts, uploads |
 | Application | `src/application` | Use cases such as `RequestMagicLink`, `CreateWebsite`, `AddItem`, `MoveItem`, `DeleteWebsite`, and the ports they depend on |
 | Infrastructure | `src/infrastructure` | Adapters: Drizzle repositories, SMTP mailer, local and S3 storage, sharp image processing, theme loader |
 | Composition | `src/composition` | The container that wires adapters to ports |
@@ -53,16 +53,19 @@ once even when it is opened twice at the same moment.
 
 The editor's preview and the public page render the same `WeddingSite` component. Saving a form runs a
 server action, which calls a use case and revalidates the editor route, so the preview updates with
-exactly what guests will see. Hidden sections, and visible sections without content, are not
-rendered.
+exactly what guests will see. A section renders its blocks in groups (consecutive blocks of one type form one
+grid or list); hidden sections, and visible sections without content, are not rendered.
 
 ## Data model
 
 Every table holding user data cascades from `users.id`: deleting a user deletes their sessions and
 weddings. Everything a couple makes cascades from `weddings.id` ([ADR 0023](adr/0023-everything-belongs-to-the-wedding.md)):
-website versions (`websites`, with their sections and items), the schedule (`wedding_events`), card versions,
-the guest list, entitlements and upload records. Section items are one table with a `jsonb` column whose
-shape is validated by the zod schemas in `src/domain/sections.ts`.
+website versions (`websites`, with their sections and blocks), the Ablauf (`wedding_events`), card versions,
+the guest list, entitlements and upload records. Sections (`website_sections`) have an id and a position; their
+blocks (`section_blocks`) are one table with a `jsonb` column whose shape is validated by the zod discriminated
+union in `src/domain/sections.ts`. Event blocks reference `wedding_events` by id (`null` = all events) and never
+copy them; deleting an event deletes the blocks pointing to it
+([ADR 0025](adr/0025-sections-built-from-typed-blocks.md)).
 
 The guest list (`rsvp_settings`, `rsvp_polls`, `households`, `guests`, `guest_requests`) cascades from
 `weddings.id`. Households are found by the SHA-256 of their personal link's token, which is an HMAC of

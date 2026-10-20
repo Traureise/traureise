@@ -1,7 +1,8 @@
 import { eq, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { parseItem, SECTION_KINDS } from "@/domain/sections";
-import { magicLinkTokens, rateLimitHits, sectionItems, sessions, uploads, users, websiteSections } from "@/infrastructure/db/schema";
+import type { NewSection } from "@/application/ports";
+import { parseEvent, type BlockData } from "@/domain/sections";
+import { magicLinkTokens, rateLimitHits, sectionBlocks, sessions, uploads, users, websiteSections } from "@/infrastructure/db/schema";
 import { DrizzleMagicLinkRepository, DrizzleSessionRepository, PostgresRateLimiter } from "@/infrastructure/repositories/auth";
 import { DrizzleUploadRepository } from "@/infrastructure/repositories/uploads";
 import { DrizzleUserRepository } from "@/infrastructure/repositories/users";
@@ -13,7 +14,7 @@ const db = setupTestDatabase();
 const userRepo = new DrizzleUserRepository(db);
 const websiteRepo = new DrizzleWebsiteRepository(db);
 const weddingRepo = new DrizzleWeddingRepository(db);
-const seedWebsite = (email?: string, slug?: string) => seedWedding(db, email, slug);
+const seedWebsite = (email?: string, slug?: string, sections?: NewSection[]) => seedWedding(db, email, slug, undefined, sections);
 
 describe("DrizzleUserRepository", () => {
   it("creates, finds and updates users; creating twice returns the same user", async () => {
@@ -98,82 +99,151 @@ describe("DrizzleWeddingRepository", () => {
     await expect(seedWebsite("ben@example.org", "anna-und-ben")).rejects.toThrow();
   });
 
-  it("keeps the schedule as the wedding's events, in order", async () => {
+  it("keeps the schedule as the wedding's events, always chronological", async () => {
     const { wedding } = await seedWebsite();
-    const event = (name: string) => {
-      const parsed = parseItem("schedule", { eventType: "ceremony", name, startDate: "2027-06-12", startTime: "14:00" });
-      if (!parsed.ok) throw new Error("fixture");
-      return parsed.value;
-    };
-    const a = await weddingRepo.addEvent(wedding.id, event("Trauung"));
-    const b = await weddingRepo.addEvent(wedding.id, event("Feier"));
-    expect([a.position, b.position]).toEqual([0, 1]);
-    await weddingRepo.setEventOrder(wedding.id, [b.id, a.id]);
-    expect((await weddingRepo.listEvents(wedding.id)).map((e) => e.data.name)).toEqual(["Feier", "Trauung"]);
-    await weddingRepo.updateEvent(a.id, event("Standesamt"));
+    const a = await weddingRepo.addEvent(wedding.id, event("Feier", "2027-06-12", "18:00"));
+    const b = await weddingRepo.addEvent(wedding.id, event("Vorabend", "2027-06-11", "20:00"));
+    expect((await weddingRepo.listEvents(wedding.id)).map((e) => e.id)).toEqual([b.id, a.id]);
+    await weddingRepo.updateEvent(a.id, event("Standesamt", "2027-06-10", "10:00"));
+    expect((await weddingRepo.listEvents(wedding.id)).map((e) => e.data.name)).toEqual(["Standesamt", "Vorabend"]);
     expect((await weddingRepo.findEvent(wedding.id, a.id))?.data.name).toBe("Standesamt");
     await weddingRepo.deleteEvent(a.id);
     expect(await weddingRepo.findEvent(wedding.id, a.id)).toBeNull();
     expect(await weddingRepo.findEvent(wedding.id, "nope")).toBeNull();
   });
 
-  it("deletes the wedding with its website versions, sections and events", async () => {
+  it("deletes the wedding with its website versions, sections and blocks", async () => {
     const { wedding, website } = await seedWebsite();
-    await websiteRepo.addItem(website.id, "faqs", { question: "A", answer: "1", imageKey: null });
+    const [section] = await websiteRepo.listSections(website.id);
+    await websiteRepo.addBlock(website.id, section!.id, faq("A"));
     await weddingRepo.delete(wedding.id);
     expect(await websiteRepo.findById(website.id)).toBeNull();
     expect(await db.select().from(websiteSections).where(eq(websiteSections.websiteId, website.id))).toHaveLength(0);
-    expect(await db.select().from(sectionItems).where(eq(sectionItems.websiteId, website.id))).toHaveLength(0);
+    expect(await db.select().from(sectionBlocks).where(eq(sectionBlocks.websiteId, website.id))).toHaveLength(0);
   });
 });
 
+function event(name: string, startDate = "2027-06-12", startTime = "14:00") {
+  const parsed = parseEvent({ eventType: "ceremony", name, startDate, startTime });
+  if (!parsed.ok) throw new Error("fixture");
+  return parsed.value;
+}
+
+const faq = (question: string): BlockData => ({ type: "faq", question, answer: "1", imageKey: null });
+const text = (value: string): BlockData => ({ type: "text", text: value });
+
 describe("DrizzleWebsiteRepository", () => {
-  it("creates a website version with all sections and lists a wedding's versions first first", async () => {
+  it("creates a website version with its sections and blocks and lists a wedding's versions first first", async () => {
     const { wedding, website } = await seedWebsite();
-    expect(website).toMatchObject({ slug: "anna-und-ben", label: "Standard", position: 0, published: false, hiddenEventIds: [], showCountdown: false, paletteId: null });
+    expect(website).toMatchObject({ slug: "anna-und-ben", label: "Standard", position: 0, published: false, showCountdown: false, paletteId: null });
+    expect(website).not.toHaveProperty("hiddenEventIds");
     expect(await websiteRepo.findBySlug("anna-und-ben")).toMatchObject({ id: website.id });
     const copy = { ...website, id: undefined, createdAt: undefined, updatedAt: undefined };
-    const friends = await websiteRepo.create({ ...copy, label: "Freunde", position: 1, slug: "anna-und-ben-freunde" }, []);
+    const friends = await websiteRepo.create({ ...copy, label: "Freunde", position: 1, slug: "anna-und-ben-freunde" }, [
+      { title: "Hallo", visible: true, suggestedType: null, blocks: [] },
+      { title: "Fragen", visible: false, suggestedType: "faq", blocks: [faq("A"), faq("B")] },
+    ]);
     expect((await websiteRepo.listByWedding(wedding.id)).map((w) => w.label)).toEqual(["Standard", "Freunde"]);
-    expect((await websiteRepo.listSections(website.id)).map((s) => s.kind).sort()).toEqual([...SECTION_KINDS].sort());
-    expect(await websiteRepo.listSections(friends.id)).toEqual([]);
+    const sections = await websiteRepo.listSections(friends.id);
+    expect(sections.map((s) => [s.position, s.title, s.visible, s.suggestedType])).toEqual([
+      [0, "Hallo", true, null],
+      [1, "Fragen", false, "faq"],
+    ]);
+    const blocks = await websiteRepo.listBlocks(friends.id);
+    expect(blocks.map((b) => [b.sectionId, b.position, b.data])).toEqual([
+      [sections[1]!.id, 0, faq("A")],
+      [sections[1]!.id, 1, faq("B")],
+    ]);
     expect(await websiteRepo.findById("not-a-uuid")).toBeNull();
     await expect(websiteRepo.create({ ...copy, position: 2 }, [])).rejects.toThrow();
   });
 
-  it("updates website fields and sections", async () => {
+  it("updates website fields", async () => {
     const { website } = await seedWebsite();
-    const updated = await websiteRepo.update(website.id, { welcomeMessage: "Hallo", published: true, hiddenEventIds: ["e1"], showCountdown: true });
-    expect(updated).toMatchObject({ welcomeMessage: "Hallo", published: true, hiddenEventIds: ["e1"], showCountdown: true });
-    await websiteRepo.updateSection(website.id, "faqs", { title: "Fragen", visible: false });
-    expect((await websiteRepo.listSections(website.id)).find((s) => s.kind === "faqs")).toMatchObject({ title: "Fragen", visible: false });
+    const updated = await websiteRepo.update(website.id, { welcomeMessage: "Hallo", published: true, showCountdown: true });
+    expect(updated).toMatchObject({ welcomeMessage: "Hallo", published: true, showCountdown: true });
   });
 
-  it("appends, reorders, updates and deletes items per section", async () => {
-    const { website } = await seedWebsite();
-    const a = await websiteRepo.addItem(website.id, "faqs", { question: "A", answer: "1", imageKey: null });
-    const b = await websiteRepo.addItem(website.id, "faqs", { question: "B", answer: "2", imageKey: null });
-    const other = await websiteRepo.addItem(website.id, "registry", { name: "Kasse", url: "https://example.org", description: "" });
-    expect([a.position, b.position, other.position]).toEqual([0, 1, 0]);
+  it("appends, renames, reorders and deletes sections; deleting one deletes its blocks", async () => {
+    const { website } = await seedWebsite("anna@example.org", "anna-und-ben", []);
+    const a = await websiteRepo.addSection(website.id, { title: "A", visible: true, suggestedType: null, blocks: [] });
+    const b = await websiteRepo.addSection(website.id, { title: "B", visible: true, suggestedType: null, blocks: [text("b")] });
+    const c = await websiteRepo.addSection(website.id, { title: "C", visible: true, suggestedType: "person", blocks: [] });
+    expect([a.position, b.position, c.position]).toEqual([0, 1, 2]);
+    expect(c).toMatchObject({ title: "C", visible: true, suggestedType: "person" });
 
-    await websiteRepo.setItemOrder(website.id, "faqs", [b.id, a.id]);
-    const faqs = (await websiteRepo.listItems(website.id)).filter((i) => i.kind === "faqs");
-    expect(faqs.map((i) => i.id)).toEqual([b.id, a.id]);
+    await websiteRepo.updateSection(a.id, { title: "A2", visible: false });
+    expect(await websiteRepo.findSection(website.id, a.id)).toMatchObject({ title: "A2", visible: false });
+    await websiteRepo.setSectionOrder(website.id, [c.id, b.id, a.id]);
+    expect((await websiteRepo.listSections(website.id)).map((s) => s.title)).toEqual(["C", "B", "A2"]);
 
-    await websiteRepo.updateItem(a.id, { question: "A2", answer: "1", imageKey: null });
-    expect((await websiteRepo.findItem(website.id, a.id))?.data).toMatchObject({ question: "A2" });
-    await websiteRepo.deleteItem(a.id);
-    expect(await websiteRepo.findItem(website.id, a.id)).toBeNull();
-    expect(await websiteRepo.findItem(website.id, "nope")).toBeNull();
+    await websiteRepo.deleteSection(b.id);
+    expect(await websiteRepo.findSection(website.id, b.id)).toBeNull();
+    expect(await websiteRepo.listBlocks(website.id)).toEqual([]);
+    expect(await websiteRepo.findSection(website.id, "x")).toBeNull();
   });
 
-  it("deletes a website version with its sections and items", async () => {
+  it("appends, updates, reorders and deletes blocks within a section", async () => {
+    const { website } = await seedWebsite("anna@example.org", "anna-und-ben", []);
+    const other = await seedWebsite("ben@example.org", "ben-und-cleo", []);
+    const first = await websiteRepo.addSection(website.id, { title: "Eins", visible: true, suggestedType: null, blocks: [] });
+    const second = await websiteRepo.addSection(website.id, { title: "Zwei", visible: true, suggestedType: null, blocks: [] });
+    const late = await websiteRepo.addBlock(website.id, second.id, text("später"));
+    const a = await websiteRepo.addBlock(website.id, first.id, faq("A"));
+    const b = await websiteRepo.addBlock(website.id, first.id, faq("B"));
+    expect([a.position, b.position, late.position]).toEqual([0, 1, 0]);
+    expect((await websiteRepo.listBlocks(website.id)).map((x) => x.id)).toEqual([a.id, b.id, late.id]);
+
+    await websiteRepo.setBlockOrder(first.id, [b.id, a.id]);
+    expect((await websiteRepo.listBlocks(website.id)).map((x) => x.id)).toEqual([b.id, a.id, late.id]);
+    await websiteRepo.updateBlock(a.id, faq("A2"));
+    expect((await websiteRepo.findBlock(website.id, a.id))?.data).toMatchObject({ question: "A2" });
+    expect(await websiteRepo.findBlock(other.website.id, a.id)).toBeNull();
+    await websiteRepo.deleteBlock(a.id);
+    expect(await websiteRepo.findBlock(website.id, a.id)).toBeNull();
+    expect(await websiteRepo.findBlock(website.id, "nope")).toBeNull();
+  });
+
+  it("deleting an event deletes the blocks pointing to it in every website version, in one go", async () => {
+    const { wedding, website } = await seedWebsite("anna@example.org", "anna-und-ben", []);
+    const copy = { ...website, id: undefined, createdAt: undefined, updatedAt: undefined };
+    const friends = await websiteRepo.create({ ...copy, label: "Freunde", position: 1, slug: "anna-und-ben-freunde" }, []);
+    const e1 = await weddingRepo.addEvent(wedding.id, event("Brunch"));
+    const e2 = await weddingRepo.addEvent(wedding.id, event("Feier"));
+    for (const site of [website, friends]) {
+      const section = await websiteRepo.addSection(site.id, { title: "Ablauf", visible: true, suggestedType: "event", blocks: [] });
+      await websiteRepo.addBlock(site.id, section.id, { type: "event", eventId: e1.id });
+      await websiteRepo.addBlock(site.id, section.id, { type: "event", eventId: null });
+      await websiteRepo.addBlock(site.id, section.id, { type: "event", eventId: e2.id });
+    }
+    await weddingRepo.deleteEvent(e1.id);
+    expect(await weddingRepo.findEvent(wedding.id, e1.id)).toBeNull();
+    for (const site of [website, friends]) {
+      expect((await websiteRepo.listBlocks(site.id)).map((x) => x.data)).toEqual([
+        { type: "event", eventId: null },
+        { type: "event", eventId: e2.id },
+      ]);
+    }
+  });
+
+  it("gives blocks and sections added at the same moment distinct positions", async () => {
+    const { website } = await seedWebsite("anna@example.org", "anna-und-ben", []);
+    const sections = await Promise.all(
+      Array.from({ length: 4 }, (_, i) => websiteRepo.addSection(website.id, { title: `S${i}`, visible: true, suggestedType: null, blocks: [] })),
+    );
+    expect(sections.map((s) => s.position).sort()).toEqual([0, 1, 2, 3]);
+    const blocks = await Promise.all(Array.from({ length: 4 }, (_, i) => websiteRepo.addBlock(website.id, sections[0]!.id, text(`B${i}`))));
+    expect(blocks.map((b) => b.position).sort()).toEqual([0, 1, 2, 3]);
+  });
+
+  it("deletes a website version with its sections and blocks", async () => {
     const { website } = await seedWebsite();
-    await websiteRepo.addItem(website.id, "faqs", { question: "A", answer: "1", imageKey: null });
+    const [section] = await websiteRepo.listSections(website.id);
+    await websiteRepo.addBlock(website.id, section!.id, faq("A"));
     await websiteRepo.delete(website.id);
     expect(await websiteRepo.findById(website.id)).toBeNull();
     expect(await db.select().from(websiteSections).where(eq(websiteSections.websiteId, website.id))).toHaveLength(0);
-    expect(await db.select().from(sectionItems).where(eq(sectionItems.websiteId, website.id))).toHaveLength(0);
+    expect(await db.select().from(sectionBlocks).where(eq(sectionBlocks.websiteId, website.id))).toHaveLength(0);
   });
 });
 

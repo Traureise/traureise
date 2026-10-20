@@ -69,7 +69,7 @@ export async function deleteWeddingAction(weddingId: string): Promise<ActionResu
   return result;
 }
 
-export async function addVersionAction(weddingId: string, item: VersionItem, input: { label: string; copyFrom: string | null }) {
+export async function addVersionAction(weddingId: string, item: VersionItem, input: { label: string; copyFrom: string | null; fromTemplate?: boolean }) {
   return wedding(weddingId, async (userId) => ({ id: (await container().addVersion.execute(userId, weddingId, item, input)).id }));
 }
 

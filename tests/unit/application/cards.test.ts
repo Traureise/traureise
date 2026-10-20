@@ -20,7 +20,7 @@ import {
 } from "@/application/cards";
 import { LockedError, NotFoundError, ValidationError } from "@/application/errors";
 import { GetGuestPage, RunGuestJobs, SaveHousehold, SaveRsvpSettings, SubmitGuestResponse } from "@/application/guests";
-import { AddItem } from "@/application/sections";
+import { AddEvent } from "@/application/schedule";
 import { CreateWedding, DeleteWedding, UpdateWeddingDetails } from "@/application/weddings";
 import { SetPublished } from "@/application/websites";
 import type { PaidTier } from "@/domain/billing";
@@ -39,7 +39,7 @@ beforeEach(async () => {
   anna = await f.users.create("anna@example.org");
   weddingId = (await new CreateWedding(f.deps).execute(anna.id, { title: "Anna & Ben", hasDate: true, weddingDate: "2027-06-12" })).id;
   websiteId = (await f.websites.listByWedding(weddingId))[0]!.id;
-  ceremony = (await new AddItem(f.deps).execute(anna.id, websiteId, "schedule", { eventType: "ceremony", name: "Trauung", startDate: "2027-06-12", startTime: "14:30", venueName: "Gut Kaden" })).id;
+  ceremony = (await new AddEvent(f.deps).execute(anna.id, weddingId, { eventType: "ceremony", name: "Trauung", startDate: "2027-06-12", startTime: "14:30", venueName: "Gut Kaden" })).id;
 });
 
 /** The first version of a kind, generated with the wedding. */

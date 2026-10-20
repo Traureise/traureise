@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { DeleteAccount, ExportAccount } from "@/application/account";
 import { RequestMagicLink, VerifyMagicLink } from "@/application/auth";
 import { ValidationError } from "@/application/errors";
-import { AddItem, UpdateSection } from "@/application/sections";
+import { AddEvent } from "@/application/schedule";
+import { AddBlock } from "@/application/sections";
 import { UploadImage } from "@/application/uploads";
 import { AddVersion, AssignVersion } from "@/application/versions";
 import { CreateWedding } from "@/application/weddings";
@@ -25,14 +26,15 @@ async function seedWebsite(ownerId = anna) {
   const [website] = await f.websites.listByWedding(wedding.id);
   const cover = await new UploadImage(f.deps).execute(ownerId, wedding.id, { bytes: JPEG, size: JPEG.length, contentType: "image/jpeg" });
   await new SetCoverImage(f.deps).execute(ownerId, website!.id, cover);
-  await new UpdateSection(f.deps).execute(ownerId, website!.id, "our-story", { body: "Kennengelernt im Zug." });
-  await new AddItem(f.deps).execute(ownerId, website!.id, "faqs", { question: "Dresscode?", answer: "Sommerlich" });
-  await new AddItem(f.deps).execute(ownerId, website!.id, "schedule", { eventType: "ceremony", name: "Trauung", startDate: "2027-06-12", startTime: "14:30" });
+  const sections = await f.websites.listSections(website!.id);
+  await new AddBlock(f.deps).execute(ownerId, website!.id, sections[0]!.id, { type: "text", text: "Kennengelernt im Zug." });
+  await new AddBlock(f.deps).execute(ownerId, website!.id, sections.at(-1)!.id, { type: "faq", question: "Dresscode?", answer: "Sommerlich" });
+  await new AddEvent(f.deps).execute(ownerId, wedding.id, { eventType: "ceremony", name: "Trauung", startDate: "2027-06-12", startTime: "14:30" });
   return { wedding, website: website!, cover };
 }
 
 describe("ExportAccount", () => {
-  it("exports account, weddings, website versions, sections, items, events and every uploaded image", async () => {
+  it("exports account, weddings, website versions, sections with their blocks, events and every uploaded image", async () => {
     const { wedding, website, cover } = await seedWebsite();
     const result = await new ExportAccount(f.deps).execute(anna);
     expect(result.filename).toBe("traureise-export-2026-10-18.zip");
@@ -46,10 +48,19 @@ describe("ExportAccount", () => {
     expect(data.exportedAt).toBe("2026-10-18T10:00:00.000Z");
     expect(data.weddings).toHaveLength(1);
     expect(data.weddings[0]).toMatchObject({ id: wedding.id, title: "Anna & Ben", weddingDate: "2027-06-12", slug: "anna-und-ben" });
-    expect(data.weddings[0].events).toEqual([expect.objectContaining({ data: expect.objectContaining({ name: "Trauung" }) })]);
+    expect(data.weddings[0].events).toEqual([{ id: expect.any(String), data: expect.objectContaining({ name: "Trauung" }) }]);
     expect(data.weddings[0].websites[0]).toMatchObject({ id: website.id, label: "Standard", published: false, coverImage: `images/${cover}` });
-    expect(data.weddings[0].websites[0].sections.find((s: { kind: string }) => s.kind === "our-story").body).toBe("Kennengelernt im Zug.");
-    expect(data.weddings[0].websites[0].items).toEqual([expect.objectContaining({ kind: "faqs", data: expect.objectContaining({ question: "Dresscode?" }) })]);
+    const exportedSite = data.weddings[0].websites[0];
+    expect(exportedSite).not.toHaveProperty("hiddenEventIds");
+    expect(exportedSite.sections[0]).toEqual({
+      id: expect.any(String),
+      position: 0,
+      title: "Unsere Geschichte",
+      visible: true,
+      suggestedType: "text",
+      blocks: [{ id: expect.any(String), position: 0, data: { type: "text", text: "Kennengelernt im Zug." } }],
+    });
+    expect(exportedSite.sections.at(-1).blocks).toEqual([expect.objectContaining({ data: expect.objectContaining({ question: "Dresscode?" }) })]);
     expect(data.weddings[0].cards.map((c: { kind: string; label: string }) => c.label)).toEqual(["Standard", "Standard", "Standard", "Standard"]);
     expect(data.files).toEqual([{ path: `images/${cover}`, weddingId: wedding.id, contentType: "image/webp" }]);
   });
@@ -115,7 +126,8 @@ describe("DeleteAccount", () => {
     expect(f.weddings.events).toEqual([]);
     expect(f.cards.cards).toEqual([]);
     expect(f.websites.websites).toEqual([]);
-    expect(f.websites.items).toEqual([]);
+    expect(f.websites.blocks).toEqual([]);
+    expect(f.websites.sections).toEqual([]);
     expect(f.uploads.uploads).toEqual([]);
     expect(f.storage.files.size).toBe(0);
     expect(f.sessions.sessions).toEqual([]);

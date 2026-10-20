@@ -7,6 +7,7 @@ import { FieldError } from "@/components/forms/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { FieldErrors } from "@/domain/result";
+import type { TimeZoneOption } from "@/lib/format";
 
 export type WeddingDetailsValue = { title: string; weddingDate: string | null; location?: string | null; timezone?: string };
 
@@ -26,7 +27,8 @@ export function WeddingDetailsFields({
   errors: FieldErrors;
   withPlace?: boolean;
   /** Shows the time zone select. */
-  timeZones?: string[];
+  /** German labels, built on the server (see timeZoneOptions). */
+  timeZones?: TimeZoneOption[];
 }) {
   const t = useTranslations("weddings.fields");
   const [hasDate, setHasDate] = useState(!!value?.weddingDate);
@@ -61,8 +63,8 @@ export function WeddingDetailsFields({
           <Label htmlFor={`${idPrefix}-timezone`}>{t("timezoneLabel")}</Label>
           <select id={`${idPrefix}-timezone`} name="timezone" defaultValue={value?.timezone} className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm">
             {timeZones.map((tz) => (
-              <option key={tz} value={tz}>
-                {tz}
+              <option key={tz.id} value={tz.id}>
+                {tz.label}
               </option>
             ))}
           </select>

@@ -1,5 +1,8 @@
 import { expect, type Page } from "@playwright/test";
 
+/** How a couple types a date: "2027-06-12" → "12.06.2027" (the date fields are German, TT.MM.JJJJ). */
+export const de = (iso: string) => iso.split("-").reverse().join(".");
+
 export const weddingIdOf = (url: string) => /\/hochzeiten\/([0-9a-f-]{36})/.exec(url)![1]!;
 export const homeUrl = (weddingId: string) => `/hochzeiten/${weddingId}`;
 export const guestsUrl = (weddingId: string) => `/hochzeiten/${weddingId}/gaeste`;
@@ -11,7 +14,7 @@ export async function createWedding(page: Page, { names = "Anna & Ben", date = "
   await form.getByLabel("Eure Namen").fill(names);
   if (date) {
     await form.getByLabel("Ja", { exact: true }).check();
-    await form.getByLabel("Hochzeitsdatum").fill(date);
+    await form.getByLabel("Hochzeitsdatum").fill(de(date));
   } else await form.getByLabel("Noch nicht").check();
   await form.getByRole("button", { name: "Hochzeit anlegen" }).click();
   await expect(page).toHaveURL(/\/hochzeiten\/[0-9a-f-]{36}$/);

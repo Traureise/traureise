@@ -35,10 +35,12 @@ test("every couple page has a way back to the wedding and to the list of wedding
     }
   }
 
-  // The walk reached the guest list, every card editor and preview, and every website editor page.
+  // The walk reached the guest list, the Ablauf, every card editor and preview, and every website editor page
+  // (theme, design, home and the eight template sections, which have ids).
   const visited = [...seen];
   expect(visited.filter((p) => /\/karten\/[0-9a-f-]{36}$/.test(p))).toHaveLength(4);
   expect(visited.filter((p) => /\/karten\/[0-9a-f-]{36}\/vorschau$/.test(p))).toHaveLength(4);
-  expect(visited.filter((p) => /\/website\/[0-9a-f-]{36}\/[a-z-]+$/.test(p)).length).toBeGreaterThanOrEqual(11);
-  for (const suffix of ["/gaeste", "/gaeste/einstellungen", "/gaeste/vorschau"]) expect(visited).toContain(`${home}${suffix}`);
+  expect(visited.filter((p) => /\/website\/[0-9a-f-]{36}\/(theme|design|home)$/.test(p))).toHaveLength(3);
+  expect(visited.filter((p) => /\/website\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/.test(p))).toHaveLength(8);
+  for (const suffix of ["/ablauf", "/gaeste", "/gaeste/einstellungen", "/gaeste/vorschau"]) expect(visited).toContain(`${home}${suffix}`);
 });

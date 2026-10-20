@@ -1,20 +1,11 @@
 import { getFormatter, getTranslations } from "next-intl/server";
 import { CalendarPlus, ExternalLink, MapPinned } from "lucide-react";
-import type { Item, Website } from "@/application/ports";
-import type { RenderableSection } from "@/application/views";
+import type { Block, Website, WeddingEvent } from "@/application/ports";
+import type { RenderableSection, RenderGroup } from "@/application/views";
 import { mapLink } from "@/domain/calendar";
-import type {
-  FaqItem,
-  GalleryItem,
-  PartyItem,
-  RegistryItem,
-  ScheduleItem,
-  ThingToDoItem,
-  TravelItem,
-} from "@/domain/sections";
 import { dateFromIso, uploadUrl } from "@/lib/format";
 
-const data = <T,>(items: Item[]) => items as unknown as (Item & { data: T })[];
+type Blocks<T extends Exclude<RenderGroup["type"], "event">> = Block<T>[];
 
 function hostOf(url: string) {
   try {
@@ -52,14 +43,14 @@ async function MapButton({ address }: { address: string }) {
   );
 }
 
-async function Schedule({ items, website }: { items: Item[]; website: Website }) {
+async function Events({ events, website }: { events: WeddingEvent[]; website: Website }) {
   const t = await getTranslations("site");
   const tTypes = await getTranslations("sections.eventTypes");
   const format = await getFormatter();
   const day = (iso: string, style: "long" | "full") => format.dateTime(dateFromIso(iso), { dateStyle: style, timeZone: "UTC" });
   return (
     <ol className="space-y-6">
-      {data<ScheduleItem>(items).map(({ id, data: e }) => (
+      {events.map(({ id, data: e }) => (
         <li key={id} className="site-surface grid gap-5 rounded-2xl p-6 sm:grid-cols-[auto_1fr]" data-testid="site-event">
           <div className="text-center sm:w-24">
             <div className="text-4xl" style={{ fontFamily: "var(--site-heading)" }}>
@@ -100,13 +91,25 @@ async function Schedule({ items, website }: { items: Item[]; website: Website })
   );
 }
 
-async function Travel({ items }: { items: Item[] }) {
-  const tTypes = await getTranslations("sections.travelTypes");
+function Texts({ blocks }: { blocks: Blocks<"text"> }) {
+  return (
+    <div className="mx-auto max-w-prose space-y-6">
+      {blocks.map(({ id, data: x }) => (
+        <p key={id} className="text-lg whitespace-pre-line">
+          {x.text}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+async function Places({ blocks }: { blocks: Blocks<"place"> }) {
+  const tTypes = await getTranslations("sections.placeTypes");
   return (
     <div className="grid gap-5 sm:grid-cols-2">
-      {data<TravelItem>(items).map(({ id, data: x }) => (
-        <article key={id} className="site-surface space-y-2 rounded-2xl p-6">
-          <p className="site-eyebrow">{tTypes(x.type)}</p>
+      {blocks.map(({ id, data: x }) => (
+        <article key={id} className="site-surface space-y-2 rounded-2xl p-6" data-testid="site-place">
+          <p className="site-eyebrow">{tTypes(x.placeType)}</p>
           <h3 className="text-2xl">{x.name}</h3>
           {x.address && <p className="site-muted whitespace-pre-line">{x.address}</p>}
           {x.description && <p className="whitespace-pre-line">{x.description}</p>}
@@ -120,24 +123,10 @@ async function Travel({ items }: { items: Item[] }) {
   );
 }
 
-function ThingsToDo({ items }: { items: Item[] }) {
-  return (
-    <div className="grid gap-5 sm:grid-cols-2">
-      {data<ThingToDoItem>(items).map(({ id, data: x }) => (
-        <article key={id} className="site-surface space-y-2 rounded-2xl p-6">
-          <h3 className="text-2xl">{x.name}</h3>
-          {x.description && <p className="whitespace-pre-line">{x.description}</p>}
-          <WebsiteLink url={x.website} />
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function Registry({ items }: { items: Item[] }) {
+function Links({ blocks }: { blocks: Blocks<"link"> }) {
   return (
     <ul className="space-y-4">
-      {data<RegistryItem>(items).map(({ id, data: x }) => (
+      {blocks.map(({ id, data: x }) => (
         <li key={id} className="site-surface flex flex-wrap items-center justify-between gap-4 rounded-2xl p-6">
           <div className="space-y-1">
             <h3 className="text-2xl">{x.name}</h3>
@@ -153,11 +142,11 @@ function Registry({ items }: { items: Item[] }) {
   );
 }
 
-async function WeddingParty({ items }: { items: Item[] }) {
+async function Persons({ blocks }: { blocks: Blocks<"person"> }) {
   const tRoles = await getTranslations("sections.roles");
   return (
     <ul className="grid grid-cols-2 gap-8 sm:grid-cols-3">
-      {data<PartyItem>(items).map(({ id, data: p }) => (
+      {blocks.map(({ id, data: p }) => (
         <li key={id} className="flex flex-col items-center gap-3 text-center">
           {p.imageKey ? (
             <Img imageKey={p.imageKey} className="aspect-square w-32 rounded-full object-cover" />
@@ -168,16 +157,17 @@ async function WeddingParty({ items }: { items: Item[] }) {
           )}
           <span className="text-lg font-medium">{p.name}</span>
           <span className="site-eyebrow">{tRoles(p.role)}</span>
+          {p.text && <p className="site-muted text-sm whitespace-pre-line">{p.text}</p>}
         </li>
       ))}
     </ul>
   );
 }
 
-function Gallery({ items }: { items: Item[] }) {
+function Gallery({ blocks }: { blocks: Blocks<"image"> }) {
   return (
     <div className="columns-1 gap-4 sm:columns-2">
-      {data<GalleryItem>(items).map(({ id, data: g }) => (
+      {blocks.map(({ id, data: g }) => (
         <figure key={id} className="mb-4 break-inside-avoid">
           <Img imageKey={g.imageKey} className="w-full rounded-xl" />
           {g.caption && <figcaption className="site-muted mt-2 text-sm">{g.caption}</figcaption>}
@@ -187,10 +177,10 @@ function Gallery({ items }: { items: Item[] }) {
   );
 }
 
-function Faqs({ items }: { items: Item[] }) {
+function Faqs({ blocks }: { blocks: Blocks<"faq"> }) {
   return (
     <dl className="space-y-8">
-      {data<FaqItem>(items).map(({ id, data: f }) => (
+      {blocks.map(({ id, data: f }) => (
         <div key={id} className="space-y-2">
           <dt className="text-2xl" style={{ fontFamily: "var(--site-heading)" }}>
             {f.question}
@@ -205,23 +195,32 @@ function Faqs({ items }: { items: Item[] }) {
   );
 }
 
-export function SectionBody({ section, website }: { section: RenderableSection; website: Website }) {
-  switch (section.kind) {
-    case "our-story":
-      return <p className="mx-auto max-w-prose text-lg whitespace-pre-line">{section.body}</p>;
-    case "schedule":
-      return <Schedule items={section.items} website={website} />;
-    case "travel":
-      return <Travel items={section.items} />;
-    case "things-to-do":
-      return <ThingsToDo items={section.items} />;
-    case "registry":
-      return <Registry items={section.items} />;
-    case "wedding-party":
-      return <WeddingParty items={section.items} />;
-    case "gallery":
-      return <Gallery items={section.items} />;
-    case "faqs":
-      return <Faqs items={section.items} />;
+function Group({ group, website }: { group: RenderGroup; website: Website }) {
+  switch (group.type) {
+    case "event":
+      return <Events events={group.events} website={website} />;
+    case "text":
+      return <Texts blocks={group.blocks as Blocks<"text">} />;
+    case "person":
+      return <Persons blocks={group.blocks as Blocks<"person">} />;
+    case "place":
+      return <Places blocks={group.blocks as Blocks<"place">} />;
+    case "link":
+      return <Links blocks={group.blocks as Blocks<"link">} />;
+    case "faq":
+      return <Faqs blocks={group.blocks as Blocks<"faq">} />;
+    case "image":
+      return <Gallery blocks={group.blocks as Blocks<"image">} />;
   }
+}
+
+/** A section's blocks: consecutive blocks of one type form one designed group (a grid, a list, a gallery). */
+export function SectionBody({ section, website }: { section: RenderableSection; website: Website }) {
+  return (
+    <div className="space-y-10">
+      {section.groups.map((group, i) => (
+        <Group key={i} group={group} website={website} />
+      ))}
+    </div>
+  );
 }

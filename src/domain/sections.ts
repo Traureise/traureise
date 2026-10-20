@@ -2,8 +2,8 @@ import { z } from "zod";
 import { imageKey, isoDate, optional, requiredText, text, time24, webUrl } from "./fields";
 import { parseWith, type FieldErrors, type Parsed } from "./result";
 
-/** Fixed section order after Home (reordering is out of scope for v1). */
-export const SECTION_KINDS = [
+/** The standard template: today's eight sections in their default order. */
+export const SECTION_TEMPLATES = [
   "our-story",
   "schedule",
   "travel",
@@ -13,17 +13,18 @@ export const SECTION_KINDS = [
   "gallery",
   "faqs",
 ] as const;
-export type SectionKind = (typeof SECTION_KINDS)[number];
+export type SectionTemplate = (typeof SECTION_TEMPLATES)[number];
 
-export const COLLECTION_KINDS = SECTION_KINDS.filter((k) => k !== "our-story") as Exclude<SectionKind, "our-story">[];
-export type CollectionKind = Exclude<SectionKind, "our-story">;
-
-export function isSectionKind(value: string): value is SectionKind {
-  return (SECTION_KINDS as readonly string[]).includes(value);
+export function isSectionTemplate(value: unknown): value is SectionTemplate {
+  return typeof value === "string" && (SECTION_TEMPLATES as readonly string[]).includes(value);
 }
 
-export function isCollectionKind(value: string): value is CollectionKind {
-  return isSectionKind(value) && value !== "our-story";
+/** The fixed block kinds a section is built from; each has its own designed layout on the site. */
+export const BLOCK_TYPES = ["text", "event", "person", "place", "link", "faq", "image"] as const;
+export type BlockType = (typeof BLOCK_TYPES)[number];
+
+export function isBlockType(value: unknown): value is BlockType {
+  return typeof value === "string" && (BLOCK_TYPES as readonly string[]).includes(value);
 }
 
 export const EVENT_TYPES = [
@@ -38,7 +39,7 @@ export const EVENT_TYPES = [
   "other",
 ] as const;
 
-export const TRAVEL_TYPES = ["hotel", "arrival", "parking", "other"] as const;
+export const PLACE_TYPES = ["hotel", "parking", "arrival", "activity", "other"] as const;
 
 /** Roles in the wedding party; labels live in messages (sections.roles.<key>). */
 export const PARTY_ROLES = [
@@ -84,13 +85,14 @@ export const PARTY_ROLES = [
   "helper",
 ] as const;
 
-const scheduleItem = z
+const eventSchema = z
   .object({
     imageKey: optional(imageKey).default(null),
     eventType: z.enum(EVENT_TYPES, "invalid_option"),
     name: requiredText(120),
-    startDate: isoDate,
-    startTime: time24,
+    // Empty is "required", not "invalid" (a half-typed native date input also submits "").
+    startDate: z.string().min(1, "required").pipe(isoDate),
+    startTime: z.string().min(1, "required").pipe(time24),
     endDate: optional(isoDate).default(null),
     endTime: optional(time24).default(null),
     venueName: text(160),
@@ -99,6 +101,8 @@ const scheduleItem = z
     website: optional(webUrl).default(null),
   })
   .transform((e) => ({ ...e, endDate: e.endTime && !e.endDate ? e.startDate : e.endDate }));
+
+export type EventData = z.infer<typeof eventSchema>;
 
 /**
  * Start/end consistency, checked on the raw input so it is reported together with any other
@@ -121,74 +125,92 @@ function scheduleTimeErrors(input: unknown): FieldErrors {
   return {};
 }
 
-const travelItem = z.object({
-  name: requiredText(120),
-  type: z.enum(TRAVEL_TYPES, "invalid_option"),
-  address: text(300),
-  website: optional(webUrl).default(null),
-  description: text(2000),
-});
-
-const thingToDoItem = z.object({
-  name: requiredText(120),
-  website: optional(webUrl).default(null),
-  description: text(2000),
-});
-
-const registryItem = z.object({
-  name: requiredText(120),
-  url: webUrl,
-  description: text(2000),
-});
-
-const partyItem = z.object({
-  name: requiredText(120),
-  role: z.enum(PARTY_ROLES, "invalid_option"),
-  imageKey: optional(imageKey).default(null),
-});
-
-const galleryItem = z.object({
-  imageKey: imageKey,
-  caption: text(300),
-});
-
-const faqItem = z.object({
-  question: requiredText(300),
-  answer: requiredText(4000),
-  imageKey: optional(imageKey).default(null),
-});
-
-export const ITEM_SCHEMAS = {
-  schedule: scheduleItem,
-  travel: travelItem,
-  "things-to-do": thingToDoItem,
-  registry: registryItem,
-  "wedding-party": partyItem,
-  gallery: galleryItem,
-  faqs: faqItem,
-} as const;
-
-export type ItemData<K extends CollectionKind = CollectionKind> = z.infer<(typeof ITEM_SCHEMAS)[K]>;
-export type ScheduleItem = ItemData<"schedule">;
-export type TravelItem = ItemData<"travel">;
-export type ThingToDoItem = ItemData<"things-to-do">;
-export type RegistryItem = ItemData<"registry">;
-export type PartyItem = ItemData<"wedding-party">;
-export type GalleryItem = ItemData<"gallery">;
-export type FaqItem = ItemData<"faqs">;
-
-export function parseItem<K extends CollectionKind>(kind: K, input: unknown): Parsed<ItemData<K>> {
-  const result = parseWith(ITEM_SCHEMAS[kind], input) as Parsed<ItemData<K>>;
-  const extra = kind === "schedule" ? scheduleTimeErrors(input) : {};
+export function parseEvent(input: unknown): Parsed<EventData> {
+  const result = parseWith(eventSchema, input);
+  const extra = scheduleTimeErrors(input);
   if (Object.keys(extra).length === 0) return result;
   return { ok: false, fieldErrors: { ...extra, ...(result.ok ? {} : result.fieldErrors) } };
 }
 
-/** Image keys referenced by an item, for cleanup when items or websites are deleted. */
+/** Events are always listed chronologically: by date, then start time. */
+export function compareEvents(a: { data: EventData }, b: { data: EventData }): number {
+  return `${a.data.startDate}T${a.data.startTime}`.localeCompare(`${b.data.startDate}T${b.data.startTime}`);
+}
+
+export const TEXT_MAX = 10_000;
+
+const blockSchema = z.discriminatedUnion(
+  "type",
+  [
+    z.object({ type: z.literal("text"), text: requiredText(TEXT_MAX) }),
+    /** `eventId: null` shows all events of the wedding. */
+    z.object({ type: z.literal("event"), eventId: z.guid("invalid_option").nullable() }),
+    z.object({
+      type: z.literal("person"),
+      name: requiredText(120),
+      role: z.enum(PARTY_ROLES, "invalid_option"),
+      imageKey: optional(imageKey).default(null),
+      text: text(2000),
+    }),
+    z.object({
+      type: z.literal("place"),
+      name: requiredText(120),
+      placeType: z.enum(PLACE_TYPES, "invalid_option"),
+      address: text(300),
+      website: optional(webUrl).default(null),
+      description: text(2000),
+    }),
+    z.object({ type: z.literal("link"), name: requiredText(120), url: webUrl, description: text(2000) }),
+    z.object({
+      type: z.literal("faq"),
+      question: requiredText(300),
+      answer: requiredText(4000),
+      imageKey: optional(imageKey).default(null),
+    }),
+    z.object({ type: z.literal("image"), imageKey: imageKey, caption: text(300) }),
+  ],
+  "invalid_option",
+);
+
+type AnyBlock = z.infer<typeof blockSchema>;
+export type BlockData<T extends BlockType = BlockType> = Extract<AnyBlock, { type: T }>;
+
+export function parseBlock(input: unknown): Parsed<BlockData> {
+  return parseWith(blockSchema, input);
+}
+
+/** The block kind each template section offers first in its empty editor. */
+export const TEMPLATE_SUGGESTIONS: Record<SectionTemplate, BlockType> = {
+  "our-story": "text",
+  schedule: "event",
+  travel: "place",
+  "things-to-do": "place",
+  registry: "link",
+  "wedding-party": "person",
+  gallery: "image",
+  faqs: "faq",
+};
+
+/** Template sections start empty, except the schedule, which shows all events. */
+export function templateBlocks(template: SectionTemplate): BlockData[] {
+  return template === "schedule" ? [{ type: "event", eventId: null }] : [];
+}
+
+/** Consecutive blocks of the same type render together (one grid, one list). */
+export function groupBlocks<B extends { data: { type: BlockType } }>(blocks: B[]): B[][] {
+  const groups: B[][] = [];
+  for (const block of blocks) {
+    const last = groups.at(-1);
+    if (last && last[0]!.data.type === block.data.type) last.push(block);
+    else groups.push([block]);
+  }
+  return groups;
+}
+
+/** Image keys referenced by a block or event, for cleanup when they or websites are deleted. */
 export function imageKeysOf(data: Record<string, unknown>): string[] {
   const key = data.imageKey;
   return typeof key === "string" ? [key] : [];
 }
 
 export const SECTION_TITLE_MAX = 60;
-export const STORY_MAX = 10_000;

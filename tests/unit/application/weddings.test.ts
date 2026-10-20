@@ -41,6 +41,27 @@ describe("creating a wedding", () => {
     expect(website).toMatchObject({ label: "Standard", position: 0, slug: "anna-und-ben", published: false, themeId: "salbei" });
   });
 
+  it("builds the first website from the standard template", async () => {
+    const wedding = await create();
+    const [website] = await f.websites.listByWedding(wedding.id);
+    const sections = await f.websites.listSections(website!.id);
+    expect(sections.map((s) => s.title)).toEqual([
+      "Unsere Geschichte",
+      "Tagesablauf",
+      "Anreise",
+      "Empfehlungen",
+      "Geschenkideen",
+      "Hochzeitsgesellschaft",
+      "Galerie",
+      "Häufige Fragen",
+    ]);
+    const schedule = sections[1]!;
+    expect(schedule.suggestedType).toBe("event");
+    expect(sections[5]!.suggestedType).toBe("person");
+    const blocks = await f.websites.listBlocks(website!.id);
+    expect(blocks.map((b) => [b.sectionId, b.data])).toEqual([[schedule.id, { type: "event", eventId: null }]]);
+  });
+
   it("is never public just because it was created: the website is a draft", async () => {
     const wedding = await create();
     expect((await f.websites.listByWedding(wedding.id))[0]!.published).toBe(false);

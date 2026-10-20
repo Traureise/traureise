@@ -1,7 +1,7 @@
 import { findFontPairing } from "@/domain/fonts";
 import { parseHome } from "@/domain/website";
 import type { Deps } from "./deps";
-import { NotFoundError, ValidationError } from "./errors";
+import { ValidationError } from "./errors";
 import { loadGuestContext } from "./guest-context";
 import { assertOwnImage, loadOwnedWebsite, releaseImages } from "./owned";
 import type { Website } from "./ports";
@@ -66,18 +66,6 @@ export class SetPublished {
   async execute(userId: string, websiteId: string, published: boolean): Promise<void> {
     await loadOwnedWebsite(this.deps, userId, websiteId);
     await this.deps.websites.update(websiteId, { published });
-  }
-}
-
-export class SetEventShown {
-  constructor(private deps: Deps) {}
-
-  /** Events belong to the wedding; each website version shows all of them unless the couple hides some. */
-  async execute(userId: string, websiteId: string, eventId: string, shown: boolean): Promise<void> {
-    const { website, wedding } = await loadOwnedWebsite(this.deps, userId, websiteId);
-    if (!(await this.deps.weddings.findEvent(wedding.id, eventId))) throw new NotFoundError();
-    const hidden = website.hiddenEventIds.filter((id) => id !== eventId);
-    await this.deps.websites.update(websiteId, { hiddenEventIds: shown ? hidden : [...hidden, eventId] });
   }
 }
 

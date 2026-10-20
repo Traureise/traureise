@@ -1,128 +1,150 @@
 import { moveItem, type Direction } from "@/domain/ordering";
 import {
+  SECTION_TEMPLATES,
   SECTION_TITLE_MAX,
-  STORY_MAX,
+  TEMPLATE_SUGGESTIONS,
   imageKeysOf,
-  isCollectionKind,
-  isSectionKind,
-  parseItem,
-  type CollectionKind,
-  type ItemData,
-  type SectionKind,
+  isSectionTemplate,
+  parseBlock,
+  templateBlocks,
+  type SectionTemplate,
 } from "@/domain/sections";
 import type { Deps } from "./deps";
 import { NotFoundError, ValidationError } from "./errors";
 import { assertOwnImage, loadOwnedWebsite, releaseImages } from "./owned";
-import type { Item, SectionPatch } from "./ports";
+import type { Block, NewSection, Section, SectionPatch, SiteTexts, Wedding } from "./ports";
+
+/** A section of the standard template, with its translated default title and default blocks. */
+export function templateSection(texts: SiteTexts, template: SectionTemplate): NewSection {
+  return { title: texts.sectionTitles[template], visible: true, suggestedType: TEMPLATE_SUGGESTIONS[template], blocks: templateBlocks(template) };
+}
+
+/** The standard template: what a new wedding's first website and "Aus Vorlage erstellen" start with. */
+export const standardSections = (texts: SiteTexts): NewSection[] => SECTION_TEMPLATES.map((t) => templateSection(texts, t));
+
+async function loadOwnedSection(deps: Deps, userId: string, websiteId: string, sectionId: string) {
+  const owned = await loadOwnedWebsite(deps, userId, websiteId);
+  const section = await deps.websites.findSection(websiteId, sectionId).catch(() => null);
+  if (!section) throw new NotFoundError();
+  return { ...owned, section };
+}
+
+async function loadOwnedBlock(deps: Deps, userId: string, websiteId: string, blockId: string) {
+  const owned = await loadOwnedWebsite(deps, userId, websiteId);
+  const block = await deps.websites.findBlock(websiteId, blockId).catch(() => null);
+  if (!block) throw new NotFoundError();
+  return { ...owned, block };
+}
+
+/** Parses block input; photos must be the wedding's, and an event block may only point to one of its events. */
+async function validBlock(deps: Deps, wedding: Wedding, input: unknown) {
+  const parsed = parseBlock(input);
+  if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
+  const data = parsed.value;
+  for (const key of imageKeysOf(data)) await assertOwnImage(deps, wedding.id, key);
+  if (data.type === "event" && data.eventId && !(await deps.weddings.findEvent(wedding.id, data.eventId))) {
+    throw new ValidationError({ eventId: "invalid_option" });
+  }
+  return data;
+}
+
+export class AddSection {
+  constructor(private deps: Deps) {}
+
+  /** "+ Abschnitt": an empty section, or one section of the standard template. Appended at the end. */
+  async execute(userId: string, websiteId: string, input: { template: SectionTemplate | null }): Promise<Section> {
+    await loadOwnedWebsite(this.deps, userId, websiteId);
+    const { template } = input;
+    if (template !== null && !isSectionTemplate(template)) throw new ValidationError({ template: "invalid_option" });
+    const section: NewSection = template
+      ? templateSection(this.deps.siteTexts, template)
+      : { title: this.deps.siteTexts.newSectionTitle, visible: true, suggestedType: null, blocks: [] };
+    return this.deps.websites.addSection(websiteId, section);
+  }
+}
 
 export class UpdateSection {
   constructor(private deps: Deps) {}
 
-  async execute(
-    userId: string,
-    websiteId: string,
-    kind: SectionKind,
-    input: { title?: string | null; visible?: boolean; body?: string },
-  ): Promise<void> {
-    await loadOwnedWebsite(this.deps, userId, websiteId);
-    if (!isSectionKind(kind)) throw new NotFoundError();
-
+  async execute(userId: string, websiteId: string, sectionId: string, input: { title?: string; visible?: boolean }): Promise<void> {
+    await loadOwnedSection(this.deps, userId, websiteId, sectionId);
     const patch: SectionPatch = {};
+    if (input.visible !== undefined && typeof input.visible !== "boolean") throw new ValidationError({ visible: "invalid_option" });
     if (input.title !== undefined) {
-      const title = input.title?.trim() ?? "";
+      const title = typeof input.title === "string" ? input.title.trim() : "";
+      if (title === "") throw new ValidationError({ title: "required" });
       if (title.length > SECTION_TITLE_MAX) throw new ValidationError({ title: "too_long" });
-      patch.title = title === "" ? null : title;
+      patch.title = title;
     }
     if (input.visible !== undefined) patch.visible = input.visible;
-    if (input.body !== undefined) {
-      if (kind !== "our-story") throw new ValidationError({ body: "not_allowed" });
-      const body = input.body.trim();
-      if (body.length > STORY_MAX) throw new ValidationError({ body: "too_long" });
-      patch.body = body;
-    }
-    await this.deps.websites.updateSection(websiteId, kind, patch);
+    await this.deps.websites.updateSection(sectionId, patch);
   }
 }
 
-function parseOrThrow<K extends CollectionKind>(kind: K, input: unknown) {
-  const parsed = parseItem(kind, input);
-  if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
-  return parsed.value;
-}
-
-/**
- * An item of a website version, or one of the wedding's events (the schedule belongs to the wedding, so editing
- * it in one version changes it for all; each version only chooses which events it shows).
- */
-async function loadOwnedItem(deps: Deps, userId: string, websiteId: string, itemId: string) {
-  const { wedding } = await loadOwnedWebsite(deps, userId, websiteId);
-  const item = (await deps.websites.findItem(websiteId, itemId).catch(() => null)) ?? (await deps.weddings.findEvent(wedding.id, itemId).catch(() => null));
-  if (!item) throw new NotFoundError();
-  return { wedding, item: item as Item };
-}
-
-export class AddItem {
+export class DeleteSection {
   constructor(private deps: Deps) {}
 
-  async execute<K extends CollectionKind>(userId: string, websiteId: string, kind: K, input: unknown): Promise<Item<K>> {
-    const { wedding } = await loadOwnedWebsite(this.deps, userId, websiteId);
-    if (!isCollectionKind(kind)) throw new NotFoundError();
-    const data = parseOrThrow(kind, input);
-    for (const key of imageKeysOf(data)) await assertOwnImage(this.deps, wedding.id, key);
-    if (kind === "schedule") return (await this.addEvent(wedding.id, data as ItemData<"schedule">)) as Item<K>;
-    return this.deps.websites.addItem(websiteId, kind, data);
-  }
-
-  /** The wedding's first event also fills the invitations that have none yet (there was nothing to choose before). */
-  private async addEvent(weddingId: string, data: ItemData<"schedule">) {
-    const event = await this.deps.weddings.addEvent(weddingId, data);
-    if ((await this.deps.weddings.listEvents(weddingId)).length > 1) return event;
-    for (const card of await this.deps.cards.listByWedding(weddingId)) {
-      if (card.kind !== "invitation" || card.content.eventId) continue;
-      const { themeId, paletteId, fontPairingId, layoutId, envelope, photoKey, content, message, reminderDays, reminderMessage } = card;
-      await this.deps.cards.update(card.id, { themeId, paletteId, fontPairingId, layoutId, envelope, photoKey, content: { ...content, eventId: event.id }, message, reminderDays, reminderMessage });
-    }
-    return event;
+  async execute(userId: string, websiteId: string, sectionId: string): Promise<void> {
+    const { wedding } = await loadOwnedSection(this.deps, userId, websiteId, sectionId);
+    const photos = (await this.deps.websites.listBlocks(websiteId)).filter((b) => b.sectionId === sectionId).flatMap((b) => imageKeysOf(b.data));
+    await this.deps.websites.deleteSection(sectionId);
+    await releaseImages(this.deps, wedding.id, photos);
   }
 }
 
-export class UpdateItem {
+/** Moves a section one step up or down; the site navigation follows. */
+export class MoveSection {
   constructor(private deps: Deps) {}
 
-  async execute(userId: string, websiteId: string, itemId: string, input: unknown): Promise<void> {
-    const { wedding, item } = await loadOwnedItem(this.deps, userId, websiteId, itemId);
-    const data = parseOrThrow(item.kind, input);
+  async execute(userId: string, websiteId: string, sectionId: string, direction: Direction): Promise<void> {
+    await loadOwnedSection(this.deps, userId, websiteId, sectionId);
+    const ids = (await this.deps.websites.listSections(websiteId)).map((s) => s.id);
+    await this.deps.websites.setSectionOrder(websiteId, moveItem(ids, sectionId, direction));
+  }
+}
+
+export class AddBlock {
+  constructor(private deps: Deps) {}
+
+  /** Appends a block of any type to the end of a section. */
+  async execute(userId: string, websiteId: string, sectionId: string, input: unknown): Promise<Block> {
+    const { wedding } = await loadOwnedSection(this.deps, userId, websiteId, sectionId);
+    const data = await validBlock(this.deps, wedding, input);
+    return this.deps.websites.addBlock(websiteId, sectionId, data);
+  }
+}
+
+export class UpdateBlock {
+  constructor(private deps: Deps) {}
+
+  /** Edits a block's fields; its type stays. */
+  async execute(userId: string, websiteId: string, blockId: string, input: unknown): Promise<void> {
+    const { wedding, block } = await loadOwnedBlock(this.deps, userId, websiteId, blockId);
+    const data = await validBlock(this.deps, wedding, input);
+    if (data.type !== block.data.type) throw new ValidationError({ type: "invalid_option" });
+    await this.deps.websites.updateBlock(blockId, data);
     const newKeys = imageKeysOf(data);
-    for (const key of newKeys) await assertOwnImage(this.deps, wedding.id, key);
-    if (item.kind === "schedule") await this.deps.weddings.updateEvent(itemId, data as ItemData<"schedule">);
-    else await this.deps.websites.updateItem(itemId, data);
-    await releaseImages(this.deps, wedding.id, imageKeysOf(item.data).filter((old) => !newKeys.includes(old)));
+    await releaseImages(this.deps, wedding.id, imageKeysOf(block.data).filter((old) => !newKeys.includes(old)));
   }
 }
 
-export class DeleteItem {
+export class DeleteBlock {
   constructor(private deps: Deps) {}
 
-  async execute(userId: string, websiteId: string, itemId: string): Promise<void> {
-    const { wedding, item } = await loadOwnedItem(this.deps, userId, websiteId, itemId);
-    if (item.kind === "schedule") await this.deps.weddings.deleteEvent(itemId);
-    else await this.deps.websites.deleteItem(itemId);
-    await releaseImages(this.deps, wedding.id, imageKeysOf(item.data));
+  async execute(userId: string, websiteId: string, blockId: string): Promise<void> {
+    const { wedding, block } = await loadOwnedBlock(this.deps, userId, websiteId, blockId);
+    await this.deps.websites.deleteBlock(blockId);
+    await releaseImages(this.deps, wedding.id, imageKeysOf(block.data));
   }
 }
 
-/** Moves an item one step up or down within its section (spec: ReorderItems). */
-export class MoveItem {
+/** Moves a block one step up or down within its section. */
+export class MoveBlock {
   constructor(private deps: Deps) {}
 
-  async execute(userId: string, websiteId: string, itemId: string, direction: Direction): Promise<void> {
-    const { wedding, item } = await loadOwnedItem(this.deps, userId, websiteId, itemId);
-    if (item.kind === "schedule") {
-      const ids = (await this.deps.weddings.listEvents(wedding.id)).map((e) => e.id);
-      await this.deps.weddings.setEventOrder(wedding.id, moveItem(ids, itemId, direction));
-      return;
-    }
-    const ids = (await this.deps.websites.listItems(websiteId)).filter((i) => i.kind === item.kind).map((i) => i.id);
-    await this.deps.websites.setItemOrder(websiteId, item.kind, moveItem(ids, itemId, direction));
+  async execute(userId: string, websiteId: string, blockId: string, direction: Direction): Promise<void> {
+    const { block } = await loadOwnedBlock(this.deps, userId, websiteId, blockId);
+    const ids = (await this.deps.websites.listBlocks(websiteId)).filter((b) => b.sectionId === block.sectionId).map((b) => b.id);
+    await this.deps.websites.setBlockOrder(block.sectionId, moveItem(ids, blockId, direction));
   }
 }

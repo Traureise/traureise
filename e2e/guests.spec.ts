@@ -5,6 +5,7 @@ import { login, uniqueEmail } from "./helpers/auth";
 import { captureWindowOpen, openedUrls } from "./helpers/cards";
 import { createWebsite } from "./helpers/editor";
 import { addEvent, addHousehold, daysUntil, guestLink, guestsUrl, household, runGuestJobs, setClockOffset, weddingIdOf } from "./helpers/guests";
+import { de } from "./helpers/weddings";
 import { waitForMail } from "./helpers/mailpit";
 
 /** A guest opens their link in a browser of their own: no session, and no third-party requests either. */
@@ -53,7 +54,7 @@ test("a couple invites households, guests answer through their links, and the co
 
     await page.getByRole("link", { name: "Einstellungen" }).click();
     const settings = page.getByRole("form", { name: "RSVP-Einstellungen" });
-    await settings.getByLabel("Antworten bis").fill("2027-05-01");
+    await settings.getByLabel("Antworten bis").fill("01.05.2027");
     await settings.getByRole("button", { name: "Gericht hinzufügen" }).click();
     await settings.getByLabel("Gericht 1", { exact: true }).fill("Fisch");
     await settings.getByRole("button", { name: "Gericht hinzufügen" }).click();
@@ -85,7 +86,7 @@ test("a couple invites households, guests answer through their links, and the co
     await expect(polls.getByTestId("poll").nth(1)).toContainText("Ja, Nein · einmal pro Haushalt");
 
     await page.reload();
-    await expect(settings.getByLabel("Antworten bis")).toHaveValue("2027-05-01");
+    await expect(settings.getByLabel("Antworten bis")).toHaveValue("01.05.2027");
     await expect(settings.getByLabel("Gericht 1", { exact: true })).toHaveValue("Fisch");
     await expect(settings.getByLabel("E-Mail bei jeder Antwort")).toBeChecked();
   });
@@ -258,7 +259,7 @@ test("a couple invites households, guests answer through their links, and the co
   await test.step("after the reply-by date the form only shows the answer", async () => {
     await page.goto(`${guestsUrl(editorUrl)}/einstellungen`);
     const settings = page.getByRole("form", { name: "RSVP-Einstellungen" });
-    await settings.getByLabel("Antworten bis").fill(berlinDay(-1));
+    await settings.getByLabel("Antworten bis").fill(de(berlinDay(-1)));
     await settings.getByRole("button", { name: "Einstellungen speichern" }).click();
     await expect(page.getByText("Gespeichert").first()).toBeVisible();
     await asGuest(browser, baseURL!, weberLink, async (guest) => {

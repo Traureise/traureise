@@ -25,6 +25,10 @@ export class ExportAccount {
     }
 
     const image = (key: string | null) => (key ? imagePath(key) : null);
+    const sectionsOf = async (websiteId: string) => {
+      const [sections, blocks] = await Promise.all([websites.listSections(websiteId), websites.listBlocks(websiteId)]);
+      return sections.map((s) => ({ ...s, blocks: blocks.filter((b) => b.sectionId === s.id).map(({ id, position, data }) => ({ id, position, data })) }));
+    };
     const exported = [];
     for (const wedding of await weddings.listByOwner(userId)) {
       const [households, weddingCards, sites, deliveries, opens, assignments] = await Promise.all([
@@ -48,7 +52,7 @@ export class ExportAccount {
         lastOpenedAt,
         createdAt,
         updatedAt,
-        events: (await weddings.listEvents(wedding.id)).map(({ id, position, data }) => ({ id, position, data })),
+        events: (await weddings.listEvents(wedding.id)).map(({ id, data }) => ({ id, data })),
         websites: await Promise.all(
           sites.map(async (site) => ({
             id: site.id,
@@ -56,7 +60,6 @@ export class ExportAccount {
             position: site.position,
             slug: site.slug,
             published: site.published,
-            hiddenEventIds: site.hiddenEventIds,
             welcomeMessage: site.welcomeMessage,
             hashtag: site.hashtag,
             showCountdown: site.showCountdown,
@@ -66,8 +69,7 @@ export class ExportAccount {
             coverImage: image(site.coverImageKey),
             createdAt: site.createdAt,
             updatedAt: site.updatedAt,
-            sections: await websites.listSections(site.id),
-            items: (await websites.listItems(site.id)).map(({ id, kind, position, data }) => ({ id, kind, position, data })),
+            sections: await sectionsOf(site.id),
           })),
         ),
         purchases: (await billingRepo.listByWedding(wedding.id)).map(({ tier, purchaseRef, provider, validUntil, revokedAt, createdAt }) => ({

@@ -100,6 +100,7 @@ function AddVersionDialog({ weddingId, item, versions, open, onOpenChange }: { w
   const router = useRouter();
   const [label, setLabel] = useState("");
   const [copyFrom, setCopyFrom] = useState(versions[0]?.id ?? "");
+  const [fromTemplate, setFromTemplate] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [pending, start] = useTransition();
   const lead = item === "engagement" ? t("addLeadEngagement") : item === "website" ? t("addLeadWebsite") : t("addLead");
@@ -107,7 +108,7 @@ function AddVersionDialog({ weddingId, item, versions, open, onOpenChange }: { w
   function submit(event: React.FormEvent) {
     event.preventDefault();
     start(async () => {
-      const result = await addVersionAction(weddingId, item, { label, copyFrom: copyFrom || null });
+      const result = await addVersionAction(weddingId, item, { label, copyFrom: copyFrom || null, fromTemplate: item === "website" && fromTemplate });
       if (!result.ok) {
         setErrors(result.fieldErrors ?? {});
         if (result.error) toast.error(tErrors(result.error));
@@ -132,9 +133,23 @@ function AddVersionDialog({ weddingId, item, versions, open, onOpenChange }: { w
             <Input id={`version-${item}-label`} value={label} maxLength={LABEL_MAX} placeholder={t("namePlaceholder")} onChange={(e) => setLabel(e.target.value)} />
             <FieldError code={errors.label} />
           </div>
-          {versions.length > 1 && (
+          {item === "website" && (
+            <fieldset className="space-y-2">
+              <legend className="sr-only">{t("addItem")}</legend>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="radio" name={`version-${item}-source`} checked={!fromTemplate} onChange={() => setFromTemplate(false)} />
+                {t("fromCopy")}
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="radio" name={`version-${item}-source`} checked={fromTemplate} onChange={() => setFromTemplate(true)} />
+                {t("fromTemplate")}
+              </label>
+              {fromTemplate && <p className="text-xs text-muted-foreground">{t("fromTemplateHint")}</p>}
+            </fieldset>
+          )}
+          {(versions.length > 1 || item === "website") && (
             <div className="space-y-2">
-              <Label htmlFor={`version-${item}-copy`}>{t("copyFrom")}</Label>
+              <Label htmlFor={`version-${item}-copy`}>{fromTemplate ? t("designFrom") : t("copyFrom")}</Label>
               <select id={`version-${item}-copy`} value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm">
                 {versions.map((v) => (
                   <option key={v.id} value={v.id}>

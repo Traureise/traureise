@@ -51,13 +51,15 @@ import {
 } from "@/application/cards";
 import { SatoriCardRenderer } from "@/infrastructure/cards/renderer";
 import { createCardMailTemplates, createCardTexts } from "@/infrastructure/mail/card-templates";
+import { createSiteTexts } from "@/infrastructure/site-texts";
 import { DrizzleCardRepository } from "@/infrastructure/repositories/cards";
 import { DrizzleGuestRepository } from "@/infrastructure/repositories/guests";
-import { AddItem, DeleteItem, MoveItem, UpdateItem, UpdateSection } from "@/application/sections";
+import { AddEvent, DeleteEvent, ListEvents, UpdateEvent } from "@/application/schedule";
+import { AddBlock, AddSection, DeleteBlock, DeleteSection, MoveBlock, MoveSection, UpdateBlock, UpdateSection } from "@/application/sections";
 import { GetUpload, UploadImage } from "@/application/uploads";
 import { AddVersion, AssignVersion, DeleteVersion, RenameVersion } from "@/application/versions";
 import { CreateWedding, DeleteWedding, GetRecentWedding, GetWeddingHome, ListWeddings, MarkWeddingUsed, UpdateWeddingDetails, UpdateWeddingSlug } from "@/application/weddings";
-import { GetWebsiteForOwner, SelectTheme, SetCoverImage, SetEventShown, SetPublished, UpdateDesign, UpdateHome, UpdateSlug } from "@/application/websites";
+import { GetWebsiteForOwner, SelectTheme, SetCoverImage, SetPublished, UpdateDesign, UpdateHome, UpdateSlug } from "@/application/websites";
 import { createDatabase } from "@/infrastructure/db/client";
 import { SharpImageProcessor } from "@/infrastructure/images/sharp";
 import { createMagicLinkTemplate } from "@/infrastructure/mail/magic-link-template";
@@ -147,6 +149,7 @@ function build() {
     cardRenderer: new SatoriCardRenderer(path.resolve(config.CARD_FONTS_DIR)),
     cardMail: createCardMailTemplates(),
     cardTexts: createCardTexts(),
+    siteTexts: createSiteTexts(),
     mailRate: { batchSize: config.MAIL_BATCH_SIZE, intervalMs: config.MAIL_SEND_INTERVAL_MS },
     appUrl: config.APP_URL.replace(/\/$/, ""),
   };
@@ -190,15 +193,21 @@ function build() {
     updateHome: new UpdateHome(deps),
     updateSlug: new UpdateSlug(deps),
     setPublished: new SetPublished(deps),
-    setEventShown: new SetEventShown(deps),
     setCoverImage: new SetCoverImage(deps),
     selectTheme: new SelectTheme(deps),
     updateDesign: new UpdateDesign(deps),
+    listEvents: new ListEvents(deps),
+    addEvent: new AddEvent(deps),
+    updateEvent: new UpdateEvent(deps),
+    deleteEvent: new DeleteEvent(deps),
+    addSection: new AddSection(deps),
     updateSection: new UpdateSection(deps),
-    addItem: new AddItem(deps),
-    updateItem: new UpdateItem(deps),
-    deleteItem: new DeleteItem(deps),
-    moveItem: new MoveItem(deps),
+    deleteSection: new DeleteSection(deps),
+    moveSection: new MoveSection(deps),
+    addBlock: new AddBlock(deps),
+    updateBlock: new UpdateBlock(deps),
+    deleteBlock: new DeleteBlock(deps),
+    moveBlock: new MoveBlock(deps),
     uploadImage: new UploadImage(deps),
     getUpload: new GetUpload(deps),
     getPublicWebsite: new GetPublicWebsite(deps),

@@ -99,8 +99,6 @@ export const websites = pgTable(
     position: integer("position").notNull(),
     slug: text("slug").notNull().unique(),
     published: boolean("published").notNull().default(false),
-    // Wedding events this version leaves out of its schedule (new events show on every version).
-    hiddenEventIds: jsonb("hidden_event_ids").$type<string[]>().notNull().default([]),
     welcomeMessage: text("welcome_message").notNull().default(""),
     hashtag: text("hashtag").notNull().default(""),
     showCountdown: boolean("show_countdown").notNull().default(false),
@@ -117,37 +115,42 @@ export const websites = pgTable(
   (t) => [index("websites_wedding_idx").on(t.weddingId, t.position)],
 );
 
+// A website version's sections, in order: a title plus an ordered list of typed blocks.
 export const websiteSections = pgTable(
   "website_sections",
-  {
-    websiteId: uuid("website_id")
-      .notNull()
-      .references(() => websites.id, { onDelete: "cascade" }),
-    kind: text("kind").notNull(),
-    // null = use the translated default title for this section kind.
-    title: text("title"),
-    visible: boolean("visible").notNull().default(true),
-    body: text("body").notNull().default(""),
-  },
-  (t) => [primaryKey({ columns: [t.websiteId, t.kind] })],
-);
-
-// Items of a website version's sections. The schedule is not here: its events belong to the wedding.
-export const sectionItems = pgTable(
-  "section_items",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     websiteId: uuid("website_id")
       .notNull()
       .references(() => websites.id, { onDelete: "cascade" }),
-    kind: text("kind").notNull(),
+    position: integer("position").notNull(),
+    title: text("title").notNull(),
+    visible: boolean("visible").notNull().default(true),
+    // The block type a template section offers first while it is empty.
+    suggestedType: text("suggested_type"),
+  },
+  (t) => [index("website_sections_website_idx").on(t.websiteId, t.position)],
+);
+
+// The blocks of a section. Event blocks reference the wedding's events (data.eventId), never copy them.
+export const sectionBlocks = pgTable(
+  "section_blocks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    sectionId: uuid("section_id")
+      .notNull()
+      .references(() => websiteSections.id, { onDelete: "cascade" }),
     position: integer("position").notNull(),
     data: jsonb("data").notNull(),
   },
-  (t) => [index("section_items_website_kind_idx").on(t.websiteId, t.kind, t.position)],
+  (t) => [index("section_blocks_section_idx").on(t.sectionId, t.position)],
 );
 
-// The schedule: shared by the website versions, the invitations and the response form.
+// The schedule ("Ablauf"): shared by the website versions, the invitations and the response form.
+// Always listed chronologically, so there is no position.
 export const weddingEvents = pgTable(
   "wedding_events",
   {
@@ -155,10 +158,9 @@ export const weddingEvents = pgTable(
     weddingId: uuid("wedding_id")
       .notNull()
       .references(() => weddings.id, { onDelete: "cascade" }),
-    position: integer("position").notNull(),
     data: jsonb("data").notNull(),
   },
-  (t) => [index("wedding_events_wedding_idx").on(t.weddingId, t.position)],
+  (t) => [index("wedding_events_wedding_idx").on(t.weddingId)],
 );
 
 export const uploads = pgTable(

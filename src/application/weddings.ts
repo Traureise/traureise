@@ -1,7 +1,6 @@
 import { activeTier, type Tier } from "@/domain/billing";
 import { cardCounts, CARD_KINDS, followWeddingDetails, type CardModel, type HouseholdCardKind } from "@/domain/cards";
 import { guestOverview } from "@/domain/guests";
-import { SECTION_KINDS } from "@/domain/sections";
 import { slugify } from "@/domain/slug";
 import { DEFAULT_TIMEZONE } from "@/domain/website";
 import {
@@ -21,10 +20,9 @@ import type { Deps } from "./deps";
 import { ValidationError } from "./errors";
 import { deliveriesByKind, loadGuestContext } from "./guest-context";
 import { deleteImage, loadOwnedWedding } from "./owned";
-import type { Section, Wedding } from "./ports";
+import type { Wedding } from "./ports";
+import { standardSections } from "./sections";
 import { assertSlugAvailable, uniqueSlug } from "./slugs";
-
-export const emptySections = (): Section[] => SECTION_KINDS.map((kind) => ({ kind, title: null, visible: true, body: "" }));
 
 export class CreateWedding {
   constructor(private deps: Deps) {}
@@ -47,7 +45,6 @@ export class CreateWedding {
         position: 0,
         slug: wedding.slug,
         published: false,
-        hiddenEventIds: [],
         welcomeMessage: "",
         hashtag: "",
         showCountdown: false,
@@ -56,7 +53,7 @@ export class CreateWedding {
         paletteId: null,
         fontPairingId: null,
       },
-      emptySections(),
+      standardSections(this.deps.siteTexts),
     );
     for (const kind of CARD_KINDS) await cards.create(newCardVersion(this.deps, wedding, website, kind, null));
     await weddings.markUsed(wedding.id);

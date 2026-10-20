@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WeddingDetailsFields } from "./wedding-details-fields";
+import type { TimeZoneOption } from "@/lib/format";
 
 export type WeddingDetails = { id: string; title: string; weddingDate: string | null; location: string | null; timezone: string; slug: string };
 
@@ -25,7 +26,7 @@ export function WeddingDetailsButton({
 }: {
   wedding: WeddingDetails;
   appUrl: string;
-  timeZones: string[];
+  timeZones: TimeZoneOption[];
   variant?: "outline" | "link";
   label?: string;
 }) {
@@ -42,7 +43,7 @@ export function WeddingDetailsButton({
   );
 }
 
-function DetailsDialog({ wedding, appUrl, timeZones, onClose }: { wedding: WeddingDetails; appUrl: string; timeZones: string[]; onClose: () => void }) {
+function DetailsDialog({ wedding, appUrl, timeZones, onClose }: { wedding: WeddingDetails; appUrl: string; timeZones: TimeZoneOption[]; onClose: () => void }) {
   const t = useTranslations("weddings.details");
   const tFields = useTranslations("weddings.fields");
   const tErrors = useTranslations("errors");

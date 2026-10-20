@@ -15,6 +15,7 @@ import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
 import { SatoriCardRenderer } from "@/infrastructure/cards/renderer";
 import { cardDeliveries, cardOpens, cards, householdVersions, households } from "@/infrastructure/db/schema";
 import { createCardMailTemplates, createCardTexts } from "@/infrastructure/mail/card-templates";
+import { createSiteTexts } from "@/infrastructure/site-texts";
 import { SmtpMailer } from "@/infrastructure/mail/smtp";
 import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing";
 import { DrizzleCardRepository } from "@/infrastructure/repositories/cards";
@@ -66,6 +67,7 @@ function deps(options: { smtp?: boolean } = {}) {
     cardRenderer: renderer,
     cardMail: createCardMailTemplates(),
     cardTexts: createCardTexts(),
+    siteTexts: createSiteTexts(),
     mailRate: { batchSize: 10, intervalMs: 0 },
     mailer,
     themes,

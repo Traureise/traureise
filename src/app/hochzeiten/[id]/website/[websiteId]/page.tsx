@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { ChevronRight, House, Palette, Type, Users } from "lucide-react";
+import { CalendarClock, ChevronRight, House, Palette, Type, Users } from "lucide-react";
 import { Panel } from "@/components/editor/panel";
 import { PublishControl } from "@/components/editor/publish-control";
+import { SectionList } from "@/components/editor/section-list";
 import { VersionMenu } from "@/components/weddings/versions";
 import { dateFromIso } from "@/lib/format";
 import { loadEditorView } from "@/lib/editor";
-import { cn } from "@/lib/utils";
 
 type Props = { params: Promise<{ id: string; websiteId: string }> };
 
@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: (await loadEditorView(id, websiteId)).website.title };
 }
 
-function NavRow({ href, icon, label, status, hidden }: { href: string; icon?: React.ReactNode; label: string; status?: string; hidden?: boolean }) {
+function NavRow({ href, icon, label, status }: { href: string; icon?: React.ReactNode; label: string; status?: string }) {
   return (
     <li>
       <Link
@@ -24,8 +24,8 @@ function NavRow({ href, icon, label, status, hidden }: { href: string; icon?: Re
         className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 transition-colors hover:border-primary/40 hover:bg-secondary/40"
       >
         {icon}
-        <span className={cn("flex-1 font-medium", hidden && "text-muted-foreground")}>{label}</span>
-        {status && <span className={cn("text-xs", hidden ? "text-muted-foreground" : "text-accent-foreground")}>{status}</span>}
+        <span className="flex-1 font-medium">{label}</span>
+        {status && <span className="text-xs text-accent-foreground">{status}</span>}
         <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
       </Link>
     </li>
@@ -37,7 +37,6 @@ export default async function EditorOverview({ params }: Props) {
   const view = await loadEditorView(id, websiteId);
   const { website, sections } = view;
   const t = await getTranslations("editor");
-  const tTitles = await getTranslations("sections.titles");
   const format = await getFormatter();
   const base = `/hochzeiten/${id}/website/${websiteId}`;
 
@@ -60,21 +59,12 @@ export default async function EditorOverview({ params }: Props) {
           <NavRow href={`${base}/home`} icon={<House className="size-4 text-muted-foreground" aria-hidden />} label={t("nav.home")} />
         </ul>
         <ul className="space-y-2">
+          <NavRow href={`/hochzeiten/${id}/ablauf`} icon={<CalendarClock className="size-4 text-muted-foreground" aria-hidden />} label={t("nav.schedule")} status={t("nav.scheduleHint")} />
           <NavRow href={`/hochzeiten/${id}/gaeste`} icon={<Users className="size-4 text-muted-foreground" aria-hidden />} label={t("nav.guests")} status={t("nav.guestsHint")} />
         </ul>
         <div className="space-y-2">
           <h2 className="text-sm font-medium text-muted-foreground">{t("nav.sections")}</h2>
-          <ul className="space-y-2" data-testid="section-nav">
-            {sections.map((s) => (
-              <NavRow
-                key={s.kind}
-                href={`${base}/${s.kind}`}
-                label={s.title ?? tTitles(s.kind)}
-                status={s.visible ? t("nav.visible") : t("nav.hidden")}
-                hidden={!s.visible}
-              />
-            ))}
-          </ul>
+          <SectionList websiteId={websiteId} base={base} sections={sections.map(({ id, position, title, visible, suggestedType }) => ({ id, position, title, visible, suggestedType }))} />
         </div>
       </nav>
     </Panel>
