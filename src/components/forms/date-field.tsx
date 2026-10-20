@@ -22,13 +22,13 @@ export function DateField({ id, label, name, value, onChange, disabled, hint, er
   return (
     <div className={cn("space-y-2", className)}>
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} name={name} type="date" disabled={disabled} className="w-auto" aria-describedby={hint ? `${id}-hint` : undefined} {...controlled} />
+      <Input id={id} name={name} type="date" disabled={disabled} className="w-auto" aria-describedby={[hint ? `${id}-hint` : null, `${id}-error`].filter(Boolean).join(" ")} aria-invalid={error ? true : undefined} {...controlled} />
       {hint && (
         <p id={`${id}-hint`} className="text-xs text-muted-foreground">
           {hint}
         </p>
       )}
-      <FieldError code={error} />
+      <FieldError id={`${id}-error`} code={error} />
     </div>
   );
 }

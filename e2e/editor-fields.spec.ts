@@ -93,10 +93,17 @@ test("every editor field reaches the public website, and invalid input explains 
     await page.goto(scheduleUrl(weddingId));
     await page.getByRole("button", { name: "Termin hinzufügen" }).click();
     const missing = page.getByRole("form", { name: "Neuer Termin" });
+    // Empty start: asked for, not called invalid; a message goes away once its field changes.
+    await missing.getByRole("button", { name: "Speichern" }).click();
+    await expect(await fieldError(missing, "Beginn (Datum)")).toHaveText("Bitte fülle dieses Feld aus.");
+    await expect(await fieldError(missing, "Beginn (Uhrzeit)")).toHaveText("Bitte fülle dieses Feld aus.");
     await fillForm(missing, { "Beginn (Datum)": "2027-06-12", "Beginn (Uhrzeit)": "22:00" });
     await missing.getByRole("button", { name: "Speichern" }).click();
     await expect(await fieldError(missing, "Name")).toHaveText("Bitte fülle dieses Feld aus.");
     await expect(await fieldError(missing, "Art")).toHaveText("Bitte wähle einen Eintrag aus der Liste.");
+    await expect(await fieldError(missing, "Beginn (Datum)")).toHaveCount(0);
+    await missing.getByLabel("Name", { exact: true }).fill("P");
+    await expect(await fieldError(missing, "Name")).toHaveCount(0);
 
     await fillForm(missing, {
       Art: { select: "Feier" },

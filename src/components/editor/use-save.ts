@@ -27,5 +27,15 @@ export function useSave() {
     });
   }
 
-  return { pending, errors, save };
+  /** Hides a field's error once the field changes; the next save checks it again. */
+  function dismiss(field: string) {
+    setErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }
+
+  return { pending, errors, save, dismiss };
 }

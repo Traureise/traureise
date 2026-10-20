@@ -142,6 +142,14 @@ describe("parseEvent", () => {
     expect(!result.ok && result.fieldErrors).toMatchObject({ endTime: "end_before_start", website: "invalid_url", name: "required" });
   });
 
+  it("asks for an empty start date and time instead of calling them invalid", () => {
+    const result = parseEvent({ ...event, startDate: "", startTime: "" });
+    expect(!result.ok && result.fieldErrors).toMatchObject({ startDate: "required", startTime: "required" });
+    expect(!parseEvent({ ...event, startDate: "2027-13-40" }).ok && parseEvent({ ...event, startDate: "2027-13-40" })).toMatchObject({
+      fieldErrors: { startDate: "invalid_date" },
+    });
+  });
+
   it("requires an end time when an end date is given", () => {
     expect(!parseEvent({ ...event, endDate: "2027-06-13" }).ok && parseEvent({ ...event, endDate: "2027-06-13" })).toMatchObject({
       fieldErrors: { endTime: "required" },

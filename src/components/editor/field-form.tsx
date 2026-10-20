@@ -28,7 +28,7 @@ type Props = {
 /** A form for one block or event, laid out from field specs. */
 export function FieldForm({ weddingId, fields, initial, idPrefix, label, onSubmit, onDone }: Props) {
   const t = useTranslations();
-  const { pending, errors, save } = useSave();
+  const { pending, errors, save, dismiss } = useSave();
   const [images, setImages] = useState<Record<string, string | null>>(
     Object.fromEntries(fields.filter((f) => f.type === "image").map((f) => [f.name, (initial[f.name] as string | null) ?? null])),
   );
@@ -50,7 +50,10 @@ export function FieldForm({ weddingId, fields, initial, idPrefix, label, onSubmi
           weddingId={weddingId}
           label={label}
           value={images[field.name] ?? null}
-          onChange={(key) => setImages((prev) => ({ ...prev, [field.name]: key }))}
+          onChange={(key) => {
+            setImages((prev) => ({ ...prev, [field.name]: key }));
+            dismiss(field.name);
+          }}
           error={errors[field.name]}
         />
       );
@@ -81,7 +84,9 @@ export function FieldForm({ weddingId, fields, initial, idPrefix, label, onSubmi
   }
 
   return (
-    <form onSubmit={(e) => (e.preventDefault(), submit(new FormData(e.currentTarget)))} className="space-y-4 rounded-xl border border-primary/30 bg-background p-4" aria-label={label}>
+    <form
+      onSubmit={(e) => (e.preventDefault(), submit(new FormData(e.currentTarget)))}
+      onChange={(e) => dismiss((e.target as EventTarget as HTMLInputElement).name)} className="space-y-4 rounded-xl border border-primary/30 bg-background p-4" aria-label={label}>
       {fields.map((field) => (
         <div key={field.name}>{input(field)}</div>
       ))}

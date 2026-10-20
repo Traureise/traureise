@@ -90,8 +90,9 @@ const eventSchema = z
     imageKey: optional(imageKey).default(null),
     eventType: z.enum(EVENT_TYPES, "invalid_option"),
     name: requiredText(120),
-    startDate: isoDate,
-    startTime: time24,
+    // Empty is "required", not "invalid" (a half-typed native date input also submits "").
+    startDate: z.string().min(1, "required").pipe(isoDate),
+    startTime: z.string().min(1, "required").pipe(time24),
     endDate: optional(isoDate).default(null),
     endTime: optional(time24).default(null),
     venueName: text(160),

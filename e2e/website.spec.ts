@@ -356,6 +356,7 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
 
   await test.step("log out", async () => {
     await page.getByRole("button", { name: "Abmelden" }).click();
+    await expect(page).toHaveURL(/\/$/);
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/login$/);
   });
