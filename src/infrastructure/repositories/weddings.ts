@@ -1,13 +1,13 @@
 import { asc, eq, sql } from "drizzle-orm";
-import type { Item, NewWedding, SlugOwners, Wedding, WeddingPatch, WeddingRepository } from "@/application/ports";
-import type { ItemData } from "@/domain/sections";
+import type { NewWedding, SlugOwners, Wedding, WeddingEvent, WeddingPatch, WeddingRepository } from "@/application/ports";
+import { compareEvents, type EventData } from "@/domain/sections";
 import type { Database } from "../db/client";
 import { weddingEvents, weddings, websites } from "../db/schema";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type EventRow = typeof weddingEvents.$inferSelect;
-const toEvent = (row: EventRow): Item<"schedule"> => ({ id: row.id, kind: "schedule", position: row.position, data: row.data as ItemData<"schedule"> });
+const toEvent = (row: EventRow): WeddingEvent => ({ id: row.id, data: row.data as EventData });
 
 export class DrizzleWeddingRepository implements WeddingRepository {
   constructor(private db: Database) {}
@@ -51,42 +51,27 @@ export class DrizzleWeddingRepository implements WeddingRepository {
     return { weddingIds: ws.map((w) => w.id), websites: sites };
   }
 
-  async listEvents(weddingId: string): Promise<Item<"schedule">[]> {
-    const rows = await this.db.select().from(weddingEvents).where(eq(weddingEvents.weddingId, weddingId)).orderBy(asc(weddingEvents.position));
-    return rows.map(toEvent);
+  async listEvents(weddingId: string): Promise<WeddingEvent[]> {
+    const rows = await this.db.select().from(weddingEvents).where(eq(weddingEvents.weddingId, weddingId));
+    return rows.map(toEvent).sort(compareEvents);
   }
 
-  async findEvent(weddingId: string, eventId: string): Promise<Item<"schedule"> | null> {
+  async findEvent(weddingId: string, eventId: string): Promise<WeddingEvent | null> {
     if (!UUID.test(eventId)) return null;
     const [row] = await this.db.select().from(weddingEvents).where(sql`${weddingEvents.weddingId} = ${weddingId} and ${weddingEvents.id} = ${eventId}`);
     return row ? toEvent(row) : null;
   }
 
-  async addEvent(weddingId: string, data: ItemData<"schedule">): Promise<Item<"schedule">> {
-    const [row] = await this.db
-      .insert(weddingEvents)
-      .values({
-        weddingId,
-        data,
-        position: sql`(select coalesce(max(${weddingEvents.position}) + 1, 0) from ${weddingEvents} where ${weddingEvents.weddingId} = ${weddingId})`,
-      })
-      .returning();
+  async addEvent(weddingId: string, data: EventData): Promise<WeddingEvent> {
+    const [row] = await this.db.insert(weddingEvents).values({ weddingId, data }).returning();
     return toEvent(row!);
   }
 
-  async updateEvent(eventId: string, data: ItemData<"schedule">): Promise<void> {
+  async updateEvent(eventId: string, data: EventData): Promise<void> {
     await this.db.update(weddingEvents).set({ data }).where(eq(weddingEvents.id, eventId));
   }
 
   async deleteEvent(eventId: string): Promise<void> {
     await this.db.delete(weddingEvents).where(eq(weddingEvents.id, eventId));
-  }
-
-  async setEventOrder(weddingId: string, orderedIds: string[]): Promise<void> {
-    await this.db.transaction(async (tx) => {
-      for (const [position, id] of orderedIds.entries()) {
-        await tx.update(weddingEvents).set({ position }).where(sql`${weddingEvents.id} = ${id} and ${weddingEvents.weddingId} = ${weddingId}`);
-      }
-    });
   }
 }

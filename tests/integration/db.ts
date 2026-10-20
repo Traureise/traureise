@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { afterAll, beforeEach } from "vitest";
-import type { Section } from "@/application/ports";
-import { SECTION_KINDS } from "@/domain/sections";
+import type { NewSection } from "@/application/ports";
+import { SECTION_TEMPLATES, TEMPLATE_SUGGESTIONS, templateBlocks } from "@/domain/sections";
 import { createDatabase, type Database } from "@/infrastructure/db/client";
 import { DrizzleUserRepository } from "@/infrastructure/repositories/users";
 import { DrizzleWebsiteRepository } from "@/infrastructure/repositories/websites";
@@ -18,10 +18,12 @@ export function setupTestDatabase() {
   return db;
 }
 
-export const allSections = (): Section[] => SECTION_KINDS.map((kind) => ({ kind, title: null, visible: true, body: "" }));
+/** The eight template sections, titled with their template keys. */
+export const allSections = (): NewSection[] =>
+  SECTION_TEMPLATES.map((t) => ({ title: t, visible: true, suggestedType: TEMPLATE_SUGGESTIONS[t], blocks: templateBlocks(t) }));
 
 /** A user with a wedding and its first website version (a draft). */
-export async function seedWedding(db: Database, email = "anna@example.org", slug = "anna-und-ben", weddingDate: string | null = "2027-06-12") {
+export async function seedWedding(db: Database, email = "anna@example.org", slug = "anna-und-ben", weddingDate: string | null = "2027-06-12", sections: NewSection[] = allSections()) {
   const user = await new DrizzleUserRepository(db).create(email);
   const wedding = await new DrizzleWeddingRepository(db).create({ ownerId: user.id, slug, title: "Anna & Ben", weddingDate, timezone: "Europe/Berlin" });
   const website = await new DrizzleWebsiteRepository(db).create(
@@ -31,7 +33,6 @@ export async function seedWedding(db: Database, email = "anna@example.org", slug
       position: 0,
       slug,
       published: false,
-      hiddenEventIds: [],
       welcomeMessage: "",
       hashtag: "",
       showCountdown: false,
@@ -40,7 +41,7 @@ export async function seedWedding(db: Database, email = "anna@example.org", slug
       paletteId: null,
       fontPairingId: null,
     },
-    allSections(),
+    sections,
   );
   return { user, wedding, website };
 }
