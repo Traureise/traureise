@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { Download } from "lucide-react";
+import { Download, Package, Trash2, UserRound } from "lucide-react";
 import { DeleteAccountForm } from "@/components/account/delete-account-form";
 import { AppHeader } from "@/components/app/app-header";
 import { SettingsSection } from "@/components/app/settings-section";
@@ -29,8 +29,8 @@ export default async function AccountPage() {
     <PageShell width="max-w-4xl" header={<AppHeader email={user.email} />}>
       <div className="space-y-8">
         <h1 className="font-heading text-5xl font-medium tracking-tight">{t("title")}</h1>
-        <div>
-          <SettingsSection title={t("profile")} description={t("profileLead")} testId="account-profile">
+        <div className="rounded-3xl border border-border bg-card px-6 sm:px-10">
+          <SettingsSection icon={<UserRound />} title={t("profile")} description={t("profileLead")} testId="account-profile">
             <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
               <dt className="text-muted-foreground">{t("email")}</dt>
               <dd className="break-all">{user.email}</dd>
@@ -40,7 +40,7 @@ export default async function AccountPage() {
           </SettingsSection>
 
           {c.billingEnabled && (
-            <SettingsSection title={t("purchases.title")} description={t("purchases.lead")} testId="account-purchases">
+            <SettingsSection icon={<Package />} title={t("purchases.title")} description={t("purchases.lead")} testId="account-purchases">
               {purchases.length === 0 ? (
                 <p className="text-sm text-muted-foreground">{t("purchases.empty")}</p>
               ) : (
@@ -60,7 +60,7 @@ export default async function AccountPage() {
             </SettingsSection>
           )}
 
-          <SettingsSection title={t("export.title")} description={t("export.lead")} testId="account-export">
+          <SettingsSection icon={<Download />} title={t("export.title")} description={t("export.lead")} testId="account-export">
             <p className="text-sm">{t("export.body")}</p>
             <Button asChild variant="secondary">
               <a href="/konto/export" download>
@@ -70,7 +70,7 @@ export default async function AccountPage() {
             </Button>
           </SettingsSection>
 
-          <SettingsSection title={t("delete.title")} description={t("delete.lead")} testId="account-delete" tone="danger">
+          <SettingsSection icon={<Trash2 />} title={t("delete.title")} description={t("delete.lead")} testId="account-delete" tone="danger">
             <div className="space-y-4 rounded-2xl border border-destructive/30 bg-destructive/[0.03] p-5">
               <p className="text-sm">{t("delete.body")}</p>
               <DeleteAccountForm />

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Plus, Trash2 } from "lucide-react";
+import { Bell, BellOff, CalendarClock, Check, Mail, MessageCircle, Newspaper, Plus, Trash2, UtensilsCrossed } from "lucide-react";
 import { saveRsvpSettingsAction } from "@/app/actions/guests";
 import { useSave } from "@/components/editor/use-save";
 import { FieldError } from "@/components/forms/field-error";
@@ -40,6 +40,8 @@ export function OptionList({ options, onChange, label, addLabel, removeLabel }: 
     </div>
   );
 }
+
+const NOTIFY_ICONS: Record<NotifyMode, typeof Bell> = { off: BellOff, each: Mail, daily: Newspaper };
 
 export const toOptions = (options: { id: string; label: string }[]): Option[] => options.map((o) => ({ key: o.id, id: o.id, label: o.label }));
 
@@ -81,34 +83,43 @@ export function RsvpSettingsForm({
     );
   }
 
+  const previewText = (whatsapp.trim() || whatsappDefault).replaceAll("{name}", t("preview.household"));
+
   return (
     <form onSubmit={submit} aria-label={t("title")}>
-      <SettingsSection id="rsvp-answers" title={t("sections.answers.title")} description={t("sections.answers.lead")}>
+      <SettingsSection id="rsvp-answers" icon={<CalendarClock />} title={t("sections.answers.title")} description={t("sections.answers.lead")}>
         <DateField id="rsvp-reply-by" label={t("replyBy")} value={replyBy} onChange={setReplyBy} hint={t("replyByHint")} error={errors.replyBy} />
-        <fieldset className="space-y-2">
+        <fieldset className="space-y-3">
           <legend className="text-sm font-medium">{t("events")}</legend>
           {schedule.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("noSchedule")}</p>
           ) : (
-            schedule.map((e) => (
-              <label key={e.id} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="size-4 accent-primary"
-                  checked={eventIds.includes(e.id)}
-                  onChange={(ev) => setEventIds((list) => (ev.target.checked ? [...list, e.id] : list.filter((id) => id !== e.id)))}
-                />
-                {e.name}
-              </label>
-            ))
+            <div className="flex flex-wrap gap-2">
+              {schedule.map((e) => (
+                <label
+                  key={e.id}
+                  className="relative inline-flex cursor-pointer items-center gap-2 rounded-full border border-input bg-card px-3.5 py-1.5 text-sm transition-colors has-checked:border-primary has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+                >
+                  <input
+                    type="checkbox"
+                    className="peer absolute inset-0 size-full cursor-pointer appearance-none rounded-full opacity-0"
+                    checked={eventIds.includes(e.id)}
+                    onChange={(ev) => setEventIds((list) => (ev.target.checked ? [...list, e.id] : list.filter((id) => id !== e.id)))}
+                  />
+                  <Check className="hidden size-3.5 peer-checked:block" aria-hidden />
+                  {e.name}
+                </label>
+              ))}
+            </div>
           )}
           <FieldError code={errors.eventIds} />
         </fieldset>
       </SettingsSection>
 
-      <SettingsSection id="rsvp-meal" title={t("sections.meal.title")} description={t("sections.meal.lead")}>
+      <SettingsSection id="rsvp-meal" icon={<UtensilsCrossed />} title={t("sections.meal.title")} description={t("sections.meal.lead")}>
         <fieldset className="space-y-3">
           <legend className="sr-only">{t("meal")}</legend>
+          {mealOptions.length === 0 && <p className="rounded-xl border border-dashed border-input px-4 py-3 text-sm text-muted-foreground">{t("mealEmpty")}</p>}
           <OptionList options={mealOptions} onChange={setMealOptions} label={(n) => t("dish", { n })} addLabel={t("addDish")} removeLabel={(n) => t("removeDish", { n })} />
         </fieldset>
         {schedule.length > 0 && mealOptions.length > 0 && (
@@ -127,24 +138,46 @@ export function RsvpSettingsForm({
         )}
       </SettingsSection>
 
-      <SettingsSection id="rsvp-notify" title={t("sections.notify.title")} description={t("sections.notify.lead")}>
-        <fieldset className="space-y-2">
+      <SettingsSection id="rsvp-notify" icon={<Bell />} title={t("sections.notify.title")} description={t("sections.notify.lead")}>
+        <fieldset className="space-y-3">
           <legend className="sr-only">{t("notify")}</legend>
-          {NOTIFY_MODES.map((mode) => (
-            <label key={mode} className="flex items-center gap-2 text-sm">
-              <input type="radio" name="notify" value={mode} checked={notify === mode} onChange={() => setNotify(mode)} className="size-4 accent-primary" />
-              {t(`notifyModes.${mode}`)}
-            </label>
-          ))}
+          <div className="grid gap-2 sm:grid-cols-3">
+            {NOTIFY_MODES.map((mode) => {
+              const Icon = NOTIFY_ICONS[mode];
+              return (
+                <label
+                  key={mode}
+                  className="relative flex cursor-pointer flex-col gap-2 rounded-xl border border-input bg-card p-4 text-sm transition-colors has-checked:border-primary has-checked:bg-secondary/60 has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+                >
+                  <input type="radio" name="notify" value={mode} checked={notify === mode} onChange={() => setNotify(mode)} className="peer absolute inset-0 size-full cursor-pointer appearance-none rounded-xl opacity-0" />
+                  <Icon className="size-5 text-muted-foreground peer-checked:text-primary" aria-hidden />
+                  <span className="font-medium">{t(`notifyModes.${mode}`)}</span>
+                  <span className="text-xs text-muted-foreground">{t(`notifyHints.${mode}`)}</span>
+                  <Check className="absolute top-3 right-3 hidden size-4 text-primary peer-checked:block" aria-hidden />
+                </label>
+              );
+            })}
+          </div>
           {notificationsLocked && <p className="text-xs text-muted-foreground">{t("notifyLocked")}</p>}
         </fieldset>
       </SettingsSection>
 
-      <SettingsSection id="rsvp-whatsapp-section" title={t("sections.whatsapp.title")} description={t("sections.whatsapp.lead")}>
-        <MessageField id="rsvp-whatsapp" label={t("whatsapp")} value={whatsapp} onChange={setWhatsapp} defaultText={whatsappDefault} max={WHATSAPP_MESSAGE_MAX} hint={t("whatsappHint")} rows={3} error={errors.whatsappMessage} />
+      <SettingsSection id="rsvp-whatsapp-section" icon={<MessageCircle />} title={t("sections.whatsapp.title")} description={t("sections.whatsapp.lead")}>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,17rem)]">
+          <MessageField id="rsvp-whatsapp" label={t("whatsapp")} value={whatsapp} onChange={setWhatsapp} defaultText={whatsappDefault} max={WHATSAPP_MESSAGE_MAX} hint={t("whatsappHint")} rows={5} error={errors.whatsappMessage} />
+          <figure className="space-y-2" aria-label={t("preview.label")}>
+            <figcaption className="text-sm font-medium">{t("preview.label")}</figcaption>
+            <div className="rounded-2xl bg-[color-mix(in_srgb,var(--color-accent)_70%,var(--color-background))] p-4">
+              <div className="ml-auto max-w-[92%] rounded-2xl rounded-tr-sm bg-card px-3.5 py-2.5 text-sm shadow-[0_1px_0_var(--color-border)]" data-testid="whatsapp-preview">
+                <p className="whitespace-pre-line">{previewText}</p>
+                <p className="mt-1 break-all text-primary underline underline-offset-2">{t("preview.link")}</p>
+              </div>
+            </div>
+          </figure>
+        </div>
       </SettingsSection>
 
-      <div className="sticky bottom-0 z-10 -mx-4 flex justify-end border-t border-border bg-background/90 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+      <div className="sticky bottom-0 z-10 -mx-6 flex items-center justify-end gap-3 rounded-b-3xl border-t border-border bg-card/90 px-6 py-3 backdrop-blur sm:-mx-10 sm:px-10">
         <Button type="submit" disabled={pending}>
           {pending ? t("saving") : t("save")}
         </Button>

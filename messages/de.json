@@ -649,7 +649,19 @@
           "lead": "Der Text, mit dem ihr den Antwortlink per WhatsApp verschickt."
         }
       },
-      "saving": "Speichert …"
+      "saving": "Speichert …",
+      "notifyHints": {
+        "off": "Ihr schaut selbst in die Gästeliste.",
+        "each": "Sofort, sobald ein Haushalt antwortet oder etwas ändert.",
+        "daily": "Eine E-Mail am Morgen, nur wenn es Neues gibt."
+      },
+      "mealEmpty": "Noch keine Gerichte, zum Beispiel Fisch, Fleisch und Vegetarisch.",
+      "preview": {
+        "label": "So kommt sie an",
+        "household": "Familie Weber",
+        "link": "persönlicher Antwortlink"
+      },
+      "contents": "Inhalt"
     },
     "polls": {
       "title": "Umfragen",
@@ -676,7 +688,8 @@
       "delete": "Löschen",
       "deleted": "Umfrage gelöscht",
       "confirmDelete": "Umfrage „{question}“ löschen?",
-      "summary": "{options} · {per}"
+      "summary": "{options} · {per}",
+      "empty": "Noch keine Umfragen."
     },
     "preview": {
       "lead": "So sehen eure Gäste das Formular. In der Vorschau wird nichts gespeichert.",
