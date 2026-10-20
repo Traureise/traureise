@@ -193,8 +193,8 @@ test("a couple creates their wedding, gets every item, adds versions, chooses wh
 
     await test.step("one person in one go; the engagement goes through the guest list; cards sent elsewhere are marked by hand", async () => {
       await page.goto(guestsUrl(weddingId));
-      const quick = page.getByRole("form", { name: "Einzelne Person schnell hinzufügen" });
-      await quick.getByPlaceholder("Name, z. B. Tante Erika").fill("Tante Erika");
+      const quick = page.getByRole("form", { name: "Gäste hinzufügen" });
+      await quick.getByLabel("Name").fill("Tante Erika");
       await quick.getByRole("button", { name: "Person hinzufügen" }).click();
       await expect(household(page, "Tante Erika")).toContainText("1 Person: Tante Erika");
 

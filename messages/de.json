@@ -576,10 +576,14 @@
       "emailUnsubscribed": "Dieser Haushalt hat sich von E-Mails abgemeldet. Tragt nur eine Adresse ein, wenn er euch ausdrücklich darum bittet.",
       "personalLine": "Persönliche Zeile für die Dankeskarte (optional)",
       "personalLinePlaceholder": "z. B. Danke für den wunderbaren Kuchen!",
-      "quickLabel": "Einzelne Person schnell hinzufügen",
-      "quickPlaceholder": "Name, z. B. Tante Erika",
+      "quickLabel": "Name",
+      "quickPlaceholder": "Name, z. B. Tante Erika oder Familie Weber",
       "quickAdd": "Person hinzufügen",
-      "quickAdded": "{name} hinzugefügt"
+      "quickAdded": "{name} hinzugefügt",
+      "addGuests": "Gäste hinzufügen",
+      "moreAdd": "Weitere Möglichkeiten",
+      "addHousehold": "Haushalt hinzufügen …",
+      "addHouseholdHint": "Familie oder Paar: mehrere Personen, ein gemeinsamer Link."
     },
     "details": {
       "show": "Antworten ansehen",

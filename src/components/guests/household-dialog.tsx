@@ -3,14 +3,15 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { saveHouseholdAction } from "@/app/actions/guests";
 import { FieldError } from "@/components/forms/field-error";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { FieldErrors } from "@/domain/result";
 
 type Person = { key: string; id: string | null; name: string; isChild: boolean };
@@ -29,32 +30,34 @@ let counter = 0;
 const newPerson = (): Person => ({ key: `new-${++counter}`, id: null, name: "", isChild: false });
 
 /**
- * Adds a household, or edits one (`household` set): name, people, and the events it is invited to. With `open`
- * and `onOpenChange` it has no trigger of its own (opened from a household's menu).
+ * Adds a household, or edits one (`household` set): name, people, and the events it is invited to. Opened from
+ * the name field's menu or a household's menu.
  */
 export function HouseholdDialog({
   weddingId,
   events,
   household,
-  open: controlledOpen,
+  open,
   onOpenChange,
+  initialName = "",
+  onSaved,
 }: {
   weddingId: string;
   events: { id: string; name: string }[];
   household?: HouseholdDraft;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** A new household's name, typed before the dialog opened. */
+  initialName?: string;
+  onSaved?: () => void;
 }) {
   const t = useTranslations("guests.household");
   const tErrors = useTranslations("errors");
   const router = useRouter();
-  const [ownOpen, setOwnOpen] = useState(false);
-  const controlled = controlledOpen !== undefined;
-  const open = controlled ? controlledOpen : ownOpen;
-  const setOpen = (next: boolean) => (controlled ? onOpenChange?.(next) : setOwnOpen(next));
+  const setOpen = onOpenChange;
   const [pending, start] = useTransition();
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [name, setName] = useState(household?.name ?? "");
+  const [name, setName] = useState(household?.name ?? initialName);
   const [people, setPeople] = useState<Person[]>(household ? household.people.map((p) => ({ ...p, key: p.id })) : [newPerson()]);
   const [invited, setInvited] = useState<string[]>(household?.invitedEventIds ?? events.map((e) => e.id));
   const [email, setEmail] = useState(household?.email ?? "");
@@ -89,6 +92,7 @@ export function HouseholdDialog({
         return;
       }
       toast.success(t("saved"));
+      onSaved?.();
       setOpen(false);
       reset();
       router.refresh();
@@ -99,20 +103,6 @@ export function HouseholdDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => (setOpen(next), next || reset())}>
-      {!controlled && (
-        <DialogTrigger asChild>
-          {household ? (
-            <Button type="button" variant="ghost" size="sm">
-              {t("edit")}
-            </Button>
-          ) : (
-            <Button type="button">
-              <Plus aria-hidden />
-              {t("add")}
-            </Button>
-          )}
-        </DialogTrigger>
-      )}
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-heading text-2xl font-medium">{household ? t("editTitle") : t("addTitle")}</DialogTitle>
@@ -190,16 +180,21 @@ export function HouseholdDialog({
 }
 
 /** The quick way for one person: a household named after them, with only them in it. */
-export function QuickAddPerson({ weddingId }: { weddingId: string }) {
+/**
+ * Adding guests from one field: Enter (or "Person hinzufügen") adds a household of one with that name; the
+ * menu opens the household form with the name filled in, for families and couples.
+ */
+export function AddGuests({ weddingId, events }: { weddingId: string; events: { id: string; name: string }[] }) {
   const t = useTranslations("guests.household");
   const tErrors = useTranslations("errors");
   const router = useRouter();
   const [name, setName] = useState("");
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
+  const [household, setHousehold] = useState(false);
 
-  function submit(event: React.FormEvent) {
-    event.preventDefault();
+  function addPerson() {
+    if (!name.trim()) return;
     start(async () => {
       const result = await saveHouseholdAction(weddingId, null, { name, people: [{ name, isChild: false }] });
       if (!result.ok) {
@@ -213,19 +208,43 @@ export function QuickAddPerson({ weddingId }: { weddingId: string }) {
     });
   }
 
+  // The dialog sits outside the form: React events bubble through portals, so its submit would add a person too.
   return (
-    <form onSubmit={submit} className="flex min-w-0 flex-wrap items-start gap-2" aria-label={t("quickLabel")}>
-      <div className="min-w-0 flex-1 space-y-1">
-        <Label htmlFor="quick-person" className="sr-only">
-          {t("quickLabel")}
-        </Label>
-        <Input id="quick-person" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("quickPlaceholder")} className="min-w-48" />
-        {error && <p className="text-sm text-destructive">{tErrors(error)}</p>}
-      </div>
-      <Button type="submit" variant="secondary" disabled={pending || !name.trim()}>
-        <Plus aria-hidden />
-        {t("quickAdd")}
-      </Button>
-    </form>
+    <>
+      <form onSubmit={(e) => (e.preventDefault(), addPerson())} className="flex min-w-0 flex-1 flex-wrap items-start gap-2" aria-label={t("addGuests")}>
+        <div className="min-w-0 flex-1 space-y-1">
+          <Label htmlFor="add-guests-name" className="sr-only">
+            {t("quickLabel")}
+          </Label>
+          <Input id="add-guests-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("quickPlaceholder")} className="h-9 min-w-48" autoComplete="off" />
+          {error && <p className="text-sm text-destructive">{tErrors(error)}</p>}
+        </div>
+        <div className="flex">
+          <Button type="submit" disabled={pending || !name.trim()} className="rounded-r-none">
+            <Plus aria-hidden />
+            {t("quickAdd")}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" className="rounded-l-none border-l border-primary-foreground/25 px-2" aria-label={t("moreAdd")}>
+                <ChevronDown aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuItem onSelect={() => setHousehold(true)} className="items-start">
+                <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-accent text-primary">
+                  <Users aria-hidden />
+                </span>
+                <span className="space-y-0.5">
+                  <span className="block font-medium">{t("addHousehold")}</span>
+                  <span className="block text-xs text-muted-foreground">{t("addHouseholdHint")}</span>
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </form>
+      {household && <HouseholdDialog weddingId={weddingId} events={events} initialName={name.trim()} open={household} onOpenChange={setHousehold} onSaved={() => setName("")} />}
+    </>
   );
 }

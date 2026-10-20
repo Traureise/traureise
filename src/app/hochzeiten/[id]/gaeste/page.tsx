@@ -6,7 +6,7 @@ import type { GuestListEntry, GuestPage } from "@/application/guests";
 import { CardShareButtons, HouseholdMenu, MarkAllSentButton, RemindAllButton, SendAllButton } from "@/components/guests/card-sending";
 import { RequestActions } from "@/components/guests/guest-actions";
 import { CardPicker, Segmented } from "@/components/guests/card-picker";
-import { HouseholdDialog, QuickAddPerson } from "@/components/guests/household-dialog";
+import { AddGuests } from "@/components/guests/household-dialog";
 import { ResponseBar } from "@/components/guests/response-bar";
 import { VersionSelects } from "@/components/guests/version-select";
 import { CopyLinkButton } from "@/components/share/copy-link-button";
@@ -279,9 +279,9 @@ export default async function GuestsPage({ params, searchParams }: Props) {
                 {t("list.csv")}
               </a>
             </Button>
-            <HouseholdDialog weddingId={id} events={page.events} />
           </div>
         </div>
+        <AddGuests weddingId={id} events={page.events} />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Segmented
             label={t("list.filter")}
@@ -451,9 +451,6 @@ export default async function GuestsPage({ params, searchParams }: Props) {
             })}
           </ul>
         )}
-        <div className="rounded-2xl border border-dashed border-border p-3">
-          <QuickAddPerson weddingId={id} />
-        </div>
       </section>
     </div>
   );

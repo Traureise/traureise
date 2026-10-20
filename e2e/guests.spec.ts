@@ -305,11 +305,21 @@ test("12 months after the wedding the guest data is deleted, after a warning 30 
   }
 });
 
-test("a household is edited and deleted from its menu", async ({ page }) => {
+test("a household is added from the name field, edited and deleted from its menu", async ({ page }) => {
   await login(page, uniqueEmail("menu"), "Mira");
   const editorUrl = await createWebsite(page, `mira-und-jan-${Date.now()}`);
   await page.goto(guestsUrl(editorUrl));
-  await addHousehold(page, "Familie Roth", [{ name: "Ida" }]);
+  // One field adds a person, or opens a household with the typed name.
+  const add = page.getByRole("form", { name: "Gäste hinzufügen" });
+  await add.getByLabel("Name").fill("Familie Roth");
+  await add.getByRole("button", { name: "Weitere Möglichkeiten" }).click();
+  await page.getByRole("menuitem", { name: "Haushalt hinzufügen" }).click();
+  const draft = page.getByRole("form", { name: "Neuer Haushalt" });
+  await expect(draft.getByLabel("Name des Haushalts")).toHaveValue("Familie Roth");
+  await draft.getByLabel("Person 1", { exact: true }).fill("Ida");
+  await draft.getByRole("button", { name: "Speichern" }).click();
+  await expect(draft).toBeHidden();
+  await expect(add.getByLabel("Name")).toHaveValue("");
   const roth = household(page, "Familie Roth");
 
   await roth.getByRole("button", { name: "Weitere Aktionen für Familie Roth" }).click();

@@ -21,7 +21,8 @@ export async function addHousehold(
   events?: { uninvite: string[] },
   extra: { email?: string; personalLine?: string } = {},
 ) {
-  await page.getByRole("button", { name: "Haushalt hinzufügen" }).click();
+  await page.getByRole("form", { name: "Gäste hinzufügen" }).getByRole("button", { name: "Weitere Möglichkeiten" }).click();
+  await page.getByRole("menuitem", { name: "Haushalt hinzufügen" }).click();
   const form = page.getByRole("form", { name: "Neuer Haushalt" });
   await form.getByLabel("Name des Haushalts").fill(name);
   for (const [i, person] of people.entries()) {
