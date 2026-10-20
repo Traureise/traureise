@@ -260,13 +260,28 @@
       "question": "Frage",
       "answer": "Antwort",
       "text": "Text",
-      "chooseOption": "Bitte wählen"
+      "chooseOption": "Bitte wählen",
+      "location": "Ort auf der Karte"
     },
     "fieldGroups": {
       "what": "Was",
       "when": "Wann",
       "where": "Wo",
       "more": "Mehr"
+    },
+    "location": {
+      "consent": "Den Ort auf einer Karte suchen? Karte und Suche kommen von OpenStreetMap; dabei geht eure IP-Adresse an die <link>OpenStreetMap Foundation</link>.",
+      "load": "Karte laden",
+      "always": "Immer laden",
+      "search": "Ort suchen",
+      "searchPlaceholder": "Name oder Adresse, z. B. Gut Sonnenhof Kempten",
+      "searchButton": "Suchen",
+      "results": "Gefundene Orte",
+      "noResults": "Nichts gefunden. Versucht es mit Name und Stadt.",
+      "failed": "Die Suche hat gerade nicht geklappt. Versucht es gleich noch einmal.",
+      "hint": "Klickt in die Karte, um den Punkt zu setzen oder zu verschieben.",
+      "clear": "Punkt entfernen",
+      "attribution": "© OpenStreetMap-Mitwirkende"
     },
     "publish": {
       "published": "Veröffentlicht",

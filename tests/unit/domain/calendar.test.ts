@@ -45,6 +45,14 @@ describe("buildIcs", () => {
 });
 
 describe("mapLink", () => {
+  it("points at the exact spot when the place was picked on the map", () => {
+    expect(mapLink("Gut Sonnenhof, Hofweg 3", { latitude: 47.72, longitude: 10.31 })).toBe(
+      "https://www.openstreetmap.org/?mlat=47.72&mlon=10.31#map=17/47.72/10.31",
+    );
+    // Saved before coordinates existed: the fields are missing.
+    expect(mapLink("Hofweg 3", {} as { latitude: null; longitude: null })).toBe("https://www.openstreetmap.org/search?query=Hofweg%203");
+  });
+
   it("links to OpenStreetMap search", () => {
     expect(mapLink("Hofweg 3, Beispielstadt")).toBe(
       "https://www.openstreetmap.org/search?query=Hofweg%203%2C%20Beispielstadt",

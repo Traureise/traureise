@@ -32,7 +32,8 @@ transfers the visitor's IP address.
 * Fonts come from `@fontsource` npm packages and are served by the app. Using Google Fonts via
   `next/font/google` would also be fine, since it downloads them at build time.
 * No analytics, no tracking, no CDNs, no embedded maps. "Karte ansehen" is a plain link to OpenStreetMap
-  that the guest chooses to follow.
+  that the guest chooses to follow. (The couple's location picker loads OpenStreetMap only after consent:
+  [ADR 0026](0026-openstreetmap-location-picker-after-consent.md).)
 * QR codes are generated in the browser. Images are stored by the instance (local volume or an
   S3-compatible bucket of the operator's choice) and served by the app.
 * Email goes through any SMTP server configured by the operator.
