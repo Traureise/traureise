@@ -461,8 +461,9 @@
     "firstName": "Vorname",
     "export": {
       "title": "Daten herunterladen",
-      "body": "Lade alle Daten deines Kontos als ZIP-Datei herunter: deine Angaben, alle Hochzeitswebsites mit ihren Inhalten (data.json) und alle hochgeladenen Bilder.",
-      "button": "ZIP-Datei herunterladen"
+      "body": "Lade alle Daten deines Kontos als ZIP-Datei herunter: deine Angaben, deine Hochzeiten mit Websites, Karten, Ablauf und Gästeliste (data.json) und alle hochgeladenen Bilder.",
+      "button": "ZIP-Datei herunterladen",
+      "lead": "Alles, was du hier angelegt hast."
     },
     "purchases": {
       "title": "Käufe",
@@ -471,15 +472,18 @@
       "validUntil": "gültig bis {date}",
       "inactive": "nicht mehr aktiv",
       "purchasedAt": "gekauft am {date}",
-      "pricing": "Zu den Preisen"
+      "pricing": "Zu den Preisen",
+      "lead": "Pakete gelten für eine Hochzeit."
     },
     "delete": {
       "title": "Konto löschen",
-      "body": "Damit löschst du dein Konto, alle Hochzeitswebsites mit ihren Inhalten und alle hochgeladenen Bilder endgültig. Deine Websites sind danach nicht mehr erreichbar. Das lässt sich nicht rückgängig machen.",
+      "body": "Damit löschst du dein Konto und alle Hochzeiten mit allem, was dazugehört: Websites, Karten, Gästeliste und Bilder. Die Websites sind danach nicht mehr erreichbar. Das lässt sich nicht rückgängig machen.",
       "confirmLabel": "Gib zur Bestätigung deine E-Mail-Adresse ein",
       "button": "Konto endgültig löschen",
-      "deleting": "Wird gelöscht …"
-    }
+      "deleting": "Wird gelöscht …",
+      "lead": "Endgültig, für alle deine Hochzeiten."
+    },
+    "profileLead": "Damit meldest du dich an."
   },
   "guests": {
     "title": "Gäste",
@@ -496,22 +500,17 @@
     "deletionNotice": "Am {date} löschen wir die Gästeliste mit allen Antworten automatisch. Wenn ihr sie behalten wollt, ladet sie vorher herunter:",
     "overview": {
       "title": "Übersicht",
-      "people": "Gäste",
       "chartLabel": "{coming} kommen, {notComing} kommen nicht, {open} offen",
       "coming": "Kommen",
       "notComing": "Kommen nicht",
       "open": "Offen",
       "households": "{answered} von {total} Haushalten haben geantwortet",
       "events": "Pro Event",
-      "noEvents": "Noch keine Events. Legt sie im Tagesablauf eurer Website an.",
       "meals": "Menü",
-      "noMeal": "Keine Menüwahl eingerichtet.",
       "allergies": "Allergien und Unverträglichkeiten",
-      "noAllergies": "Bisher keine.",
       "allergyLine": "{name} ({household}): {allergies}",
       "otherAnswers": "Andere Antworten: {answers}",
       "requests": "Anfragen für weitere Gäste",
-      "noRequests": "Keine offenen Anfragen.",
       "request": "{name} – angefragt von {household}",
       "addRequest": "Zur Gästeliste",
       "declineRequest": "Ablehnen"
@@ -541,7 +540,9 @@
       "linkCopied": "Link für {household} kopiert",
       "copyFailed": "Kopieren hat nicht geklappt.",
       "whatsapp": "WhatsApp",
-      "whatsappDefault": "Hallo '{name}', wir heiraten! Sagt uns bitte über diesen Link, ob ihr dabei seid. Liebe Grüße, {title}"
+      "whatsappDefault": "Hallo '{name}', wir heiraten! Sagt uns bitte über diesen Link, ob ihr dabei seid. Liebe Grüße, {title}",
+      "child": "{name} (Kind)",
+      "more": "Weitere Aktionen für {name}"
     },
     "household": {
       "add": "Haushalt hinzufügen",
@@ -605,7 +606,7 @@
       "replyBy": "Antworten bis",
       "replyByHint": "Bis zum Ende dieses Tages können Gäste ihre Antwort ändern. Danach sehen sie sie nur noch.",
       "events": "Events, für die Gäste zusagen können",
-      "noSchedule": "Legt zuerst im Tagesablauf eurer Website Events an.",
+      "noSchedule": "Legt zuerst im Ablauf eurer Hochzeit Termine an.",
       "meal": "Menüwahl",
       "mealHint": "Die Gerichte, die ihr mit der Location abgesprochen habt. Ohne Gerichte gibt es keine Menüwahl.",
       "dish": "Gericht {n}",
@@ -622,7 +623,26 @@
       "notifyLocked": "E-Mails verschicken wir, sobald das RSVP-Paket aktiv ist.",
       "whatsapp": "Text für WhatsApp",
       "whatsappHint": "Der Link kommt automatisch dazu.",
-      "save": "Einstellungen speichern"
+      "save": "Einstellungen speichern",
+      "sections": {
+        "answers": {
+          "title": "Antworten",
+          "lead": "Bis wann eure Gäste antworten und für welche Termine sie zusagen können."
+        },
+        "meal": {
+          "title": "Menüwahl",
+          "lead": "Die Gerichte, die ihr mit der Location abgesprochen habt. Ohne Gerichte fragt das Antwortformular nicht nach dem Essen."
+        },
+        "notify": {
+          "title": "Benachrichtigungen",
+          "lead": "Wann ihr per E-Mail von neuen Antworten erfahrt."
+        },
+        "whatsapp": {
+          "title": "Nachricht",
+          "lead": "Der Text, mit dem ihr den Antwortlink per WhatsApp verschickt."
+        }
+      },
+      "saving": "Speichert …"
     },
     "polls": {
       "title": "Umfragen",

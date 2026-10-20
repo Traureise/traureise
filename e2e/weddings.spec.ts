@@ -201,9 +201,12 @@ test("a couple creates their wedding, gets every item, adds versions, chooses wh
       await chooseCard(page, "Verlobungsanzeige");
       await expect(page.getByTestId("card-sending-counts")).toHaveText("0 von 3 Haushalten geöffnet · 0 gesendet");
       const erika = household(page, "Tante Erika");
-      await erika.getByRole("button", { name: "Als gesendet markieren" }).click();
+      // Marking by hand is in the household's menu.
+      await erika.getByRole("button", { name: "Weitere Aktionen für Tante Erika" }).click();
+      await page.getByRole("menuitem", { name: "Als gesendet markieren" }).click();
       await expect(erika.getByTestId("delivery-status")).toHaveText(/^Als gesendet markiert am/);
-      await erika.getByRole("button", { name: "Doch nicht gesendet" }).click();
+      await erika.getByRole("button", { name: "Weitere Aktionen für Tante Erika" }).click();
+      await page.getByRole("menuitem", { name: "Doch nicht gesendet" }).click();
       await expect(erika.getByTestId("delivery-status")).toHaveText("Nicht gesendet");
       await page.getByRole("button", { name: "Alle als gesendet markieren (3)" }).click();
       await page.getByRole("alertdialog").getByRole("button", { name: "Als gesendet markieren" }).click();

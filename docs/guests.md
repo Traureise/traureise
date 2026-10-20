@@ -10,13 +10,15 @@ requests to bring someone else, and a message. The couple sees the answers on th
 The **Gäste** page (`/hochzeiten/<id>/gaeste`) is linked from the wedding's home and from the website editor.
 It has three tabs:
 
-- **Übersicht**: a pie chart of everyone (kommen, kommen nicht, offen), how many households have answered,
-  the headcount per event, counts per dish and per poll answer, the allergy list, and pending requests for
-  additional guests (**Zur Gästeliste** adds the person to that household, **Ablehnen** declines; the
-  household sees the outcome on its link). Below is the guest list: households with their people, a status
-  filter (offen, geantwortet, abgesagt), each household's answers, **Link kopieren**, **WhatsApp** and a
-  **CSV** export of every person with their answers.
-- **Einstellungen**: the reply-by date (answers can change until the end of that day, then the form is
+- **Übersicht**: pending requests for additional guests come first (**Zur Gästeliste** adds the person to
+  that household, **Ablehnen** declines; the household sees the outcome on its link). Then a response bar of
+  everyone (kommen, kommen nicht, offen, with open answers hatched), how many households have answered, and
+  only the counts there are: per event, per dish, per poll answer, the allergy list. Below is the guest list,
+  one row per household: its people, a status filter (offen, geantwortet, abgesagt), **Link kopieren** and
+  **WhatsApp** (or, for a chosen card, its send buttons), and a menu with the reminder, marking a card as sent
+  by hand, leaving a household out, editing and deleting. Each row opens the household's answers. A **CSV**
+  export lists every person with their answers.
+- **Einstellungen**, one page of sections (answers, meal choice, notifications, message, polls): the reply-by date (answers can change until the end of that day, then the form is
   read-only), which events of the schedule guests answer for (all by default), the meal choice (dishes,
   optionally only for one event), notifications (off, an email per answer, or a daily summary at 8:00), and
   the WhatsApp text (`{name}` becomes the household's name; the link is added). Polls are single or multiple

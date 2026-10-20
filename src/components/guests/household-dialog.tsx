@@ -28,12 +28,30 @@ export type HouseholdDraft = {
 let counter = 0;
 const newPerson = (): Person => ({ key: `new-${++counter}`, id: null, name: "", isChild: false });
 
-/** Adds a household, or edits one (`household` set): name, people, and the events it is invited to. */
-export function HouseholdDialog({ weddingId, events, household }: { weddingId: string; events: { id: string; name: string }[]; household?: HouseholdDraft }) {
+/**
+ * Adds a household, or edits one (`household` set): name, people, and the events it is invited to. With `open`
+ * and `onOpenChange` it has no trigger of its own (opened from a household's menu).
+ */
+export function HouseholdDialog({
+  weddingId,
+  events,
+  household,
+  open: controlledOpen,
+  onOpenChange,
+}: {
+  weddingId: string;
+  events: { id: string; name: string }[];
+  household?: HouseholdDraft;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
   const t = useTranslations("guests.household");
   const tErrors = useTranslations("errors");
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const controlled = controlledOpen !== undefined;
+  const open = controlled ? controlledOpen : ownOpen;
+  const setOpen = (next: boolean) => (controlled ? onOpenChange?.(next) : setOwnOpen(next));
   const [pending, start] = useTransition();
   const [errors, setErrors] = useState<FieldErrors>({});
   const [name, setName] = useState(household?.name ?? "");
@@ -81,18 +99,20 @@ export function HouseholdDialog({ weddingId, events, household }: { weddingId: s
 
   return (
     <Dialog open={open} onOpenChange={(next) => (setOpen(next), next || reset())}>
-      <DialogTrigger asChild>
-        {household ? (
-          <Button type="button" variant="ghost" size="sm">
-            {t("edit")}
-          </Button>
-        ) : (
-          <Button type="button">
-            <Plus aria-hidden />
-            {t("add")}
-          </Button>
-        )}
-      </DialogTrigger>
+      {!controlled && (
+        <DialogTrigger asChild>
+          {household ? (
+            <Button type="button" variant="ghost" size="sm">
+              {t("edit")}
+            </Button>
+          ) : (
+            <Button type="button">
+              <Plus aria-hidden />
+              {t("add")}
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-heading text-2xl font-medium">{household ? t("editTitle") : t("addTitle")}</DialogTitle>

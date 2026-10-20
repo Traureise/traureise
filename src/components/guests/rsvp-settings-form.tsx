@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DateField } from "@/components/forms/date-field";
 import { MessageField } from "@/components/forms/message-field";
+import { SettingsSection } from "@/components/app/settings-section";
 import { NOTIFY_MODES, WHATSAPP_MESSAGE_MAX, type NotifyMode, type RsvpSettings } from "@/domain/guests";
 
 type Option = { key: string; id: string | null; label: string };
@@ -81,34 +82,36 @@ export function RsvpSettingsForm({
   }
 
   return (
-    <form onSubmit={submit} className="space-y-8" aria-label={t("title")}>
-      <DateField id="rsvp-reply-by" label={t("replyBy")} value={replyBy} onChange={setReplyBy} hint={t("replyByHint")} error={errors.replyBy} />
+    <form onSubmit={submit} aria-label={t("title")}>
+      <SettingsSection id="rsvp-answers" title={t("sections.answers.title")} description={t("sections.answers.lead")}>
+        <DateField id="rsvp-reply-by" label={t("replyBy")} value={replyBy} onChange={setReplyBy} hint={t("replyByHint")} error={errors.replyBy} />
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">{t("events")}</legend>
+          {schedule.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("noSchedule")}</p>
+          ) : (
+            schedule.map((e) => (
+              <label key={e.id} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={eventIds.includes(e.id)}
+                  onChange={(ev) => setEventIds((list) => (ev.target.checked ? [...list, e.id] : list.filter((id) => id !== e.id)))}
+                />
+                {e.name}
+              </label>
+            ))
+          )}
+          <FieldError code={errors.eventIds} />
+        </fieldset>
+      </SettingsSection>
 
-      <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">{t("events")}</legend>
-        {schedule.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("noSchedule")}</p>
-        ) : (
-          schedule.map((e) => (
-            <label key={e.id} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="size-4 accent-primary"
-                checked={eventIds.includes(e.id)}
-                onChange={(ev) => setEventIds((list) => (ev.target.checked ? [...list, e.id] : list.filter((id) => id !== e.id)))}
-              />
-              {e.name}
-            </label>
-          ))
-        )}
-        <FieldError code={errors.eventIds} />
-      </fieldset>
-
-      <fieldset className="space-y-3">
-        <legend className="text-sm font-medium">{t("meal")}</legend>
-        <p className="text-xs text-muted-foreground">{t("mealHint")}</p>
-        <OptionList options={mealOptions} onChange={setMealOptions} label={(n) => t("dish", { n })} addLabel={t("addDish")} removeLabel={(n) => t("removeDish", { n })} />
-        {schedule.length > 0 && (
+      <SettingsSection id="rsvp-meal" title={t("sections.meal.title")} description={t("sections.meal.lead")}>
+        <fieldset className="space-y-3">
+          <legend className="sr-only">{t("meal")}</legend>
+          <OptionList options={mealOptions} onChange={setMealOptions} label={(n) => t("dish", { n })} addLabel={t("addDish")} removeLabel={(n) => t("removeDish", { n })} />
+        </fieldset>
+        {schedule.length > 0 && mealOptions.length > 0 && (
           <div className="space-y-2">
             <Label htmlFor="rsvp-meal-event">{t("mealEvent")}</Label>
             <select id="rsvp-meal-event" value={mealEvent} onChange={(e) => setMealEvent(e.target.value)} className="h-9 rounded-lg border border-input bg-transparent px-3 text-sm">
@@ -122,24 +125,30 @@ export function RsvpSettingsForm({
             <FieldError code={errors["meal.eventId"]} />
           </div>
         )}
-      </fieldset>
+      </SettingsSection>
 
-      <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">{t("notify")}</legend>
-        {NOTIFY_MODES.map((mode) => (
-          <label key={mode} className="flex items-center gap-2 text-sm">
-            <input type="radio" name="notify" value={mode} checked={notify === mode} onChange={() => setNotify(mode)} className="size-4 accent-primary" />
-            {t(`notifyModes.${mode}`)}
-          </label>
-        ))}
-        {notificationsLocked && <p className="text-xs text-muted-foreground">{t("notifyLocked")}</p>}
-      </fieldset>
+      <SettingsSection id="rsvp-notify" title={t("sections.notify.title")} description={t("sections.notify.lead")}>
+        <fieldset className="space-y-2">
+          <legend className="sr-only">{t("notify")}</legend>
+          {NOTIFY_MODES.map((mode) => (
+            <label key={mode} className="flex items-center gap-2 text-sm">
+              <input type="radio" name="notify" value={mode} checked={notify === mode} onChange={() => setNotify(mode)} className="size-4 accent-primary" />
+              {t(`notifyModes.${mode}`)}
+            </label>
+          ))}
+          {notificationsLocked && <p className="text-xs text-muted-foreground">{t("notifyLocked")}</p>}
+        </fieldset>
+      </SettingsSection>
 
-      <MessageField id="rsvp-whatsapp" label={t("whatsapp")} value={whatsapp} onChange={setWhatsapp} defaultText={whatsappDefault} max={WHATSAPP_MESSAGE_MAX} hint={t("whatsappHint")} rows={3} error={errors.whatsappMessage} />
+      <SettingsSection id="rsvp-whatsapp-section" title={t("sections.whatsapp.title")} description={t("sections.whatsapp.lead")}>
+        <MessageField id="rsvp-whatsapp" label={t("whatsapp")} value={whatsapp} onChange={setWhatsapp} defaultText={whatsappDefault} max={WHATSAPP_MESSAGE_MAX} hint={t("whatsappHint")} rows={3} error={errors.whatsappMessage} />
+      </SettingsSection>
 
-      <Button type="submit" disabled={pending}>
-        {t("save")}
-      </Button>
+      <div className="sticky bottom-0 z-10 -mx-4 flex justify-end border-t border-border bg-background/90 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+        <Button type="submit" disabled={pending}>
+          {pending ? t("saving") : t("save")}
+        </Button>
+      </div>
     </form>
   );
 }

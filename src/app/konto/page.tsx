@@ -4,6 +4,7 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { Download } from "lucide-react";
 import { DeleteAccountForm } from "@/components/account/delete-account-form";
 import { AppHeader } from "@/components/app/app-header";
+import { SettingsSection } from "@/components/app/settings-section";
 import { PageShell } from "@/components/app/app-footer";
 import { Button } from "@/components/ui/button";
 import { container } from "@/composition/container";
@@ -11,18 +12,6 @@ import { requireProfile } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations("account"))("title") };
-}
-
-function Panel({ title, children, testId, tone }: { title: string; children: React.ReactNode; testId: string; tone?: "danger" }) {
-  return (
-    <section
-      data-testid={testId}
-      className={`space-y-4 rounded-2xl border p-6 ${tone === "danger" ? "border-destructive/40 bg-destructive/[0.03]" : "border-border bg-card"}`}
-    >
-      <h2 className="font-heading text-2xl font-medium">{title}</h2>
-      {children}
-    </section>
-  );
 }
 
 export default async function AccountPage() {
@@ -37,56 +26,57 @@ export default async function AccountPage() {
   const lastDay = (d: Date) => format.dateTime(new Date(d.getTime() - 1), { dateStyle: "long", timeZone: "UTC" });
 
   return (
-    <PageShell width="max-w-3xl" header={<AppHeader email={user.email} />}>
+    <PageShell width="max-w-4xl" header={<AppHeader email={user.email} />}>
       <div className="space-y-8">
         <h1 className="font-heading text-5xl font-medium tracking-tight">{t("title")}</h1>
+        <div>
+          <SettingsSection title={t("profile")} description={t("profileLead")} testId="account-profile">
+            <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
+              <dt className="text-muted-foreground">{t("email")}</dt>
+              <dd className="break-all">{user.email}</dd>
+              <dt className="text-muted-foreground">{t("firstName")}</dt>
+              <dd>{user.firstName}</dd>
+            </dl>
+          </SettingsSection>
 
-        <Panel title={t("profile")} testId="account-profile">
-          <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
-            <dt className="text-muted-foreground">{t("email")}</dt>
-            <dd>{user.email}</dd>
-            <dt className="text-muted-foreground">{t("firstName")}</dt>
-            <dd>{user.firstName}</dd>
-          </dl>
-        </Panel>
+          {c.billingEnabled && (
+            <SettingsSection title={t("purchases.title")} description={t("purchases.lead")} testId="account-purchases">
+              {purchases.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t("purchases.empty")}</p>
+              ) : (
+                <ul className="divide-y divide-border text-sm">
+                  {purchases.map((p) => (
+                    <li key={`${p.weddingId}-${p.tier}-${p.purchasedAt.toISOString()}`} className="space-y-0.5 py-2 first:pt-0" data-testid="purchase">
+                      <p className="font-medium">{t("purchases.item", { tier: tPricing(`${p.tier}.name`), website: p.weddingTitle })}</p>
+                      <p className="text-muted-foreground">{t("purchases.purchasedAt", { date: date(p.purchasedAt) })}</p>
+                      <p className="text-muted-foreground">{p.active ? t("purchases.validUntil", { date: lastDay(p.validUntil) }) : t("purchases.inactive")}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <Link href="/preise" className="inline-block text-sm text-primary underline-offset-4 hover:underline">
+                {t("purchases.pricing")}
+              </Link>
+            </SettingsSection>
+          )}
 
-        {c.billingEnabled && (
-          <Panel title={t("purchases.title")} testId="account-purchases">
-            {purchases.length === 0 ? (
-              <p className="text-muted-foreground">{t("purchases.empty")}</p>
-            ) : (
-              <ul className="space-y-2">
-                {purchases.map((p) => (
-                  <li key={`${p.weddingId}-${p.tier}-${p.purchasedAt.toISOString()}`} className="text-sm" data-testid="purchase">
-                    <span className="font-medium">{t("purchases.item", { tier: tPricing(`${p.tier}.name`), website: p.weddingTitle })}</span>
-                    {" · "}
-                    {t("purchases.purchasedAt", { date: date(p.purchasedAt) })}
-                    {" · "}
-                    {p.active ? t("purchases.validUntil", { date: lastDay(p.validUntil) }) : t("purchases.inactive")}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <Link href="/preise" className="text-sm text-primary underline-offset-4 hover:underline">
-              {t("purchases.pricing")}
-            </Link>
-          </Panel>
-        )}
+          <SettingsSection title={t("export.title")} description={t("export.lead")} testId="account-export">
+            <p className="text-sm">{t("export.body")}</p>
+            <Button asChild variant="secondary">
+              <a href="/konto/export" download>
+                <Download aria-hidden />
+                {t("export.button")}
+              </a>
+            </Button>
+          </SettingsSection>
 
-        <Panel title={t("export.title")} testId="account-export">
-          <p className="text-muted-foreground">{t("export.body")}</p>
-          <Button asChild variant="secondary">
-            <a href="/konto/export" download>
-              <Download aria-hidden />
-              {t("export.button")}
-            </a>
-          </Button>
-        </Panel>
-
-        <Panel title={t("delete.title")} testId="account-delete" tone="danger">
-          <p className="text-muted-foreground">{t("delete.body")}</p>
-          <DeleteAccountForm />
-        </Panel>
+          <SettingsSection title={t("delete.title")} description={t("delete.lead")} testId="account-delete" tone="danger">
+            <div className="space-y-4 rounded-2xl border border-destructive/30 bg-destructive/[0.03] p-5">
+              <p className="text-sm">{t("delete.body")}</p>
+              <DeleteAccountForm />
+            </div>
+          </SettingsSection>
+        </div>
       </div>
     </PageShell>
   );

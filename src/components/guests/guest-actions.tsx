@@ -3,35 +3,10 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Check, Trash2, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { toast } from "sonner";
-import { decideGuestRequestAction, deleteHouseholdAction } from "@/app/actions/guests";
+import { decideGuestRequestAction } from "@/app/actions/guests";
 import { Button } from "@/components/ui/button";
-
-export function DeleteHouseholdButton({ weddingId, householdId, name }: { weddingId: string; householdId: string; name: string }) {
-  const t = useTranslations("guests.household");
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      disabled={pending}
-      onClick={() => {
-        if (!window.confirm(t("confirmDelete", { name }))) return;
-        start(async () => {
-          const result = await deleteHouseholdAction(weddingId, householdId);
-          if (result.ok) toast.success(t("deleted"));
-          router.refresh();
-        });
-      }}
-    >
-      <Trash2 aria-hidden />
-      {t("delete")}
-    </Button>
-  );
-}
 
 /** Zur Gästeliste / Ablehnen for a household's request to bring someone. */
 export function RequestActions({ weddingId, requestId }: { weddingId: string; requestId: string }) {

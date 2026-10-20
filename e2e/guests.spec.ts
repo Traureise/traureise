@@ -304,3 +304,26 @@ test("12 months after the wedding the guest data is deleted, after a warning 30 
     await setClockOffset(page.request, baseURL!, 0);
   }
 });
+
+test("a household is edited and deleted from its menu", async ({ page }) => {
+  await login(page, uniqueEmail("menu"), "Mira");
+  const editorUrl = await createWebsite(page, `mira-und-jan-${Date.now()}`);
+  await page.goto(guestsUrl(editorUrl));
+  await addHousehold(page, "Familie Roth", [{ name: "Ida" }]);
+  const roth = household(page, "Familie Roth");
+
+  await roth.getByRole("button", { name: "Weitere Aktionen für Familie Roth" }).click();
+  await page.getByRole("menuitem", { name: "Bearbeiten" }).click();
+  const form = page.getByRole("form", { name: "Haushalt bearbeiten" });
+  await form.getByLabel("Name des Haushalts").fill("Familie Roth-Berg");
+  await form.getByRole("button", { name: "Speichern" }).click();
+  await expect(form).toBeHidden();
+  const renamed = household(page, "Familie Roth-Berg");
+  await expect(renamed).toContainText("1 Person: Ida");
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await renamed.getByRole("button", { name: "Weitere Aktionen für Familie Roth-Berg" }).click();
+  await page.getByRole("menuitem", { name: "Löschen" }).click();
+  await expect(page.getByTestId("household")).toHaveCount(0);
+  await expect(page.getByTestId("guests-empty")).toBeVisible();
+});

@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { CalendarClock, Download, Lock, Mail, MessageCircle } from "lucide-react";
+import { CalendarClock, ChevronRight, Download, Lock, Mail, MessageCircle } from "lucide-react";
 import type { GuestListEntry, GuestPage } from "@/application/guests";
-import { CardSendButtons, MarkAllSentButton, ReminderButton, RemindAllButton, SendAllButton } from "@/components/guests/card-sending";
-import { DeleteHouseholdButton, RequestActions } from "@/components/guests/guest-actions";
+import { CardShareButtons, HouseholdMenu, MarkAllSentButton, RemindAllButton, SendAllButton } from "@/components/guests/card-sending";
+import { RequestActions } from "@/components/guests/guest-actions";
 import { HouseholdDialog, QuickAddPerson } from "@/components/guests/household-dialog";
-import { PieChart } from "@/components/guests/pie-chart";
+import { ResponseBar } from "@/components/guests/response-bar";
 import { VersionSelects } from "@/components/guests/version-select";
 import { CopyLinkButton } from "@/components/share/copy-link-button";
 import { WhatsAppButton } from "@/components/share/whatsapp-button";
@@ -25,6 +25,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 const STATUSES: HouseholdStatus[] = ["open", "answered", "declined"];
+/** The dot in a household's margin: filled once it answered, hollow while open. */
+const STATUS_DOT: Record<HouseholdStatus, string> = { open: "border border-primary/50", answered: "bg-primary", declined: "bg-primary/35" };
 /** Filters by what happened with the chosen card ("Einladung nicht geöffnet"). */
 const DELIVERY_FILTERS = {
   "nicht-gesendet": (s: DeliveryStatus) => s === "notSent" || s === "queued" || s === "failed",
@@ -55,24 +57,22 @@ async function DeliveryBadge({ entry, kind, timeZone, version }: { entry: GuestL
     </Badge>
   );
 }
-const COLORS = { coming: "var(--color-primary)", notComing: "var(--color-muted-foreground)", open: "color-mix(in srgb, var(--color-primary) 22%, white)" };
-
-function Card({ title, children, testId, className }: { title: string; children: React.ReactNode; testId: string; className?: string }) {
+/** A small group of counts under the response bar (per event, per dish, per poll answer). */
+function Facts({ title, testId, children }: { title: string; testId: string; children: React.ReactNode }) {
   return (
-    <section className={cn("space-y-3 rounded-2xl border border-border bg-card p-5", className)} data-testid={testId}>
-      <h3 className="font-heading text-xl font-medium">{title}</h3>
+    <section className="min-w-0 space-y-2" data-testid={testId}>
+      <h3 className="text-sm font-medium">{title}</h3>
       {children}
     </section>
   );
 }
 
-function Counts({ rows, empty }: { rows: { key: string; label: string; count: number }[]; empty: string }) {
-  if (rows.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
+function Counts({ rows }: { rows: { key: string; label: string; count: number }[] }) {
   return (
     <ul className="space-y-1 text-sm">
       {rows.map((r) => (
-        <li key={r.key} className="flex justify-between gap-4">
-          <span>{r.label}</span>
+        <li key={r.key} className="flex justify-between gap-4 border-b border-dotted border-border pb-1 last:border-0">
+          <span className="text-muted-foreground">{r.label}</span>
           <span className="font-medium tabular-nums">{r.count}</span>
         </li>
       ))}
@@ -80,78 +80,73 @@ function Counts({ rows, empty }: { rows: { key: string; label: string; count: nu
   );
 }
 
+/**
+ * Where the answers stand: the response bar by person, then only the counts there are (events, dishes, polls,
+ * allergies). Requests to bring someone come first, because they wait for the couple.
+ */
 async function Overview({ page }: { page: GuestPage }) {
   const t = await getTranslations("guests.overview");
   const { overview, wedding } = page;
   const { people } = overview;
-  const legend = [
-    { key: "coming" as const, value: people.coming },
-    { key: "notComing" as const, value: people.notComing },
-    { key: "open" as const, value: people.open },
+  const parts = [
+    { key: "coming" as const, label: t("coming"), value: people.coming },
+    { key: "notComing" as const, label: t("notComing"), value: people.notComing },
+    { key: "open" as const, label: t("open"), value: people.open },
   ];
+  const showMeals = overview.meals.length > 0 && overview.meals.some((m) => m.count > 0);
   return (
-    <section aria-labelledby="overview-title" className="space-y-4" data-testid="guest-overview">
+    <section aria-labelledby="overview-title" className="space-y-8" data-testid="guest-overview">
       <h2 id="overview-title" className="sr-only">
         {t("title")}
       </h2>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card title={t("people")} testId="overview-people" className="md:row-span-2">
-          <div className="flex flex-wrap items-center gap-6">
-            <PieChart label={t("chartLabel", people)} slices={legend.map((l) => ({ value: l.value, color: COLORS[l.key], label: `${t(l.key)}: ${l.value}` }))} />
-            <ul className="space-y-2 text-sm">
-              {legend.map((l) => (
-                <li key={l.key} className="flex items-center gap-2">
-                  <span className="size-3 rounded-full" style={{ background: COLORS[l.key] }} aria-hidden />
-                  <span>{t(l.key)}</span>
-                  <span className="font-medium tabular-nums" data-testid={`count-${l.key}`}>
-                    {l.value}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <p className="text-sm text-muted-foreground" data-testid="overview-households">
-            {t("households", overview.households)}
-          </p>
-        </Card>
-        <Card title={t("events")} testId="overview-events">
-          <Counts rows={overview.events.map((e) => ({ key: e.id, label: e.name, count: e.count }))} empty={t("noEvents")} />
-        </Card>
-        <Card title={t("meals")} testId="overview-meals">
-          <Counts rows={overview.meals.map((m) => ({ key: m.id, label: m.label, count: m.count }))} empty={t("noMeal")} />
-        </Card>
-        <Card title={t("allergies")} testId="overview-allergies">
-          {overview.allergies.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("noAllergies")}</p>
-          ) : (
-            <ul className="space-y-1 text-sm">
-              {overview.allergies.map((a, i) => (
-                <li key={i}>{t("allergyLine", a)}</li>
-              ))}
-            </ul>
-          )}
-        </Card>
-        {overview.polls.map((poll) => (
-          <Card key={poll.id} title={poll.question} testId="overview-poll">
-            <Counts rows={poll.options.map((o) => ({ key: o.id, label: o.label, count: o.count }))} empty="" />
-            {poll.other.length > 0 && <p className="text-sm text-muted-foreground">{t("otherAnswers", { answers: poll.other.join(", ") })}</p>}
-          </Card>
-        ))}
-        <Card title={t("requests")} testId="overview-requests" className="md:col-span-2">
-          {overview.requests.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("noRequests")}</p>
-          ) : (
-            <ul className="space-y-2">
-              {overview.requests.map((r) => (
-                <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 text-sm" data-testid="guest-request">
-                  <span>{t("request", { name: r.name, household: r.household })}</span>
-                  <RequestActions weddingId={wedding.id} requestId={r.id} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+      {overview.requests.length > 0 && (
+        <section className="space-y-3 rounded-2xl border border-primary/30 bg-primary/[0.04] p-5" data-testid="overview-requests">
+          <h3 className="font-heading text-xl font-medium">{t("requests")}</h3>
+          <ul className="divide-y divide-primary/15">
+            {overview.requests.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-2 text-sm first:pt-0 last:pb-0" data-testid="guest-request">
+                <span>{t("request", { name: r.name, household: r.household })}</span>
+                <RequestActions weddingId={wedding.id} requestId={r.id} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <div className="space-y-3" data-testid="overview-people">
+        <ResponseBar parts={parts} label={t("chartLabel", people)} />
+        <p className="text-sm text-muted-foreground" data-testid="overview-households">
+          {t("households", overview.households)}
+        </p>
       </div>
+      {(overview.events.length > 0 || showMeals || overview.polls.length > 0 || overview.allergies.length > 0) && (
+        <div className="grid gap-x-10 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+          {overview.events.length > 0 && (
+            <Facts title={t("events")} testId="overview-events">
+              <Counts rows={overview.events.map((e) => ({ key: e.id, label: e.name, count: e.count }))} />
+            </Facts>
+          )}
+          {showMeals && (
+            <Facts title={t("meals")} testId="overview-meals">
+              <Counts rows={overview.meals.map((m) => ({ key: m.id, label: m.label, count: m.count }))} />
+            </Facts>
+          )}
+          {overview.polls.map((poll) => (
+            <Facts key={poll.id} title={poll.question} testId="overview-poll">
+              <Counts rows={poll.options.map((o) => ({ key: o.id, label: o.label, count: o.count }))} />
+              {poll.other.length > 0 && <p className="text-sm text-muted-foreground">{t("otherAnswers", { answers: poll.other.join(", ") })}</p>}
+            </Facts>
+          ))}
+          {overview.allergies.length > 0 && (
+            <Facts title={t("allergies")} testId="overview-allergies">
+              <ul className="space-y-1 text-sm">
+                {overview.allergies.map((a, i) => (
+                  <li key={i}>{t("allergyLine", a)}</li>
+                ))}
+              </ul>
+            </Facts>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -173,9 +168,12 @@ async function HouseholdDetails({ entry, page }: { entry: GuestListEntry; page: 
         <li key={p.id}>{t("poll", { question: p.question, answer: answer(p.id, answers) ?? "" })}</li>
       ));
   return (
-    <details className="group rounded-xl bg-secondary/40 px-4 py-2 text-sm">
-      <summary className="cursor-pointer py-1 text-primary">{t("show")}</summary>
-      <div className="space-y-4 py-3">
+    <details className="group text-sm">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-primary underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden">
+        <ChevronRight className="size-3.5 transition-transform group-open:rotate-90 motion-reduce:transition-none" aria-hidden />
+        {t("show")}
+      </summary>
+      <div className="mt-3 space-y-4 rounded-xl bg-secondary/40 p-4">
         <ul className="space-y-3">
           {entry.people.map((p) => (
             <li key={p.id} data-testid="guest-person" data-guest-id={p.id}>
@@ -380,81 +378,87 @@ export default async function GuestsPage({ params, searchParams }: Props) {
             {page.households.length === 0 ? t("list.empty") : t("list.emptyFilter")}
           </p>
         ) : (
-          <ul className="space-y-3">
+          <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
             {shown.map((h) => {
               const household = h.link ? { id: h.id, name: h.name, email: h.email, link: h.link } : null;
+              const delivery = card ? (h.deliveries[card.kind] ?? null) : null;
+              const canRemind = !!household && h.status === "open" && remindable && (!card || card.kind === "invitation");
               return (
-                <li key={h.id} className="space-y-3 rounded-2xl border border-border bg-card p-4" data-testid="household">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h3 className="font-heading text-xl font-medium">{h.name}</h3>
-                    <Badge variant={h.status === "open" ? "outline" : "secondary"} data-testid="household-status">
-                      {tStatus(h.status)}
-                    </Badge>
-                    {card && <DeliveryBadge entry={h} kind={card.kind} timeZone={page.wedding.timezone} version={versionLabel(h, card.kind)} />}
-                    <span className="text-sm text-muted-foreground">{t("list.people", { count: h.people.length, names: h.people.map((p) => p.name).join(", ") })}</span>
-                    {h.invitedEventIds && page.events.length > 0 && (
-                      <span className="text-sm text-muted-foreground">{t("list.invitedTo", { events: h.events.map((e) => e.name).join(", ") || t("list.noEvent") })}</span>
-                    )}
-                    <span className="inline-flex items-center gap-1 text-sm text-muted-foreground" data-testid="household-channel">
-                      {h.email ? <Mail className="size-3.5" aria-hidden /> : <MessageCircle className="size-3.5" aria-hidden />}
-                      {h.email ? tSending("channelEmail", { email: h.email }) : h.unsubscribedAt ? tSending("channelUnsubscribed") : tSending("channelLink")}
-                    </span>
+                <li key={h.id} className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 px-4 py-4 sm:px-5" data-testid="household">
+                  <span className={cn("mt-2 size-2.5 rounded-full", STATUS_DOT[h.status])} aria-hidden />
+                  <div className="min-w-0 space-y-2">
+                    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                      <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <h3 className="font-heading text-xl font-medium">{h.name}</h3>
+                        <span className={cn("text-xs font-medium", h.status === "open" ? "text-muted-foreground" : "text-primary")} data-testid="household-status">
+                          {tStatus(h.status)}
+                        </span>
+                        {card && <DeliveryBadge entry={h} kind={card.kind} timeZone={page.wedding.timezone} version={versionLabel(h, card.kind)} />}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {card && card.waitsForDate ? null : card && household && card.active ? (
+                          <CardShareButtons
+                            weddingId={id}
+                            kind={card.kind}
+                            household={household}
+                            message={h.messages[card.kind]}
+                            emailSending={page.emailSending}
+                            excluded={delivery?.excluded ?? false}
+                          />
+                        ) : !card && h.link ? (
+                          <>
+                            <CopyLinkButton url={h.link} copiedMessage={t("list.linkCopied", { household: h.name })} />
+                            <WhatsAppButton message={whatsappMessage} name={h.name} link={h.link} />
+                          </>
+                        ) : (
+                          <>
+                            <Button asChild variant="secondary" size="sm">
+                              <Link href="/preise">
+                                <Lock aria-hidden />
+                                {t("list.copyLink")}
+                              </Link>
+                            </Button>
+                            <Button asChild variant="secondary" size="sm">
+                              <Link href="/preise">
+                                <Lock aria-hidden />
+                                {t("list.whatsapp")}
+                              </Link>
+                            </Button>
+                          </>
+                        )}
+                        <HouseholdMenu
+                          weddingId={id}
+                          events={page.events}
+                          household={{
+                            id: h.id,
+                            name: h.name,
+                            link: h.link,
+                            invitedEventIds: h.invitedEventIds,
+                            email: h.email,
+                            personalLine: h.personalLine,
+                            unsubscribed: !!h.unsubscribedAt && !h.email,
+                            people: h.people.map((p) => ({ id: p.id, name: p.name, isChild: p.isChild })),
+                          }}
+                          card={
+                            card && household && card.active && !card.waitsForDate
+                              ? { kind: card.kind, sent: !!sentAt(delivery), markedByHand: delivery?.sharedVia === "manual" && !delivery?.emailedAt, excluded: delivery?.excluded ?? false }
+                              : null
+                          }
+                          reminder={canRemind ? { byEmail: page.emailReminders && page.cards.some((c) => c.kind === "invitation"), message: h.reminderMessage } : null}
+                        />
+                      </div>
+                    </div>
+                    <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                      <span>{t("list.people", { count: h.people.length, names: h.people.map((p) => (p.isChild ? t("list.child", { name: p.name }) : p.name)).join(", ") })}</span>
+                      {h.invitedEventIds && page.events.length > 0 && <span>{t("list.invitedTo", { events: h.events.map((e) => e.name).join(", ") || t("list.noEvent") })}</span>}
+                      <span className="inline-flex items-center gap-1" data-testid="household-channel">
+                        {h.email ? <Mail className="size-3.5" aria-hidden /> : <MessageCircle className="size-3.5" aria-hidden />}
+                        {h.email ? tSending("channelEmail", { email: h.email }) : h.unsubscribedAt ? tSending("channelUnsubscribed") : tSending("channelLink")}
+                      </span>
+                    </p>
+                    <VersionSelects weddingId={id} household={{ id: h.id, name: h.name, versions: h.versions }} choices={page.versionChoices} />
+                    <HouseholdDetails entry={h} page={page} />
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {card && card.waitsForDate ? null : card && household && card.active ? (
-                      <CardSendButtons
-                        weddingId={id}
-                        kind={card.kind}
-                        household={household}
-                        message={h.messages[card.kind]}
-                        emailSending={page.emailSending}
-                        excluded={h.deliveries[card.kind]?.excluded ?? false}
-                        sent={!!sentAt(h.deliveries[card.kind])}
-                        markedByHand={h.deliveries[card.kind]?.sharedVia === "manual" && !h.deliveries[card.kind]?.emailedAt}
-                      />
-                    ) : !card && h.link ? (
-                      <>
-                        <CopyLinkButton url={h.link} copiedMessage={t("list.linkCopied", { household: h.name })} />
-                        <WhatsAppButton message={whatsappMessage} name={h.name} link={h.link} />
-                      </>
-                    ) : (
-                      <>
-                        <Button asChild variant="secondary" size="sm">
-                          <Link href="/preise">
-                            <Lock aria-hidden />
-                            {t("list.copyLink")}
-                          </Link>
-                        </Button>
-                        <Button asChild variant="secondary" size="sm">
-                          <Link href="/preise">
-                            <Lock aria-hidden />
-                            {t("list.whatsapp")}
-                          </Link>
-                        </Button>
-                      </>
-                    )}
-                    {household && h.status === "open" && remindable && (!card || card.kind === "invitation") && (
-                      <ReminderButton weddingId={id} household={household} byEmail={page.emailReminders && page.cards.some((c) => c.kind === "invitation")} message={h.reminderMessage} />
-                    )}
-                    <span className="ml-auto flex gap-1">
-                      <HouseholdDialog
-                        weddingId={id}
-                        events={page.events}
-                        household={{
-                          id: h.id,
-                          name: h.name,
-                          invitedEventIds: h.invitedEventIds,
-                          email: h.email,
-                          personalLine: h.personalLine,
-                          unsubscribed: !!h.unsubscribedAt && !h.email,
-                          people: h.people.map((p) => ({ id: p.id, name: p.name, isChild: p.isChild })),
-                        }}
-                      />
-                      <DeleteHouseholdButton weddingId={id} householdId={h.id} name={h.name} />
-                    </span>
-                  </div>
-                  <VersionSelects weddingId={id} household={{ id: h.id, name: h.name, versions: h.versions }} choices={page.versionChoices} />
-                  <HouseholdDetails entry={h} page={page} />
                 </li>
               );
             })}
