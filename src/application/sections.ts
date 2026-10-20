@@ -69,8 +69,9 @@ export class UpdateSection {
   async execute(userId: string, websiteId: string, sectionId: string, input: { title?: string; visible?: boolean }): Promise<void> {
     await loadOwnedSection(this.deps, userId, websiteId, sectionId);
     const patch: SectionPatch = {};
+    if (input.visible !== undefined && typeof input.visible !== "boolean") throw new ValidationError({ visible: "invalid_option" });
     if (input.title !== undefined) {
-      const title = input.title.trim();
+      const title = typeof input.title === "string" ? input.title.trim() : "";
       if (title === "") throw new ValidationError({ title: "required" });
       if (title.length > SECTION_TITLE_MAX) throw new ValidationError({ title: "too_long" });
       patch.title = title;

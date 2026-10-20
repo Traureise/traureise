@@ -223,6 +223,7 @@ export class InMemoryWeddings implements WeddingRepository {
   }
   async deleteEvent(eventId: string) {
     this.events = this.events.filter((e) => e.id !== eventId);
+    this.websites.blocks = this.websites.blocks.filter((b) => !(b.data.type === "event" && b.data.eventId === eventId));
   }
 }
 
@@ -319,9 +320,6 @@ export class InMemoryWebsites implements WebsiteRepository {
       const block = this.blocks.find((b) => b.id === id && b.sectionId === sectionId);
       if (block) block.position = position;
     });
-  }
-  async deleteEventBlocks(eventId: string) {
-    this.blocks = this.blocks.filter((b) => !(b.data.type === "event" && b.data.eventId === eventId));
   }
 }
 

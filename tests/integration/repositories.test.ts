@@ -204,7 +204,7 @@ describe("DrizzleWebsiteRepository", () => {
     expect(await websiteRepo.findBlock(website.id, "nope")).toBeNull();
   });
 
-  it("deletes the blocks of one event in every website version", async () => {
+  it("deleting an event deletes the blocks pointing to it in every website version, in one go", async () => {
     const { wedding, website } = await seedWebsite("anna@example.org", "anna-und-ben", []);
     const copy = { ...website, id: undefined, createdAt: undefined, updatedAt: undefined };
     const friends = await websiteRepo.create({ ...copy, label: "Freunde", position: 1, slug: "anna-und-ben-freunde" }, []);
@@ -216,13 +216,24 @@ describe("DrizzleWebsiteRepository", () => {
       await websiteRepo.addBlock(site.id, section.id, { type: "event", eventId: null });
       await websiteRepo.addBlock(site.id, section.id, { type: "event", eventId: e2.id });
     }
-    await websiteRepo.deleteEventBlocks(e1.id);
+    await weddingRepo.deleteEvent(e1.id);
+    expect(await weddingRepo.findEvent(wedding.id, e1.id)).toBeNull();
     for (const site of [website, friends]) {
       expect((await websiteRepo.listBlocks(site.id)).map((x) => x.data)).toEqual([
         { type: "event", eventId: null },
         { type: "event", eventId: e2.id },
       ]);
     }
+  });
+
+  it("gives blocks and sections added at the same moment distinct positions", async () => {
+    const { website } = await seedWebsite("anna@example.org", "anna-und-ben", []);
+    const sections = await Promise.all(
+      Array.from({ length: 4 }, (_, i) => websiteRepo.addSection(website.id, { title: `S${i}`, visible: true, suggestedType: null, blocks: [] })),
+    );
+    expect(sections.map((s) => s.position).sort()).toEqual([0, 1, 2, 3]);
+    const blocks = await Promise.all(Array.from({ length: 4 }, (_, i) => websiteRepo.addBlock(website.id, sections[0]!.id, text(`B${i}`))));
+    expect(blocks.map((b) => b.position).sort()).toEqual([0, 1, 2, 3]);
   });
 
   it("deletes a website version with its sections and blocks", async () => {

@@ -49,6 +49,10 @@ test("a couple shapes sections from blocks", async ({ page }) => {
     await expect(form).toBeHidden();
     await addBlock(page, "Ort", { Name: "Café am See", Art: { select: "Ausflug" } });
     await expectBlocks(page, ["Brunch · 13.06.2027 · 11:00", "Café am See"]);
+    // The event's row says that it is the wedding's and where to change it.
+    const brunchRow = blocks(page).filter({ hasText: "Brunch" });
+    await expect(brunchRow.getByTestId("block-event-hint")).toContainText("Gilt für alle Website-Versionen");
+    await expect(brunchRow.getByRole("link", { name: "Im Ablauf ändern" })).toHaveAttribute("href", scheduleUrl(weddingId));
     // An empty section stays off the site; now that it has blocks, rename it there.
     await renameSection(page, dayAfter, "Der Tag danach");
 

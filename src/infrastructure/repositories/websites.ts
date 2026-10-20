@@ -24,6 +24,8 @@ const toBlock = (row: typeof sectionBlocks.$inferSelect): Block => ({
 
 /** Inserts sections (with their blocks) after the website's last section. */
 async function insertSections(tx: Tx, websiteId: string, sections: NewSection[]): Promise<Section[]> {
+  // Locks the website row so two sections added at the same moment get distinct positions.
+  await tx.select({ id: websites.id }).from(websites).where(eq(websites.id, websiteId)).for("update");
   const [{ next }] = (await tx
     .select({ next: sql<number>`coalesce(max(${websiteSections.position}) + 1, 0)::int` })
     .from(websiteSections)
@@ -138,16 +140,20 @@ export class DrizzleWebsiteRepository implements WebsiteRepository {
   }
 
   async addBlock(websiteId: string, sectionId: string, data: BlockData): Promise<Block> {
-    const [row] = await this.db
-      .insert(sectionBlocks)
-      .values({
-        websiteId,
-        sectionId,
-        data,
-        position: sql`(select coalesce(max(${sectionBlocks.position}) + 1, 0) from ${sectionBlocks} where ${sectionBlocks.sectionId} = ${sectionId})`,
-      })
-      .returning();
-    return toBlock(row!);
+    return this.db.transaction(async (tx) => {
+      // Locks the section row so two blocks added at the same moment get distinct positions.
+      await tx.select({ id: websiteSections.id }).from(websiteSections).where(eq(websiteSections.id, sectionId)).for("update");
+      const [row] = await tx
+        .insert(sectionBlocks)
+        .values({
+          websiteId,
+          sectionId,
+          data,
+          position: sql`(select coalesce(max(${sectionBlocks.position}) + 1, 0) from ${sectionBlocks} where ${sectionBlocks.sectionId} = ${sectionId})`,
+        })
+        .returning();
+      return toBlock(row!);
+    });
   }
 
   async updateBlock(blockId: string, data: BlockData): Promise<void> {
@@ -169,7 +175,4 @@ export class DrizzleWebsiteRepository implements WebsiteRepository {
     });
   }
 
-  async deleteEventBlocks(eventId: string): Promise<void> {
-    await this.db.delete(sectionBlocks).where(sql`${sectionBlocks.data}->>'type' = 'event' and ${sectionBlocks.data}->>'eventId' = ${eventId}`);
-  }
 }

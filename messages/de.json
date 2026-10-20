@@ -236,6 +236,8 @@
       "chooseEvent": "Termin",
       "newEvent": "Neuer Termin",
       "eventShared": "Termine gehören zum Ablauf der Hochzeit: Änderungen gelten für alle Website-Versionen, die Einladungen und das Antwortformular.",
+      "eventRowHint": "Gilt für alle Website-Versionen, die Einladungen und das Antwortformular.",
+      "openSchedule": "Im Ablauf ändern",
       "newBlock": "Neuer Baustein",
       "editBlock": "Baustein bearbeiten"
     },

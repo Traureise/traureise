@@ -2,7 +2,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import type { NewWedding, SlugOwners, Wedding, WeddingEvent, WeddingPatch, WeddingRepository } from "@/application/ports";
 import { compareEvents, type EventData } from "@/domain/sections";
 import type { Database } from "../db/client";
-import { weddingEvents, weddings, websites } from "../db/schema";
+import { sectionBlocks, weddingEvents, weddings, websites } from "../db/schema";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -72,6 +72,9 @@ export class DrizzleWeddingRepository implements WeddingRepository {
   }
 
   async deleteEvent(eventId: string): Promise<void> {
-    await this.db.delete(weddingEvents).where(eq(weddingEvents.id, eventId));
+    await this.db.transaction(async (tx) => {
+      await tx.delete(sectionBlocks).where(sql`${sectionBlocks.data}->>'type' = 'event' and ${sectionBlocks.data}->>'eventId' = ${eventId}`);
+      await tx.delete(weddingEvents).where(eq(weddingEvents.id, eventId));
+    });
   }
 }

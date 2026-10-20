@@ -99,7 +99,6 @@ export const websites = pgTable(
     position: integer("position").notNull(),
     slug: text("slug").notNull().unique(),
     published: boolean("published").notNull().default(false),
-    // Wedding events this version leaves out of its schedule (new events show on every version).
     welcomeMessage: text("welcome_message").notNull().default(""),
     hashtag: text("hashtag").notNull().default(""),
     showCountdown: boolean("show_countdown").notNull().default(false),

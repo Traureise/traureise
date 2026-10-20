@@ -70,7 +70,6 @@ export class DeleteEvent {
   /** Also deletes the blocks that show just this event, in every website version. */
   async execute(userId: string, weddingId: string, eventId: string): Promise<void> {
     const { wedding, event } = await loadOwnedEvent(this.deps, userId, weddingId, eventId);
-    await this.deps.websites.deleteEventBlocks(eventId);
     await this.deps.weddings.deleteEvent(eventId);
     await releaseImages(this.deps, wedding.id, imageKeysOf(event.data));
   }

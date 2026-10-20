@@ -123,6 +123,7 @@ export interface WeddingRepository {
   findEvent(weddingId: string, eventId: string): Promise<WeddingEvent | null>;
   addEvent(weddingId: string, data: EventData): Promise<WeddingEvent>;
   updateEvent(eventId: string, data: EventData): Promise<void>;
+  /** Deletes the event and, in the same transaction, every event block pointing to it, in any website version. */
   deleteEvent(eventId: string): Promise<void>;
 }
 
@@ -156,8 +157,6 @@ export interface WebsiteRepository {
   deleteBlock(blockId: string): Promise<void>;
   /** Rewrites positions within the section so that `orderedIds` are 0..n-1. */
   setBlockOrder(sectionId: string, orderedIds: string[]): Promise<void>;
-  /** Deletes every event block pointing to this event, in any website version. */
-  deleteEventBlocks(eventId: string): Promise<void>;
 }
 
 export type UploadRecord = { key: string; weddingId: string | null; contentType: string; size: number; createdAt: Date };

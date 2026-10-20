@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { ArrowDown, ArrowUp, PencilLine, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -149,6 +150,14 @@ export function SectionEditor({ websiteId, weddingId, section, blocks, events }:
                 >
                   <Trash2 aria-hidden />
                 </Button>
+                {block.data.type === "event" && (
+                  <p className="basis-full text-xs text-muted-foreground" data-testid="block-event-hint">
+                    {t("blocks.eventRowHint")}{" "}
+                    <Link href={`/hochzeiten/${weddingId}/ablauf`} className="text-primary underline-offset-4 hover:underline">
+                      {t("blocks.openSchedule")}
+                    </Link>
+                  </p>
+                )}
               </li>
             ),
           )}

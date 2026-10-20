@@ -64,6 +64,12 @@ describe("UpdateSection", () => {
     await expect(new UpdateSection(f.deps).execute(anna, websiteId, faqs.id, { title: "x".repeat(61) })).rejects.toMatchObject({ fieldErrors: { title: "too_long" } });
   });
 
+  it("answers a title that is not text with a field error", async () => {
+    const faqs = await sectionTitled("Häufige Fragen");
+    await expect(new UpdateSection(f.deps).execute(anna, websiteId, faqs.id, { title: 5 as never })).rejects.toMatchObject({ fieldErrors: { title: "required" } });
+    await expect(new UpdateSection(f.deps).execute(anna, websiteId, faqs.id, { visible: "ja" as never })).rejects.toBeInstanceOf(ValidationError);
+  });
+
   it("keeps sections of other websites out of reach", async () => {
     const other = await newWedding(f.deps, ben, { title: "Ben & Cleo" });
     const [bens] = await f.websites.listSections(other.websiteId);
