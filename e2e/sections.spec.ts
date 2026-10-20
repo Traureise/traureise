@@ -75,7 +75,10 @@ test("a couple shapes sections from blocks", async ({ page }) => {
   });
 
   await test.step("deleting the event in the Ablauf removes it everywhere", async () => {
-    await page.goto(scheduleUrl(weddingId));
+    // The website editor leads to the Ablauf, where events are edited.
+    await page.goto(editorUrl);
+    await page.getByRole("navigation", { name: "Website bearbeiten" }).getByRole("link", { name: /^Ablauf/ }).click();
+    await expect(page).toHaveURL(new RegExp(`${scheduleUrl(weddingId)}$`));
     page.once("dialog", (dialog) => dialog.accept());
     await page.getByTestId("event").filter({ hasText: "Brunch" }).getByRole("button", { name: /^Löschen/ }).click();
     await expect(page.getByTestId("event")).toHaveCount(0);
