@@ -13,7 +13,7 @@ import { VersionMenu } from "@/components/weddings/versions";
 import { WeddingDetailsButton } from "@/components/weddings/wedding-details-dialog";
 import { WeddingNav } from "@/components/weddings/wedding-nav";
 import { container } from "@/composition/container";
-import { dateFromIso } from "@/lib/format";
+import { dateFromIso, timeZoneOptions } from "@/lib/format";
 import { requireProfile } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +48,7 @@ export default async function CardEditorPage({ params }: Props) {
   const format = await getFormatter();
   const { wedding, card } = data;
   const c = container();
-  const timeZones = Intl.supportedValuesOf("timeZone");
+  const timeZones = timeZoneOptions();
   const base = `/hochzeiten/${id}/karten/${card.id}`;
   const kindName = tKinds(card.kind);
   const header = (

@@ -15,7 +15,7 @@ import { WeddingDetailsButton } from "@/components/weddings/wedding-details-dial
 import { WeddingNav } from "@/components/weddings/wedding-nav";
 import { WeddingSwitcher } from "@/components/weddings/wedding-switcher";
 import { container } from "@/composition/container";
-import { dateFromIso } from "@/lib/format";
+import { dateFromIso, timeZoneOptions } from "@/lib/format";
 import { requireProfile } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -70,7 +70,7 @@ export default async function WeddingHomePage({ params, searchParams }: Props) {
               <CalendarHeart aria-hidden />
               {badge}
             </Badge>
-            <WeddingDetailsButton wedding={wedding} appUrl={c.appUrl} timeZones={Intl.supportedValuesOf("timeZone")} variant="link" />
+            <WeddingDetailsButton wedding={wedding} appUrl={c.appUrl} timeZones={timeZoneOptions()} variant="link" />
             {home.tier && (
               <span className="text-sm text-muted-foreground" data-testid="wedding-plan">
                 · {t("plan", { tier: tTiers(`${home.tier}.name`) })}

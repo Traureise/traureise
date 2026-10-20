@@ -60,7 +60,7 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
       kernLink = await guestLink(page, "Familie Kern");
       await page.getByRole("link", { name: "Einstellungen" }).click();
       const settings = page.getByRole("form", { name: "RSVP-Einstellungen" });
-      await settings.getByLabel("Antworten bis").fill("2027-05-01");
+      await settings.getByLabel("Antworten bis").fill("01.05.2027");
       await settings.getByRole("button", { name: "Einstellungen speichern" }).click();
       await expect(page.getByText("Gespeichert").first()).toBeVisible();
     });

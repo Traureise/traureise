@@ -97,7 +97,7 @@ test("every editor field reaches the public website, and invalid input explains 
     await missing.getByRole("button", { name: "Speichern" }).click();
     await expect(await fieldError(missing, "Beginn (Datum)")).toHaveText("Bitte fülle dieses Feld aus.");
     await expect(await fieldError(missing, "Beginn (Uhrzeit)")).toHaveText("Bitte fülle dieses Feld aus.");
-    await fillForm(missing, { "Beginn (Datum)": "2027-06-12", "Beginn (Uhrzeit)": "22:00" });
+    await fillForm(missing, { "Beginn (Datum)": "12.06.2027", "Beginn (Uhrzeit)": "22:00" });
     await missing.getByRole("button", { name: "Speichern" }).click();
     await expect(await fieldError(missing, "Name")).toHaveText("Bitte fülle dieses Feld aus.");
     await expect(await fieldError(missing, "Art")).toHaveText("Bitte wähle einen Eintrag aus der Liste.");
@@ -108,7 +108,7 @@ test("every editor field reaches the public website, and invalid input explains 
     await fillForm(missing, {
       Art: { select: "Feier" },
       Name: "Party",
-      "Ende (Datum, optional)": "2027-06-12",
+      "Ende (Datum, optional)": "12.06.2027",
       "Ende (Uhrzeit, optional)": "21:00",
       Website: "nicht eine url",
     });
@@ -116,9 +116,16 @@ test("every editor field reaches the public website, and invalid input explains 
     await expect(await fieldError(missing, "Ende (Uhrzeit, optional)")).toHaveText("Das Ende muss nach dem Beginn liegen.");
     await expect(await fieldError(missing, "Website")).toHaveText("Bitte gib eine gültige Webadresse ein (z. B. https://beispiel.de).");
 
+    // German fields: the calendar picks a day (week starts on Monday), a time can be typed without the colon.
+    await missing.getByLabel("Ende (Datum, optional)").locator("xpath=following-sibling::button").click();
+    const calendar = page.getByRole("dialog", { name: "Juni 2027" });
+    await expect(calendar.getByRole("columnheader")).toHaveText(["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]);
+    await calendar.getByRole("button", { name: "Sonntag, 13. Juni 2027" }).click();
+    await expect(missing.getByLabel("Ende (Datum, optional)")).toHaveValue("13.06.2027");
+    await missing.getByLabel("Ende (Uhrzeit, optional)").fill("200");
+    await missing.getByLabel("Ende (Uhrzeit, optional)").blur();
+    await expect(missing.getByLabel("Ende (Uhrzeit, optional)")).toHaveValue("02:00");
     await fillForm(missing, {
-      "Ende (Datum, optional)": "2027-06-13",
-      "Ende (Uhrzeit, optional)": "02:00",
       Website: "seehaus.example",
       Bild: { file: PHOTO },
       Veranstaltungsort: "Seehaus",

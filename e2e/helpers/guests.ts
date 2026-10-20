@@ -1,10 +1,10 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import { addEvent as addScheduleEvent } from "./editor";
-import { weddingIdOf } from "./weddings";
+import { de, weddingIdOf } from "./weddings";
 
 /** Adds an event to the Ablauf of the wedding an editor URL belongs to (an event guests can answer for). */
 export async function addEvent(page: Page, editorUrl: string, name: string, date: string, time: string) {
-  await addScheduleEvent(page, weddingIdOf(editorUrl), { Art: { select: "Feier" }, Name: name, "Beginn (Datum)": date, "Beginn (Uhrzeit)": time });
+  await addScheduleEvent(page, weddingIdOf(editorUrl), { Art: { select: "Feier" }, Name: name, "Beginn (Datum)": de(date), "Beginn (Uhrzeit)": time });
 }
 
 /** The guest list of the wedding a website editor URL belongs to. */

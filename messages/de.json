@@ -895,7 +895,12 @@
     "messageHint": "'{name}' wird durch den Namen des Haushalts ersetzt.",
     "messageDefault": "Leer lassen für den Standardtext.",
     "messageCount": "{count} von {max} Zeichen",
-    "dateOptional": "Datum (optional)"
+    "dateOptional": "Datum (optional)",
+    "datePlaceholder": "TT.MM.JJJJ",
+    "timePlaceholder": "HH:MM",
+    "openCalendar": "Kalender öffnen",
+    "previousMonth": "Vorheriger Monat",
+    "nextMonth": "Nächster Monat"
   },
   "share": {
     "copyLink": "Link kopieren",

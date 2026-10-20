@@ -9,7 +9,7 @@ import { WeddingDetailsButton } from "@/components/weddings/wedding-details-dial
 import { container } from "@/composition/container";
 import { FONT_PAIRINGS } from "@/domain/fonts";
 import { localize } from "@/domain/theme";
-import { themeAssetUrl } from "@/lib/format";
+import { themeAssetUrl, timeZoneOptions } from "@/lib/format";
 import { loadEditorView } from "@/lib/editor";
 
 export default async function EditorSectionPage({ params }: { params: Promise<{ id: string; websiteId: string; section: string }> }) {
@@ -26,7 +26,7 @@ export default async function EditorSectionPage({ params }: { params: Promise<{ 
         <HomeForm
           website={view.website}
           appUrl={c.appUrl}
-          details={<WeddingDetailsButton wedding={view.wedding} appUrl={c.appUrl} timeZones={Intl.supportedValuesOf("timeZone")} variant="link" />}
+          details={<WeddingDetailsButton wedding={view.wedding} appUrl={c.appUrl} timeZones={timeZoneOptions()} variant="link" />}
         />
       </Panel>
     );

@@ -1,4 +1,5 @@
 import type { WeddingEvent } from "@/application/ports";
+import { germanDate } from "@/domain/days";
 import { EVENT_TYPES, PARTY_ROLES, PLACE_TYPES, type BlockData, type BlockType } from "@/domain/sections";
 
 export type FieldType = "text" | "textarea" | "date" | "time" | "url" | "select" | "image";
@@ -51,11 +52,9 @@ export const EVENT_FIELDS: FieldSpec[] = [
   { name: "website", type: "url" },
 ];
 
-/** "12.06.2027" */
-const shortDate = (iso: string) => iso.split("-").reverse().join(".");
 
 /** An event's line in pickers and lists: name · date · time. */
-export const eventLine = ({ data: e }: WeddingEvent) => `${e.name} · ${shortDate(e.startDate)} · ${e.startTime}`;
+export const eventLine = ({ data: e }: WeddingEvent) => `${e.name} · ${germanDate(e.startDate)} · ${e.startTime}`;
 
 /**
  * The line that identifies a block in the editor list. Empty for "Alle Termine" (the component names it) and for

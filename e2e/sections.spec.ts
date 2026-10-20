@@ -41,7 +41,7 @@ test("a couple shapes sections from blocks", async ({ page }) => {
     const form = await openNewBlock(page, "Termin");
     await form.getByRole("button", { name: "Neuer Termin" }).click();
     const eventForm = page.getByRole("form", { name: "Neuer Termin" });
-    await fillForm(eventForm, { Art: { select: "Brunch" }, Name: "Brunch", "Beginn (Datum)": "2027-06-13", "Beginn (Uhrzeit)": "11:00" });
+    await fillForm(eventForm, { Art: { select: "Brunch" }, Name: "Brunch", "Beginn (Datum)": "13.06.2027", "Beginn (Uhrzeit)": "11:00" });
     await eventForm.getByRole("button", { name: "Speichern" }).click();
     await expect(eventForm).toBeHidden();
     await expect(form.getByLabel("Termin", { exact: true })).toHaveValue(/^[0-9a-f-]{36}$/);

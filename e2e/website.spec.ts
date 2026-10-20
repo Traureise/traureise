@@ -94,7 +94,7 @@ const BLOCKS: BlockCase[] = [
 const event = (n: "A" | "B" | "C"): Values => ({
   Art: { select: n === "A" ? "Trauung" : n === "B" ? "Sektempfang" : "Feier" },
   Name: `Programmpunkt ${n}`,
-  "Beginn (Datum)": "2027-06-12",
+  "Beginn (Datum)": "12.06.2027",
   "Beginn (Uhrzeit)": n === "A" ? "14:30" : n === "B" ? "16:00" : "19:00",
   ...(n === "A" ? { "Ende (Uhrzeit, optional)": "15:30", Veranstaltungsort: "Gut Sonnenhof", Adresse: "Hofweg 3, 12345 Beispielstadt" } : {}),
 });
@@ -157,7 +157,7 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
     await page.getByTestId("home-wedding-details").getByRole("button", { name: "Angaben ändern" }).click();
     details = page.getByRole("dialog", { name: "Eure Hochzeit" });
     await details.getByLabel("Ja", { exact: true }).check();
-    await details.getByLabel("Hochzeitsdatum").fill("2027-06-12");
+    await details.getByLabel("Hochzeitsdatum").fill("12.06.2027");
     await details.getByRole("button", { name: "Speichern" }).click();
     await expect(preview.getByTestId("site-date")).toHaveText("Samstag, 12. Juni 2027");
   });

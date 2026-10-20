@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { DateField } from "@/components/forms/date-field";
+import { TimeField } from "@/components/forms/time-field";
 import { FieldError } from "@/components/forms/field-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageField } from "./image-field";
+import { normalizeTime } from "@/domain/days";
 import type { FieldSpec } from "./block-fields";
 import { useSave } from "./use-save";
 
@@ -35,7 +37,10 @@ export function FieldForm({ weddingId, fields, initial, idPrefix, label, onSubmi
 
   function submit(form: FormData) {
     const data: Record<string, unknown> = {};
-    for (const field of fields) data[field.name] = field.type === "image" ? images[field.name] : String(form.get(field.name) ?? "");
+    for (const field of fields) {
+      const raw = field.type === "image" ? images[field.name] : String(form.get(field.name) ?? "");
+      data[field.name] = field.type === "time" ? normalizeTime(raw as string) : raw;
+    }
     save(() => onSubmit(data), onDone);
   }
 
@@ -75,6 +80,8 @@ export function FieldForm({ weddingId, fields, initial, idPrefix, label, onSubmi
               </option>
             ))}
           </select>
+        ) : field.type === "time" ? (
+          <TimeField {...common} defaultValue={(value as string) ?? ""} className="w-28" />
         ) : (
           <Input {...common} type={field.type === "url" ? "text" : field.type} inputMode={field.type === "url" ? "url" : undefined} defaultValue={(value as string) ?? ""} />
         )}
@@ -86,7 +93,10 @@ export function FieldForm({ weddingId, fields, initial, idPrefix, label, onSubmi
   return (
     <form
       onSubmit={(e) => (e.preventDefault(), submit(new FormData(e.currentTarget)))}
-      onChange={(e) => dismiss((e.target as EventTarget as HTMLInputElement).name)} className="space-y-4 rounded-xl border border-primary/30 bg-background p-4" aria-label={label}>
+      onChange={(e) => {
+        const target = e.target as EventTarget as HTMLInputElement;
+        dismiss(target.name || target.dataset.field || "");
+      }} className="space-y-4 rounded-xl border border-primary/30 bg-background p-4" aria-label={label}>
       {fields.map((field) => (
         <div key={field.name}>{input(field)}</div>
       ))}
