@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { BLOCK_TYPES, SECTION_TITLE_MAX, type BlockType } from "@/domain/sections";
+import { BLOCK_TYPES, type BlockType } from "@/domain/sections";
 import { BLOCK_FIELDS, blockHeadline } from "./block-fields";
 import { EventBlockForm } from "./event-block-form";
 import { FieldForm } from "./field-form";
@@ -94,7 +94,7 @@ export function SectionEditor({ websiteId, weddingId, section, blocks, events }:
       >
         <Label htmlFor="section-title">{t("section.titleLabel")}</Label>
         <div className="flex gap-2">
-          <Input id="section-title" name="title" required maxLength={SECTION_TITLE_MAX} defaultValue={section.title} aria-describedby="section-title-error" />
+          <Input id="section-title" name="title" defaultValue={section.title} aria-describedby="section-title-error" />
           <Button type="submit" variant="secondary" disabled={pending}>
             {pending ? t("saving") : t("save")}
           </Button>

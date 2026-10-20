@@ -3,13 +3,16 @@ import path from "node:path";
 import { expect, recordForeignRequests, test } from "./fixtures";
 import { login, uniqueEmail } from "./helpers/auth";
 import {
-  addItem,
-  deleteItem,
-  editItem,
-  expectItems,
-  moveItem,
+  addBlock,
+  addEvent,
+  deleteBlock,
+  editBlock,
+  expectBlocks,
+  moveBlock,
   openSection,
   renameSection,
+  scheduleUrl,
+  siteSection,
   toggleVisibility,
   type Values,
 } from "./helpers/editor";
@@ -18,36 +21,23 @@ import { createWeddingWithWebsite, homeUrl, publishWebsite, step } from "./helpe
 const COVER = path.join(import.meta.dirname, "assets/cover.jpg");
 const PHOTO = path.join(import.meta.dirname, "assets/photo.jpg");
 
-type CollectionCase = {
-  id: string;
+type BlockCase = {
+  /** The template section, by its default title. */
   nav: string;
+  /** The block type's German label. */
+  type: string;
   renamed: string;
-  /** Three items; the flow edits the first, moves and deletes the others. */
+  /** Three blocks; the flow edits the first, moves and deletes the others. */
   make: (n: "A" | "B" | "C") => Values;
   headline: (n: string) => string;
   edit: Values;
   editedHeadline: string;
 };
 
-const COLLECTIONS: CollectionCase[] = [
+const BLOCKS: BlockCase[] = [
   {
-    id: "schedule",
-    nav: "Tagesablauf",
-    renamed: "Ablauf des Tages",
-    make: (n) => ({
-      Art: { select: n === "A" ? "Trauung" : n === "B" ? "Sektempfang" : "Feier" },
-      Name: `Programmpunkt ${n}`,
-      "Beginn (Datum)": "2027-06-12",
-      "Beginn (Uhrzeit)": n === "A" ? "14:30" : n === "B" ? "16:00" : "19:00",
-      ...(n === "A" ? { "Ende (Uhrzeit, optional)": "15:30", Veranstaltungsort: "Gut Sonnenhof", Adresse: "Hofweg 3, 12345 Beispielstadt" } : {}),
-    }),
-    headline: (n) => `Programmpunkt ${n}`,
-    edit: { Name: "Freie Trauung", Beschreibung: "Bitte seid um 14 Uhr da." },
-    editedHeadline: "Freie Trauung",
-  },
-  {
-    id: "travel",
     nav: "Anreise",
+    type: "Ort",
     renamed: "Anreise & Hotels",
     make: (n) => ({ Name: `Unterkunft ${n}`, Art: { select: n === "A" ? "Hotel" : "Parken" }, Adresse: `Bahnhofstraße ${n}` }),
     headline: (n) => `Unterkunft ${n}`,
@@ -55,17 +45,17 @@ const COLLECTIONS: CollectionCase[] = [
     editedHeadline: "Hotel Linde",
   },
   {
-    id: "things-to-do",
     nav: "Empfehlungen",
+    type: "Ort",
     renamed: "Tipps für euch",
-    make: (n) => ({ Name: `Tipp ${n}`, Beschreibung: `Beschreibung ${n}` }),
+    make: (n) => ({ Name: `Tipp ${n}`, Art: { select: "Ausflug" }, Beschreibung: `Beschreibung ${n}` }),
     headline: (n) => `Tipp ${n}`,
     edit: { Name: "Altstadtführung" },
     editedHeadline: "Altstadtführung",
   },
   {
-    id: "registry",
     nav: "Geschenkideen",
+    type: "Link",
     renamed: "Wunschliste",
     make: (n) => ({ Name: `Wunsch ${n}`, Link: `https://example.org/wunsch-${n.toLowerCase()}` }),
     headline: (n) => `Wunsch ${n}`,
@@ -73,8 +63,8 @@ const COLLECTIONS: CollectionCase[] = [
     editedHeadline: "Hochzeitsreise",
   },
   {
-    id: "wedding-party",
     nav: "Hochzeitsgesellschaft",
+    type: "Person",
     renamed: "Unsere Liebsten",
     make: (n) => ({ Name: `Person ${n}`, Rolle: { select: n === "A" ? "Trauzeugin" : "Trauzeuge" }, ...(n === "A" ? { Bild: { file: PHOTO } } : {}) }),
     headline: (n) => `Person ${n}`,
@@ -82,8 +72,8 @@ const COLLECTIONS: CollectionCase[] = [
     editedHeadline: "Mia Berger",
   },
   {
-    id: "gallery",
     nav: "Galerie",
+    type: "Bild",
     renamed: "Momente",
     make: (n) => ({ Bild: { file: PHOTO }, Bildunterschrift: `Foto ${n}` }),
     headline: (n) => `Foto ${n}`,
@@ -91,8 +81,8 @@ const COLLECTIONS: CollectionCase[] = [
     editedHeadline: "Der Antrag",
   },
   {
-    id: "faqs",
     nav: "Häufige Fragen",
+    type: "Frage & Antwort",
     renamed: "Fragen & Antworten",
     make: (n) => ({ Frage: `Frage ${n}?`, Antwort: `Antwort ${n}.` }),
     headline: (n) => `Frage ${n}?`,
@@ -101,6 +91,14 @@ const COLLECTIONS: CollectionCase[] = [
   },
 ];
 
+const event = (n: "A" | "B" | "C"): Values => ({
+  Art: { select: n === "A" ? "Trauung" : n === "B" ? "Sektempfang" : "Feier" },
+  Name: `Programmpunkt ${n}`,
+  "Beginn (Datum)": "2027-06-12",
+  "Beginn (Uhrzeit)": n === "A" ? "14:30" : n === "B" ? "16:00" : "19:00",
+  ...(n === "A" ? { "Ende (Uhrzeit, optional)": "15:30", Veranstaltungsort: "Gut Sonnenhof", Adresse: "Hofweg 3, 12345 Beispielstadt" } : {}),
+});
+
 test("a couple builds, shares, restyles and deletes their wedding website", async ({ page, browser, baseURL, context, thirdPartyRequests }) => {
   test.setTimeout(6 * 60_000);
   const slug = `anna-und-ben-${Date.now()}`;
@@ -108,6 +106,7 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
   const preview = page.getByTestId("site-preview");
   let editorUrl = "";
   let weddingId = "";
+  const sectionIds: Record<string, string> = {};
 
   await test.step("log in, create the wedding; its website is a draft until published", async () => {
     await login(page, uniqueEmail("anna"), "Anna");
@@ -163,44 +162,72 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
     await expect(preview.getByTestId("site-date")).toHaveText("Samstag, 12. Juni 2027");
   });
 
-  await test.step("write our story, rename it, hide and show it", async () => {
-    await openSection(page, editorUrl, "Unsere Geschichte");
-    await page.getByLabel("Eure Geschichte").fill("Kennengelernt im Nachtzug nach Wien.");
-    await page.getByRole("button", { name: "Speichern" }).click();
-    await expect(preview.getByTestId("site-section-our-story")).toContainText("Kennengelernt im Nachtzug nach Wien.");
-    await renameSection(page, "our-story", "Wie alles begann");
-    await toggleVisibility(page, "our-story");
+  await test.step("write our story in a text block, rename it, hide and show it", async () => {
+    const id = await openSection(page, editorUrl, "Unsere Geschichte");
+    await page.getByRole("button", { name: "Text hinzufügen" }).click();
+    const form = page.getByRole("form", { name: "Neuer Baustein" });
+    await form.getByLabel("Text", { exact: true }).fill("Kennengelernt im Nachtzug nach Wien.");
+    await form.getByRole("button", { name: "Speichern" }).click();
+    await expect(form).toBeHidden();
+    await expect(siteSection(preview, id)).toContainText("Kennengelernt im Nachtzug nach Wien.");
+    await renameSection(page, id, "Wie alles begann");
+    await toggleVisibility(page, id);
   });
 
-  for (const c of COLLECTIONS) {
-    await test.step(`manage items in ${c.nav}`, async () => {
-      await openSection(page, editorUrl, c.nav);
-      for (const n of ["A", "B", "C"] as const) await addItem(page, c.make(n));
-      await expectItems(page, ["A", "B", "C"].map(c.headline));
-      await expect(preview.getByTestId(`site-section-${c.id}`)).toContainText(c.headline("C"));
+  await test.step("the Ablauf: events are chronological and every website shows them through Tagesablauf", async () => {
+    for (const n of ["C", "A", "B"] as const) await addEvent(page, weddingId, event(n));
+    const events = page.getByTestId("event").getByTestId("event-headline");
+    await expect(events).toHaveText([/^Programmpunkt A/, /^Programmpunkt B/, /^Programmpunkt C/]);
+    await page.getByTestId("event").filter({ hasText: "Programmpunkt A" }).getByRole("button", { name: /^Bearbeiten/ }).click();
+    const form = page.getByRole("form", { name: "Termin bearbeiten" });
+    await form.getByLabel("Name", { exact: true }).fill("Freie Trauung");
+    await form.getByLabel("Beschreibung", { exact: true }).fill("Bitte seid um 14 Uhr da.");
+    await form.getByRole("button", { name: "Speichern" }).click();
+    await expect(form).toBeHidden();
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByTestId("event").filter({ hasText: "Programmpunkt C" }).getByRole("button", { name: /^Löschen/ }).click();
+    await expect(events).toHaveText([/^Freie Trauung/, /^Programmpunkt B/]);
 
-      await editItem(page, c.headline("A"), c.edit);
-      await moveItem(page, c.headline("C"), "Nach oben");
-      await expectItems(page, [c.editedHeadline, c.headline("C"), c.headline("B")]);
-      await deleteItem(page, c.headline("C"));
-      await moveItem(page, c.headline("B"), "Nach oben");
-      await expectItems(page, [c.headline("B"), c.editedHeadline]);
+    const id = await openSection(page, editorUrl, "Tagesablauf");
+    await expectBlocks(page, ["Alle Termine"]);
+    const section = siteSection(preview, id);
+    await expect(section.getByTestId("site-event")).toHaveCount(2);
+    const text = await section.innerText();
+    expect(text.indexOf("Freie Trauung")).toBeLessThan(text.indexOf("Programmpunkt B"));
+    await renameSection(page, id, "Ablauf des Tages");
+    await toggleVisibility(page, id);
+  });
 
-      const section = preview.getByTestId(`site-section-${c.id}`);
+  for (const c of BLOCKS) {
+    await test.step(`manage ${c.type} blocks in ${c.nav}`, async () => {
+      const id = await openSection(page, editorUrl, c.nav);
+      sectionIds[c.nav] = id;
+      for (const n of ["A", "B", "C"] as const) await addBlock(page, c.type, c.make(n));
+      await expectBlocks(page, ["A", "B", "C"].map(c.headline));
+      await expect(siteSection(preview, id)).toContainText(c.headline("C"));
+
+      await editBlock(page, c.headline("A"), c.edit);
+      await moveBlock(page, c.headline("C"), "Nach oben");
+      await expectBlocks(page, [c.editedHeadline, c.headline("C"), c.headline("B")]);
+      await deleteBlock(page, c.headline("C"));
+      await moveBlock(page, c.headline("B"), "Nach oben");
+      await expectBlocks(page, [c.headline("B"), c.editedHeadline]);
+
+      const section = siteSection(preview, id);
       await expect(section).toContainText(c.editedHeadline);
       await expect(section).not.toContainText(c.headline("C"));
       const text = await section.innerText();
       expect(text.indexOf(c.headline("B"))).toBeLessThan(text.indexOf(c.editedHeadline));
 
-      await renameSection(page, c.id, c.renamed);
-      await toggleVisibility(page, c.id);
+      await renameSection(page, id, c.renamed);
+      await toggleVisibility(page, id);
     });
   }
 
   await test.step("hide a section; the overview marks it hidden", async () => {
     await openSection(page, editorUrl, "Wunschliste");
     await page.getByRole("switch", { name: "Abschnitt anzeigen" }).click();
-    await expect(preview.getByTestId("site-section-registry")).toHaveCount(0);
+    await expect(siteSection(preview, sectionIds["Geschenkideen"]!)).toHaveCount(0);
     await page.goto(editorUrl);
     await expect(page.getByTestId("section-nav").getByRole("link", { name: /Wunschliste/ })).toContainText("Ausgeblendet");
     await expect(page.getByTestId("section-nav").getByRole("link", { name: /Momente/ })).toContainText("Sichtbar");
@@ -213,13 +240,20 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
     await expect(guest).toHaveTitle("Anna & Ben heiraten");
     await expect(guest.locator('meta[property="og:title"]')).toHaveAttribute("content", "Anna & Ben heiraten");
     await expect(guest.locator('meta[property="og:image"]')).toHaveAttribute("content", /\/uploads\/.+\.webp$/);
-    const sections = await guest.locator("[data-testid^=site-section-]").evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
-    expect(sections).toEqual(["our-story", "schedule", "travel", "things-to-do", "wedding-party", "gallery", "faqs"].map((id) => `site-section-${id}`));
+    await expect(guest.getByTestId("site-section").getByRole("heading", { level: 2 })).toHaveText([
+      "Wie alles begann",
+      "Ablauf des Tages",
+      "Anreise & Hotels",
+      "Tipps für euch",
+      "Unsere Liebsten",
+      "Momente",
+      "Fragen & Antworten",
+    ]);
     const nav = guest.getByRole("navigation", { name: "Abschnitte" });
     await expect(nav.getByRole("link")).toHaveText(["Start", "Wie alles begann", "Ablauf des Tages", "Anreise & Hotels", "Tipps für euch", "Unsere Liebsten", "Momente", "Fragen & Antworten"]);
     await expect(guest.getByText("Wunsch B")).toHaveCount(0);
     await expect(guest.getByText("Gibt es einen Dresscode?")).toBeVisible();
-    await expect(guest.getByTestId("site-section-wedding-party")).toContainText("Trauzeugin");
+    await expect(siteSection(guest, sectionIds["Hochzeitsgesellschaft"]!)).toContainText("Trauzeugin");
 
     const event = guest.getByTestId("site-event").filter({ hasText: "Freie Trauung" });
     await expect(event).toContainText("14:30 – 15:30 Uhr");
@@ -294,7 +328,7 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
     const benForeign = recordForeignRequests(ben, baseURL!);
     const benPage = await ben.newPage();
     await login(benPage, uniqueEmail("ben"), "Ben");
-    for (const url of [homeUrl(weddingId), `${homeUrl(weddingId)}/gaeste`, editorUrl, `${editorUrl}/home`, `${editorUrl}/faqs`]) {
+    for (const url of [homeUrl(weddingId), `${homeUrl(weddingId)}/gaeste`, scheduleUrl(weddingId), editorUrl, `${editorUrl}/home`, `${editorUrl}/${sectionIds["Häufige Fragen"]}`]) {
       const res = await benPage.goto(url);
       expect(res?.status()).toBe(404);
       await expect(benPage.getByRole("heading", { name: "Seite nicht gefunden" })).toBeVisible();
