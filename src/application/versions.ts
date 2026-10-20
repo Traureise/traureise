@@ -5,7 +5,8 @@ import type { Deps } from "./deps";
 import { LockedError, NotFoundError, ValidationError } from "./errors";
 import { loadGuestContext, type GuestContext } from "./guest-context";
 import { loadOwnedWedding, releaseImages } from "./owned";
-import type { Card, Website } from "./ports";
+import type { Card, NewSection, Website } from "./ports";
+import { standardSections } from "./sections";
 import { uniqueSlug } from "./slugs";
 
 type Version = { id: string; label: string; position: number };
@@ -48,8 +49,14 @@ export class AddVersion {
   /**
    * "+ Version": a copy of an existing version (by default the first) under a new name, for another audience.
    * Extra versions are paid per item (VERSION_FEATURES); a new website version starts as a draft with its own address.
+   * A website version `fromTemplate` takes only the source's design and starts with the standard template's sections.
    */
-  async execute(userId: string, weddingId: string, item: VersionItem, input: { label: unknown; copyFrom: string | null }): Promise<Version> {
+  async execute(
+    userId: string,
+    weddingId: string,
+    item: VersionItem,
+    input: { label: unknown; copyFrom: string | null; fromTemplate?: boolean },
+  ): Promise<Version> {
     const { wedding, ctx } = await load(this.deps, userId, weddingId, item);
     if (!ctx.can(VERSION_FEATURES[item])) throw new LockedError();
     const label = parseLabel(input.label);
@@ -61,9 +68,8 @@ export class AddVersion {
     if (item === "website") {
       const site = source as Website;
       const slug = await uniqueSlug(this.deps, `${wedding.slug}-${slugify(label)}`, { wedding: weddingId, website: null });
-      const created = await this.deps.websites.create({ ...fieldsOf(site), label, position, slug, published: false }, await this.deps.websites.listSections(site.id));
-      for (const i of await this.deps.websites.listItems(site.id)) await this.deps.websites.addItem(created.id, i.kind, i.data);
-      return created;
+      const sections = input.fromTemplate ? standardSections(this.deps.siteTexts) : await this.copySections(site.id);
+      return this.deps.websites.create({ ...fieldsOf(site), label, position, slug, published: false }, sections);
     }
 
     const card = source as Card;
@@ -72,6 +78,17 @@ export class AddVersion {
     let slug = base;
     for (let n = 2; taken.has(slug); n++) slug = `${base}-${n}`;
     return this.deps.cards.create({ ...fieldsOf(card), label, slug, position });
+  }
+
+  /** The sections with their blocks, in order. Event blocks keep pointing to the wedding's events. */
+  private async copySections(websiteId: string): Promise<NewSection[]> {
+    const [sections, blocks] = await Promise.all([this.deps.websites.listSections(websiteId), this.deps.websites.listBlocks(websiteId)]);
+    return sections.map(({ title, visible, suggestedType, id }) => ({
+      title,
+      visible,
+      suggestedType,
+      blocks: blocks.filter((b) => b.sectionId === id).map((b) => b.data),
+    }));
   }
 }
 
@@ -101,7 +118,7 @@ export class DeleteVersion {
     if (versionsOf(ctx, item).length <= 1) throw new ValidationError({ _: "last_version" });
     if (item === "website") {
       const site = version as Website;
-      const photos = [site.coverImageKey, ...(await this.deps.websites.listItems(site.id)).flatMap((i) => imageKeysOf(i.data))];
+      const photos = [site.coverImageKey, ...(await this.deps.websites.listBlocks(site.id)).flatMap((b) => imageKeysOf(b.data))];
       await this.deps.websites.delete(site.id);
       await releaseImages(this.deps, weddingId, photos);
     } else {

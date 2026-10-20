@@ -3,12 +3,22 @@ import { GetHouseholdPage, ShareCard, SendCardEmails, RunMailJobs } from "@/appl
 import { LockedError, NotFoundError, ValidationError } from "@/application/errors";
 import { GetGuestPage, SaveHousehold } from "@/application/guests";
 import { GetPublicWebsite } from "@/application/public";
-import { AddItem } from "@/application/sections";
+import { AddBlock, DeleteSection } from "@/application/sections";
+import { UploadImage } from "@/application/uploads";
 import { AddVersion, AssignVersion, DeleteVersion, RenameVersion } from "@/application/versions";
 import { CreateWedding } from "@/application/weddings";
 import { SetPublished } from "@/application/websites";
 import type { PaidTier } from "@/domain/billing";
-import { createFakes } from "../../fakes";
+import { parseEvent } from "@/domain/sections";
+import { JPEG, createFakes } from "../../fakes";
+
+const STANDARD_TITLES = ["Unsere Geschichte", "Tagesablauf", "Anreise", "Empfehlungen", "Geschenkideen", "Hochzeitsgesellschaft", "Galerie", "Häufige Fragen"];
+
+function trauung() {
+  const parsed = parseEvent({ eventType: "ceremony", name: "Trauung", startDate: "2027-06-12", startTime: "14:30" });
+  if (!parsed.ok) throw new Error("fixture");
+  return parsed.value;
+}
 
 let f: ReturnType<typeof createFakes>;
 let anna: { id: string };
@@ -43,14 +53,53 @@ describe("adding versions", () => {
     expect((await cardsOf("saveTheDate")).map((c) => c.slug)).toEqual(["standard", "familie", "familie-2"]);
   });
 
-  it("adds a website version with its own address, as a draft, with sections and items copied", async () => {
+  it("adds a website version with its own address, as a draft, with sections and blocks copied", async () => {
     const [first] = await f.websites.listByWedding(weddingId);
-    await f.websites.addItem(first!.id, "faqs", { question: "Parken?", answer: "Am Hof.", imageKey: null });
+    const sections = await f.websites.listSections(first!.id);
+    const faqs = sections.find((x) => x.title === "Häufige Fragen")!;
+    await f.websites.updateSection(faqs.id, { title: "Fragen" });
+    await f.websites.addBlock(first!.id, faqs.id, { type: "faq", question: "Parken?", answer: "Am Hof.", imageKey: null });
+    const event = await f.weddings.addEvent(weddingId, trauung());
+    await f.websites.addBlock(first!.id, faqs.id, { type: "event", eventId: event.id });
     const friends = await add("website", "Freunde", first!.id);
     const site = (await f.websites.findById(friends.id))!;
     expect(site).toMatchObject({ label: "Freunde", position: 1, slug: "anna-und-ben-freunde", published: false });
-    expect((await f.websites.listItems(site.id)).map((i) => i.kind)).toEqual(["faqs"]);
-    expect((await f.websites.listSections(site.id)).length).toBeGreaterThan(0);
+    const copied = await f.websites.listSections(site.id);
+    expect(copied.map((x) => x.title)).toEqual(sections.map((x) => (x.id === faqs.id ? "Fragen" : x.title)));
+    expect(copied.map((x) => x.id)).not.toContain(faqs.id);
+    const blocks = await f.websites.listBlocks(site.id);
+    expect(blocks.map((b) => b.data)).toEqual([
+      { type: "event", eventId: null },
+      { type: "faq", question: "Parken?", answer: "Am Hof.", imageKey: null },
+      { type: "event", eventId: event.id },
+    ]);
+    expect(blocks[1]!.sectionId).toBe(copied.find((x) => x.title === "Fragen")!.id);
+  });
+
+  it("adds a website version from the standard template, keeping the source's design", async () => {
+    const [first] = await f.websites.listByWedding(weddingId);
+    await f.websites.update(first!.id, { themeId: "bogen", welcomeMessage: "Hallo" });
+    const [story] = await f.websites.listSections(first!.id);
+    await f.websites.updateSection(story!.id, { title: "Wie alles begann" });
+    await f.websites.addBlock(first!.id, story!.id, { type: "text", text: "Es war einmal" });
+    const friends = await new AddVersion(f.deps).execute(anna.id, weddingId, "website", { label: "Freunde", copyFrom: first!.id, fromTemplate: true });
+    const site = (await f.websites.findById(friends.id))!;
+    expect(site).toMatchObject({ themeId: "bogen", welcomeMessage: "Hallo", published: false });
+    expect((await f.websites.listSections(site.id)).map((x) => x.title)).toEqual(STANDARD_TITLES);
+    expect((await f.websites.listBlocks(site.id)).map((b) => b.data)).toEqual([{ type: "event", eventId: null }]);
+  });
+
+  it("deletes a section of a copied version without deleting the photo the original still shows", async () => {
+    const [first] = await f.websites.listByWedding(weddingId);
+    const gallery = (await f.websites.listSections(first!.id)).find((x) => x.title === "Galerie")!;
+    const key = await new UploadImage(f.deps).execute(anna.id, weddingId, { bytes: JPEG, size: JPEG.length, contentType: "image/jpeg" });
+    await new AddBlock(f.deps).execute(anna.id, first!.id, gallery.id, { type: "image", imageKey: key, caption: "" });
+    const friends = await add("website", "Freunde", first!.id);
+    const copiedGallery = (await f.websites.listSections(friends.id)).find((x) => x.title === "Galerie")!;
+    await new DeleteSection(f.deps).execute(anna.id, friends.id, copiedGallery.id);
+    expect(f.storage.files.has(key)).toBe(true);
+    await new DeleteSection(f.deps).execute(anna.id, first!.id, gallery.id);
+    expect(f.storage.files.has(key)).toBe(false);
   });
 
   it("are paid: Einladungen for Save the Dates and invitations, Komplett for the others, any package for a website", async () => {
@@ -190,11 +239,9 @@ describe("who gets what", () => {
     expect(page.versionChoices.map((c) => [c.item, c.versions.map((v) => v.label)])).toEqual([["invitation", ["Standard", "Familie"]]]);
   });
 
-  it("events belong to the wedding; each website version chooses which it shows", async () => {
-    const [first] = await f.websites.listByWedding(weddingId);
-    await new AddItem(f.deps).execute(anna.id, first!.id, "schedule", { eventType: "ceremony", name: "Trauung", startDate: "2027-06-12", startTime: "14:30" });
-    const friends = await add("website", "Freunde");
-    expect((await f.weddings.listEvents(weddingId)).map((e) => e.data.name)).toEqual(["Trauung"]);
-    expect(await f.websites.listItems(friends.id)).toEqual([]);
+  it("events belong to the wedding; a copied version points to the same events", async () => {
+    const event = await f.weddings.addEvent(weddingId, trauung());
+    await add("website", "Freunde");
+    expect((await f.weddings.listEvents(weddingId)).map((e) => e.id)).toEqual([event.id]);
   });
 });

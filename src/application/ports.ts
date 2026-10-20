@@ -1,4 +1,4 @@
-import type { BlockData, BlockType, EventData } from "@/domain/sections";
+import type { BlockData, BlockType, EventData, SectionTemplate } from "@/domain/sections";
 import type { Entitlement, PaidTier, Tier, TierOffer } from "@/domain/billing";
 import type { ThemeManifest } from "@/domain/theme";
 import type { Household, HouseholdInput, HouseholdResponse, Poll, PollInput, RequestStatus, RsvpSettings } from "@/domain/guests";
@@ -427,6 +427,9 @@ export interface CardRenderer {
   png(model: CardModel, photo: Uint8Array | null, width: number): Promise<Uint8Array>;
   pdf(model: CardModel, photo: Uint8Array | null, format: PaperFormat): Promise<Uint8Array>;
 }
+
+/** Translated texts for websites: the standard template's section titles and a new section's title. */
+export type SiteTexts = { sectionTitles: Record<SectionTemplate, string>; newSectionTitle: string };
 
 /** Translated texts for cards (labels on the card, defaults for new cards). */
 export type CardTexts = {

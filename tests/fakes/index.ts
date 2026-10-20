@@ -38,6 +38,7 @@ import type {
   SectionPatch,
   SessionRecord,
   SessionRepository,
+  SiteTexts,
   StoredFile,
   ThemeCatalog,
   TokenGenerator,
@@ -604,6 +605,20 @@ export const fakeCardMail: CardMailTemplates = {
   reminder: (m) => ({ subject: `Erinnerung: ${m.couple}`, text: JSON.stringify(m), html: "" }),
 };
 
+export const fakeSiteTexts: SiteTexts = {
+  sectionTitles: {
+    "our-story": "Unsere Geschichte",
+    schedule: "Tagesablauf",
+    travel: "Anreise",
+    "things-to-do": "Empfehlungen",
+    registry: "Geschenkideen",
+    "wedding-party": "Hochzeitsgesellschaft",
+    gallery: "Galerie",
+    faqs: "Häufige Fragen",
+  },
+  newSectionTitle: "Neuer Abschnitt",
+};
+
 export const fakeCardTexts: CardTexts = {
   labels: {
     locale: "de",
@@ -920,6 +935,7 @@ export function createFakes() {
     cardRenderer: new FakeCardRenderer(),
     cardMail: fakeCardMail,
     cardTexts: fakeCardTexts,
+    siteTexts: fakeSiteTexts,
     mailRate: { batchSize: 50, intervalMs: 0 },
     appUrl: "http://localhost:3000",
   };
