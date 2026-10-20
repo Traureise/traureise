@@ -2,44 +2,45 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { saveItemAction } from "@/app/actions/editor";
 import { DateField } from "@/components/forms/date-field";
 import { FieldError } from "@/components/forms/field-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { CollectionKind } from "@/domain/sections";
 import { ImageField } from "./image-field";
-import { ITEM_FIELDS, type FieldSpec } from "./item-fields";
+import type { FieldSpec } from "./block-fields";
 import { useSave } from "./use-save";
 
 type Props = {
-  websiteId: string;
   /** Photos belong to the wedding. */
   weddingId: string;
-  kind: CollectionKind;
-  itemId: string | null;
+  fields: FieldSpec[];
   initial: Record<string, unknown>;
+  /** Keeps input ids unique when several forms are on the page. */
+  idPrefix: string;
+  /** The form's accessible name. */
+  label: string;
+  onSubmit: (data: Record<string, unknown>) => Promise<{ ok: true } | { ok: false; fieldErrors?: Record<string, string>; error?: string }>;
   onDone: () => void;
 };
 
-export function ItemForm({ websiteId, weddingId, kind, itemId, initial, onDone }: Props) {
+/** A form for one block or event, laid out from field specs. */
+export function FieldForm({ weddingId, fields, initial, idPrefix, label, onSubmit, onDone }: Props) {
   const t = useTranslations();
   const { pending, errors, save } = useSave();
   const [images, setImages] = useState<Record<string, string | null>>(
-    Object.fromEntries(ITEM_FIELDS[kind].filter((f) => f.type === "image").map((f) => [f.name, (initial[f.name] as string | null) ?? null])),
+    Object.fromEntries(fields.filter((f) => f.type === "image").map((f) => [f.name, (initial[f.name] as string | null) ?? null])),
   );
-  const prefix = itemId ?? "new";
 
   function submit(form: FormData) {
     const data: Record<string, unknown> = {};
-    for (const field of ITEM_FIELDS[kind]) data[field.name] = field.type === "image" ? images[field.name] : String(form.get(field.name) ?? "");
-    save(() => saveItemAction(websiteId, kind, itemId, data), onDone);
+    for (const field of fields) data[field.name] = field.type === "image" ? images[field.name] : String(form.get(field.name) ?? "");
+    save(() => onSubmit(data), onDone);
   }
 
   function input(field: FieldSpec) {
-    const id = `${prefix}-${field.name}`;
+    const id = `${idPrefix}-${field.name}`;
     const label = t(`editor.fields.${field.name === "imageKey" ? "image" : field.name}`);
     const value = initial[field.name];
     const common = { id, name: field.name, "aria-describedby": `${id}-error`, "aria-invalid": errors[field.name] ? true : undefined };
@@ -80,8 +81,8 @@ export function ItemForm({ websiteId, weddingId, kind, itemId, initial, onDone }
   }
 
   return (
-    <form onSubmit={(e) => (e.preventDefault(), submit(new FormData(e.currentTarget)))} className="space-y-4 rounded-xl border border-primary/30 bg-background p-4" aria-label={itemId ? t("editor.section.editItem") : t("editor.section.newItem")}>
-      {ITEM_FIELDS[kind].map((field) => (
+    <form onSubmit={(e) => (e.preventDefault(), submit(new FormData(e.currentTarget)))} className="space-y-4 rounded-xl border border-primary/30 bg-background p-4" aria-label={label}>
+      {fields.map((field) => (
         <div key={field.name}>{input(field)}</div>
       ))}
       <div className="flex justify-end gap-2">

@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { ValidationError } from "@/application/errors";
 import { container } from "@/composition/container";
 import type { Direction } from "@/domain/ordering";
-import type { CollectionKind, SectionKind } from "@/domain/sections";
+import type { SectionTemplate } from "@/domain/sections";
 import { runAction, type ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/session";
 
@@ -53,24 +54,39 @@ export async function setCoverImageAction(websiteId: string, imageKey: string | 
   return edit(websiteId, (userId) => container().setCoverImage.execute(userId, websiteId, imageKey));
 }
 
-export async function updateSectionAction(websiteId: string, kind: SectionKind, patch: { title?: string; visible?: boolean; body?: string }) {
-  return edit(websiteId, (userId) => container().updateSection.execute(userId, websiteId, kind, patch));
+export async function addSectionAction(websiteId: string, template: SectionTemplate | null) {
+  return edit(websiteId, async (userId) => (await container().addSection.execute(userId, websiteId, { template })).id);
 }
 
-export async function saveItemAction(websiteId: string, kind: CollectionKind, itemId: string | null, data: Record<string, unknown>) {
+export async function updateSectionAction(websiteId: string, sectionId: string, patch: { title?: string; visible?: boolean }) {
+  return edit(websiteId, (userId) => container().updateSection.execute(userId, websiteId, sectionId, patch));
+}
+
+/** Goes back to the version's overview: the deleted section's page no longer exists. */
+export async function deleteSectionAction(weddingId: string, websiteId: string, sectionId: string) {
+  const result = await edit(websiteId, (userId) => container().deleteSection.execute(userId, websiteId, sectionId));
+  if (result.ok) redirect(`/hochzeiten/${weddingId}/website/${websiteId}`);
+  return result;
+}
+
+export async function moveSectionAction(websiteId: string, sectionId: string, direction: Direction) {
+  return edit(websiteId, (userId) => container().moveSection.execute(userId, websiteId, sectionId, direction));
+}
+
+export async function saveBlockAction(websiteId: string, sectionId: string, blockId: string | null, data: Record<string, unknown>) {
   return edit(websiteId, async (userId) => {
-    if (itemId) await container().updateItem.execute(userId, websiteId, itemId, data);
-    else await container().addItem.execute(userId, websiteId, kind, data);
+    if (blockId) await container().updateBlock.execute(userId, websiteId, blockId, data);
+    else await container().addBlock.execute(userId, websiteId, sectionId, data);
     return undefined;
   });
 }
 
-export async function deleteItemAction(websiteId: string, itemId: string) {
-  return edit(websiteId, (userId) => container().deleteItem.execute(userId, websiteId, itemId));
+export async function deleteBlockAction(websiteId: string, blockId: string) {
+  return edit(websiteId, (userId) => container().deleteBlock.execute(userId, websiteId, blockId));
 }
 
-export async function moveItemAction(websiteId: string, itemId: string, direction: Direction) {
-  return edit(websiteId, (userId) => container().moveItem.execute(userId, websiteId, itemId, direction));
+export async function moveBlockAction(websiteId: string, blockId: string, direction: Direction) {
+  return edit(websiteId, (userId) => container().moveBlock.execute(userId, websiteId, blockId, direction));
 }
 
 export async function selectThemeAction(websiteId: string, themeId: string) {
@@ -83,8 +99,4 @@ export async function updateDesignAction(websiteId: string, input: { paletteId: 
 
 export async function setPublishedAction(websiteId: string, published: boolean) {
   return edit(websiteId, (userId) => container().setPublished.execute(userId, websiteId, published));
-}
-
-export async function setEventShownAction(websiteId: string, eventId: string, shown: boolean) {
-  return edit(websiteId, (userId) => container().setEventShown.execute(userId, websiteId, eventId, shown));
 }

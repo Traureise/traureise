@@ -199,20 +199,43 @@
       "shown": "Wird angezeigt",
       "hidden": "Ist ausgeblendet",
       "titleLabel": "Titel des Abschnitts",
-      "titleHint": "Leer lassen für den Standardtitel „{default}“.",
-      "add": "Hinzufügen",
       "edit": "Bearbeiten",
       "delete": "Löschen",
       "moveUp": "Nach oben",
       "moveDown": "Nach unten",
-      "empty": "Noch keine Einträge.",
-      "deleteConfirm": "Eintrag löschen?",
-      "deleted": "Eintrag gelöscht",
-      "storyLabel": "Eure Geschichte",
-      "newItem": "Neuer Eintrag",
-      "editItem": "Eintrag bearbeiten",
-      "sharedSchedule": "Der Tagesablauf gilt für die ganze Hochzeit: Änderungen sehen alle Website-Versionen, die Einladungen und das Antwortformular.",
-      "showOnVersion": "Auf dieser Website zeigen"
+      "empty": "Noch keine Bausteine.",
+      "deleteConfirm": "Baustein löschen?",
+      "deleted": "Baustein gelöscht"
+    },
+    "sections": {
+      "add": "Abschnitt hinzufügen",
+      "addLead": "Ein leerer Abschnitt oder ein Abschnitt aus der Vorlage, mit seinen Standardbausteinen.",
+      "empty": "Leerer Abschnitt",
+      "fromTemplate": "Aus der Vorlage",
+      "delete": "Abschnitt löschen",
+      "deleteConfirm": "Abschnitt mit allen Bausteinen löschen?",
+      "created": "Abschnitt hinzugefügt",
+      "cancel": "Abbrechen",
+      "submit": "Hinzufügen"
+    },
+    "blocks": {
+      "addBlock": "Baustein hinzufügen",
+      "addSuggested": "{type} hinzufügen",
+      "types": {
+        "text": "Text",
+        "event": "Termin",
+        "person": "Person",
+        "place": "Ort",
+        "link": "Link",
+        "faq": "Frage & Antwort",
+        "image": "Bild"
+      },
+      "allEvents": "Alle Termine",
+      "chooseEvent": "Termin",
+      "newEvent": "Neuer Termin",
+      "eventShared": "Termine gehören zum Ablauf der Hochzeit: Änderungen gelten für alle Website-Versionen, die Einladungen und das Antwortformular.",
+      "newBlock": "Neuer Baustein",
+      "editBlock": "Baustein bearbeiten"
     },
     "fields": {
       "image": "Bild",
@@ -226,12 +249,13 @@
       "address": "Adresse",
       "description": "Beschreibung",
       "website": "Website",
-      "type": "Art",
+      "placeType": "Art",
       "url": "Link",
       "role": "Rolle",
       "caption": "Bildunterschrift",
       "question": "Frage",
       "answer": "Antwort",
+      "text": "Text",
       "chooseOption": "Bitte wählen"
     },
     "publish": {

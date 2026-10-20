@@ -54,6 +54,7 @@ import { createCardMailTemplates, createCardTexts } from "@/infrastructure/mail/
 import { createSiteTexts } from "@/infrastructure/site-texts";
 import { DrizzleCardRepository } from "@/infrastructure/repositories/cards";
 import { DrizzleGuestRepository } from "@/infrastructure/repositories/guests";
+import { AddEvent, DeleteEvent, ListEvents, UpdateEvent } from "@/application/schedule";
 import { AddBlock, AddSection, DeleteBlock, DeleteSection, MoveBlock, MoveSection, UpdateBlock, UpdateSection } from "@/application/sections";
 import { GetUpload, UploadImage } from "@/application/uploads";
 import { AddVersion, AssignVersion, DeleteVersion, RenameVersion } from "@/application/versions";
@@ -195,6 +196,10 @@ function build() {
     setCoverImage: new SetCoverImage(deps),
     selectTheme: new SelectTheme(deps),
     updateDesign: new UpdateDesign(deps),
+    listEvents: new ListEvents(deps),
+    addEvent: new AddEvent(deps),
+    updateEvent: new UpdateEvent(deps),
+    deleteEvent: new DeleteEvent(deps),
     addSection: new AddSection(deps),
     updateSection: new UpdateSection(deps),
     deleteSection: new DeleteSection(deps),

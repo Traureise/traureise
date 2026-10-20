@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
-import { itemsOf } from "@/application/views";
 import { DesignPicker } from "@/components/editor/design-picker";
 import { HomeForm } from "@/components/editor/home-form";
 import { Panel } from "@/components/editor/panel";
@@ -9,7 +8,6 @@ import { ThemePicker } from "@/components/editor/theme-picker";
 import { WeddingDetailsButton } from "@/components/weddings/wedding-details-dialog";
 import { container } from "@/composition/container";
 import { FONT_PAIRINGS } from "@/domain/fonts";
-import { isCollectionKind, isSectionKind } from "@/domain/sections";
 import { localize } from "@/domain/theme";
 import { themeAssetUrl } from "@/lib/format";
 import { loadEditorView } from "@/lib/editor";
@@ -18,7 +16,6 @@ export default async function EditorSectionPage({ params }: { params: Promise<{ 
   const { id: weddingId, websiteId: id, section } = await params;
   const view = await loadEditorView(weddingId, id);
   const t = await getTranslations("editor");
-  const tTitles = await getTranslations("sections.titles");
   const locale = await getLocale();
   const c = container();
   const back = { backHref: `/hochzeiten/${weddingId}/website/${id}`, backLabel: t("backToOverview") };
@@ -65,18 +62,13 @@ export default async function EditorSectionPage({ params }: { params: Promise<{ 
     );
   }
 
-  if (!isSectionKind(section)) notFound();
-  const current = view.sections.find((s) => s.kind === section)!;
+  // Anything else is a section id; one of another version (or unknown) is a 404.
+  const current = view.sections.find((s) => s.id === section);
+  if (!current) notFound();
+  const { blocks, ...rest } = current;
   return (
-    <Panel {...back} title={current.title ?? tTitles(section)}>
-      <SectionEditor
-        websiteId={id}
-        weddingId={weddingId}
-        section={current}
-        // The schedule lists every event of the wedding; this version shows those not hidden.
-        items={section === "schedule" ? view.events : isCollectionKind(section) ? itemsOf(view, section) : []}
-        hiddenEventIds={view.website.hiddenEventIds}
-      />
+    <Panel {...back} title={current.title}>
+      <SectionEditor websiteId={id} weddingId={weddingId} section={rest} blocks={blocks} events={view.events} />
     </Panel>
   );
 }
