@@ -342,6 +342,20 @@
       "helper": "Helfer:in"
     }
   },
+  "schedule": {
+    "title": "Ablauf",
+    "lead": "Alle Termine eurer Hochzeit. Websites, Einladungen und das Antwortformular zeigen sie von hier.",
+    "add": "Termin hinzufügen",
+    "newEvent": "Neuer Termin",
+    "editEvent": "Termin bearbeiten",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "deleteConfirm": "Termin löschen? Er verschwindet auch von allen Websites.",
+    "deleted": "Termin gelöscht",
+    "empty": "Noch keine Termine.",
+    "summary": "{count, plural, =0 {Noch keine Termine} one {# Termin} other {# Termine}}",
+    "editSchedule": "Ablauf bearbeiten"
+  },
   "site": {
     "home": "Start",
     "dateOpen": "Datum noch offen",
@@ -1001,7 +1015,11 @@
       "deleteTitle": "„{label}“ löschen?",
       "deleteBody": "Haushalte mit dieser Version bekommen danach die erste Version. Was schon gesendet wurde, bleibt gesendet.",
       "deleteConfirm": "Endgültig löschen",
-      "deleted": "Version gelöscht"
+      "deleted": "Version gelöscht",
+      "fromTemplate": "Aus Vorlage erstellen",
+      "fromCopy": "Kopie einer Version",
+      "designFrom": "Design von",
+      "fromTemplateHint": "Die Abschnitte der Vorlage, mit dem Design der gewählten Version."
     },
     "items": {
       "engagement": "Verlobungsanzeige",
