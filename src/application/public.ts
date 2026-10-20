@@ -4,7 +4,7 @@ import { firstVersion } from "@/domain/weddings";
 import { weddingBySlug } from "./cards";
 import type { Deps } from "./deps";
 import { loadGuestContext } from "./guest-context";
-import { itemsOf, loadView, type WebsiteView } from "./views";
+import { loadView, shownEventIds, type WebsiteView } from "./views";
 
 export class GetPublicWebsite {
   constructor(private deps: Deps) {}
@@ -29,9 +29,8 @@ export class GetEventIcs {
   /** An event's calendar file, for an event the public website shows. */
   async execute(slug: string, itemId: string): Promise<{ filename: string; content: string } | null> {
     const view = await new GetPublicWebsite(this.deps).execute(slug);
-    if (!view || !view.sections.find((s) => s.kind === "schedule")?.visible) return null;
-    const event = itemsOf(view, "schedule").find((i) => i.id === itemId);
-    if (!event) return null;
+    if (!view || !shownEventIds(view).has(itemId)) return null;
+    const event = view.events.find((e) => e.id === itemId)!;
     const e = event.data;
     const content = buildIcs(
       {

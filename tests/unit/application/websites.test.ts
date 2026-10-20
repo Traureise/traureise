@@ -6,15 +6,12 @@ import {
   GetWebsiteForOwner,
   SelectTheme,
   SetCoverImage,
-  SetEventShown,
   SetPublished,
   UpdateDesign,
   UpdateHome,
   UpdateSlug,
 } from "@/application/websites";
-import { AddItem } from "@/application/sections";
 import { UploadImage } from "@/application/uploads";
-import { SECTION_KINDS } from "@/domain/sections";
 import { JPEG, createFakes } from "../../fakes";
 
 let f: ReturnType<typeof createFakes>;
@@ -37,8 +34,8 @@ const upload = (userId = anna, wedding = weddingId) => new UploadImage(f.deps).e
 describe("the first website version", () => {
   it("has every section, the default theme and the wedding's names and date", async () => {
     const view = await new GetWebsiteForOwner(f.deps).execute(anna, id);
-    expect(view.sections.map((s) => s.kind)).toEqual(SECTION_KINDS);
-    expect(view.sections.every((s) => s.visible && s.title === null)).toBe(true);
+    expect(view.sections).toHaveLength(8);
+    expect(view.sections.every((s) => s.visible)).toBe(true);
     expect(view.website).toMatchObject({ title: "Anna & Ben", weddingDate: "2027-06-12", timezone: "Europe/Berlin", themeId: "salbei", published: false });
     expect(view).toMatchObject({ online: false, publicUrl: "http://localhost:3000/anna-und-ben", versions: [{ id, label: "Standard" }] });
   });
@@ -135,18 +132,3 @@ describe("editing", () => {
   });
 });
 
-describe("events", () => {
-  it("belong to the wedding; a version can leave some out", async () => {
-    const trauung = await new AddItem(f.deps).execute(anna, id, "schedule", { eventType: "ceremony", name: "Trauung", startDate: "2027-06-12", startTime: "14:30" });
-    const friends = await new AddVersion(f.deps).execute(anna, weddingId, "website", { label: "Freunde", copyFrom: null });
-    const names = async (websiteId: string) => (await new GetWebsiteForOwner(f.deps).execute(anna, websiteId)).items.filter((i) => i.kind === "schedule").map((i) => (i.data as { name: string }).name);
-    expect(await names(friends.id)).toEqual(["Trauung"]);
-    await new SetEventShown(f.deps).execute(anna, friends.id, trauung.id, false);
-    expect(await names(friends.id)).toEqual([]);
-    expect(await names(id)).toEqual(["Trauung"]);
-    expect((await new GetWebsiteForOwner(f.deps).execute(anna, friends.id)).events.map((e) => e.data.name)).toEqual(["Trauung"]);
-    await new SetEventShown(f.deps).execute(anna, friends.id, trauung.id, true);
-    expect(await names(friends.id)).toEqual(["Trauung"]);
-    await expect(new SetEventShown(f.deps).execute(anna, friends.id, "nope", false)).rejects.toBeInstanceOf(NotFoundError);
-  });
-});

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { GetEventIcs, GetPublicWebsite, GetWeddingIcs } from "@/application/public";
-import { AddItem, UpdateSection } from "@/application/sections";
+import { AddEvent } from "@/application/schedule";
+import { AddBlock, UpdateSection } from "@/application/sections";
 import { AddVersion } from "@/application/versions";
-import { GetWebsiteForOwner, SetPublished, UpdateSlug } from "@/application/websites";
-import { renderableSections } from "@/application/views";
+import { SetPublished, UpdateSlug } from "@/application/websites";
 import { createFakes } from "../../fakes";
 import { newWedding } from "../../fakes/wedding";
 
@@ -37,7 +37,7 @@ describe("GetPublicWebsite", () => {
   });
 
   it("is null for a draft, and so are its calendar events", async () => {
-    const item = await new AddItem(f.deps).execute(anna, websiteId, "schedule", event);
+    const item = await new AddEvent(f.deps).execute(anna, weddingId, event);
     await new SetPublished(f.deps).execute(anna, websiteId, false);
     expect(await new GetPublicWebsite(f.deps).execute("anna-und-ben")).toBeNull();
     expect(await new GetEventIcs(f.deps).execute("anna-und-ben", item.id)).toBeNull();
@@ -58,34 +58,28 @@ describe("GetPublicWebsite", () => {
   });
 });
 
-describe("renderableSections", () => {
-  it("contains visible sections with content in fixed order, and nothing hidden", async () => {
-    await new AddItem(f.deps).execute(anna, websiteId, "faqs", { question: "Parken?", answer: "Ja" });
-    await new AddItem(f.deps).execute(anna, websiteId, "schedule", event);
-    await new UpdateSection(f.deps).execute(anna, websiteId, "our-story", { body: "Kennengelernt im Zug." });
-    await new AddItem(f.deps).execute(anna, websiteId, "registry", { name: "Kasse", url: "https://example.org" });
-    await new UpdateSection(f.deps).execute(anna, websiteId, "registry", { visible: false });
-
-    const view = await new GetWebsiteForOwner(f.deps).execute(anna, websiteId);
-    const sections = renderableSections(view);
-    expect(sections.map((s) => s.kind)).toEqual(["our-story", "schedule", "faqs"]);
-    expect(sections[2]!.items).toHaveLength(1);
-  });
-});
-
 describe("GetEventIcs", () => {
-  it("exports a visible schedule event and nothing else", async () => {
-    const item = await new AddItem(f.deps).execute(anna, websiteId, "schedule", event);
+  const sectionTitled = async (title: string) => (await f.websites.listSections(websiteId)).find((s) => s.title === title)!;
+
+  it("exports an event the site shows through a visible all-events block, and nothing else", async () => {
+    const item = await new AddEvent(f.deps).execute(anna, weddingId, event);
     const ics = await new GetEventIcs(f.deps).execute("anna-und-ben", item.id);
     expect(ics?.filename).toBe("trauung.ics");
     expect(ics?.content).toContain("DTSTART:20270612T120000Z");
     expect(ics?.content).toContain("URL:http://localhost:3000/anna-und-ben");
+    expect(await new GetEventIcs(f.deps).execute("anna-und-ben", "nope")).toBeNull();
+  });
 
-    const faq = await new AddItem(f.deps).execute(anna, websiteId, "faqs", { question: "Q", answer: "A" });
-    expect(await new GetEventIcs(f.deps).execute("anna-und-ben", faq.id)).toBeNull();
-
-    await new UpdateSection(f.deps).execute(anna, websiteId, "schedule", { visible: false });
+  it("is null for an event only a hidden section shows", async () => {
+    const item = await new AddEvent(f.deps).execute(anna, weddingId, event);
+    const schedule = await sectionTitled("Tagesablauf");
+    await new UpdateSection(f.deps).execute(anna, websiteId, schedule.id, { visible: false });
+    const faqs = await sectionTitled("Häufige Fragen");
+    await new UpdateSection(f.deps).execute(anna, websiteId, faqs.id, { visible: false });
+    await new AddBlock(f.deps).execute(anna, websiteId, faqs.id, { type: "event", eventId: item.id });
     expect(await new GetEventIcs(f.deps).execute("anna-und-ben", item.id)).toBeNull();
+    await new UpdateSection(f.deps).execute(anna, websiteId, faqs.id, { visible: true });
+    expect(await new GetEventIcs(f.deps).execute("anna-und-ben", item.id)).not.toBeNull();
   });
 });
 

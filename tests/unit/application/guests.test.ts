@@ -15,7 +15,7 @@ import {
   SubmitGuestResponse,
 } from "@/application/guests";
 import { GetHouseholdPage } from "@/application/cards";
-import { AddItem } from "@/application/sections";
+import { AddEvent } from "@/application/schedule";
 import { CreateWedding, DeleteWedding } from "@/application/weddings";
 import type { CsvLabels } from "@/domain/guests";
 import { FakeArchive, createFakes } from "../../fakes";
@@ -33,9 +33,8 @@ beforeEach(async () => {
   f.deps.billing.enabled = false;
   anna = await f.users.create("anna@example.org");
   weddingId = (await new CreateWedding(f.deps).execute(anna.id, { title: "Anna & Ben", hasDate: true, weddingDate: "2027-06-12" })).id;
-  const site = (await f.websites.listByWedding(weddingId))[0]!.id;
-  party = (await new AddItem(f.deps).execute(anna.id, site, "schedule", event("Feier", "2027-06-12", "18:00"))).id;
-  brunch = (await new AddItem(f.deps).execute(anna.id, site, "schedule", event("Brunch", "2027-06-13", "11:00"))).id;
+  party = (await new AddEvent(f.deps).execute(anna.id, weddingId, event("Feier", "2027-06-12", "18:00"))).id;
+  brunch = (await new AddEvent(f.deps).execute(anna.id, weddingId, event("Brunch", "2027-06-13", "11:00"))).id;
 });
 
 const saveHousehold = (input: unknown, householdId: string | null = null, userId = anna.id) =>

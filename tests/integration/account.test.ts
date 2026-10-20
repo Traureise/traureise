@@ -6,9 +6,9 @@ import { describe, expect, it } from "vitest";
 import { DeleteAccount, ExportAccount } from "@/application/account";
 import type { Deps } from "@/application/deps";
 import { CreateWedding } from "@/application/weddings";
-import { SECTION_KINDS } from "@/domain/sections";
 import { cardDeliveries, cardOpens, cards, householdVersions, households, weddingEvents } from "@/infrastructure/db/schema";
 import { createCardTexts } from "@/infrastructure/mail/card-templates";
+import { createSiteTexts } from "@/infrastructure/site-texts";
 import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
 import { DrizzleMagicLinkRepository, DrizzleSessionRepository, PostgresRateLimiter } from "@/infrastructure/repositories/auth";
 import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing";
@@ -45,6 +45,7 @@ async function realDeps() {
     tokens: cryptoTokens,
     themes: new FakeThemes(),
     cardTexts: createCardTexts(),
+    siteTexts: createSiteTexts(),
   } as unknown as Deps;
   return { deps, dir };
 }
@@ -57,7 +58,8 @@ async function seed(deps: Deps, email: string) {
   await deps.storage.put(key, new Uint8Array([9, 8, 7]), "image/webp");
   await deps.uploads.create({ key, ownerId: user.id, weddingId: wedding.id, contentType: "image/webp", size: 3 });
   await deps.websites.update(website!.id, { coverImageKey: key });
-  await deps.websites.addItem(website!.id, "faqs", { question: "Dresscode?", answer: "Sommerlich", imageKey: null });
+  const faqs = (await deps.websites.listSections(website!.id)).at(-1)!;
+  await deps.websites.addBlock(website!.id, faqs.id, { type: "faq", question: "Dresscode?", answer: "Sommerlich", imageKey: null });
   const household = await deps.guests.createHousehold(wedding.id, { name: "Weber", invitedEventIds: null, email: "weber@example.org", personalLine: "", people: [{ id: null, name: "Eva", isChild: false }] }, (id) => `hash-${id}`);
   const [card] = await deps.cards.listByWedding(wedding.id);
   await deps.cards.markShared(household.id, "saveTheDate", "link", new Date());
@@ -90,8 +92,19 @@ describe("account export", () => {
     expect(data.account.email).toBe("anna@example.org");
     expect(data.weddings[0]).toMatchObject({ id: wedding.id, purchases: [expect.objectContaining({ tier: "rsvp" })] });
     expect(data.weddings[0].websites[0]).toMatchObject({ id: website.id, coverImage: `images/${key}` });
-    expect(data.weddings[0].websites[0].items[0].data.question).toBe("Dresscode?");
-    expect(data.weddings[0].websites[0].sections).toHaveLength(SECTION_KINDS.length);
+    const sections = data.weddings[0].websites[0].sections;
+    expect(sections.map((s: { title: string }) => s.title)).toEqual([
+      "Unsere Geschichte",
+      "Tagesablauf",
+      "Anreise",
+      "Empfehlungen",
+      "Geschenkideen",
+      "Hochzeitsgesellschaft",
+      "Galerie",
+      "Häufige Fragen",
+    ]);
+    expect(sections.at(-1).blocks[0].data.question).toBe("Dresscode?");
+    expect(data.weddings[0].websites[0]).not.toHaveProperty("hiddenEventIds");
     expect(data.weddings[0].cards).toHaveLength(4);
     expect(data.weddings[0].deliveries).toMatchObject([{ household: "Weber", kind: "saveTheDate" }]);
     expect(data.weddings[0].opens).toHaveLength(1);
@@ -109,7 +122,7 @@ describe("account deletion", () => {
 
     expect(await deps.users.findById(anna.user.id)).toBeNull();
     expect(await deps.websites.findById(anna.website.id)).toBeNull();
-    expect(await deps.websites.listItems(anna.website.id)).toEqual([]);
+    expect(await deps.websites.listBlocks(anna.website.id)).toEqual([]);
     expect(await deps.websites.listSections(anna.website.id)).toEqual([]);
     expect(await deps.uploads.listByOwner(anna.user.id)).toEqual([]);
     expect(await deps.billingRepo.listByWedding(anna.wedding.id)).toEqual([]);

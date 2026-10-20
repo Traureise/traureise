@@ -58,7 +58,7 @@ import { AddBlock, AddSection, DeleteBlock, DeleteSection, MoveBlock, MoveSectio
 import { GetUpload, UploadImage } from "@/application/uploads";
 import { AddVersion, AssignVersion, DeleteVersion, RenameVersion } from "@/application/versions";
 import { CreateWedding, DeleteWedding, GetRecentWedding, GetWeddingHome, ListWeddings, MarkWeddingUsed, UpdateWeddingDetails, UpdateWeddingSlug } from "@/application/weddings";
-import { GetWebsiteForOwner, SelectTheme, SetCoverImage, SetEventShown, SetPublished, UpdateDesign, UpdateHome, UpdateSlug } from "@/application/websites";
+import { GetWebsiteForOwner, SelectTheme, SetCoverImage, SetPublished, UpdateDesign, UpdateHome, UpdateSlug } from "@/application/websites";
 import { createDatabase } from "@/infrastructure/db/client";
 import { SharpImageProcessor } from "@/infrastructure/images/sharp";
 import { createMagicLinkTemplate } from "@/infrastructure/mail/magic-link-template";
@@ -192,7 +192,6 @@ function build() {
     updateHome: new UpdateHome(deps),
     updateSlug: new UpdateSlug(deps),
     setPublished: new SetPublished(deps),
-    setEventShown: new SetEventShown(deps),
     setCoverImage: new SetCoverImage(deps),
     selectTheme: new SelectTheme(deps),
     updateDesign: new UpdateDesign(deps),
