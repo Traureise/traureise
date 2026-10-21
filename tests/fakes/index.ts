@@ -57,7 +57,7 @@ import type {
 } from "@/application/ports";
 import type { Deps } from "@/application/deps";
 import { compareEvents, type BlockData, type EventData } from "@/domain/sections";
-import { DEFAULT_RSVP_SETTINGS, type Household, type HouseholdResponse, type RsvpSettings } from "@/domain/guests";
+import { DEFAULT_RSVP_SETTINGS, type AnswerSource, type Household, type HouseholdResponse, type RsvpSettings } from "@/domain/guests";
 import { parseThemeManifest, type ThemeManifest } from "@/domain/theme";
 import type { CardInput, CardKind, Delivery, HouseholdCardKind, SharedVia } from "@/domain/cards";
 import type { AssignableItem, Assignment } from "@/domain/weddings";
@@ -489,6 +489,7 @@ export class InMemoryGuests implements GuestRepository {
       message: "",
       pollAnswers: {},
       respondedAt: null,
+      answeredBy: null,
       createdAt: new Date(),
       email: data.email,
       personalLine: data.personalLine,
@@ -514,7 +515,7 @@ export class InMemoryGuests implements GuestRepository {
   async deleteHousehold(weddingId: string, householdId: string) {
     this.households = this.households.filter((h) => !(h.id === householdId && h.weddingId === weddingId));
   }
-  async saveResponse(householdId: string, response: HouseholdResponse, at: Date) {
+  async saveResponse(householdId: string, response: HouseholdResponse, at: Date, by: AnswerSource) {
     const h = this.households.find((x) => x.id === householdId)!;
     for (const answer of response.people) {
       const { guestId, ...rest } = answer;
@@ -523,6 +524,7 @@ export class InMemoryGuests implements GuestRepository {
     h.pollAnswers = copy(response.pollAnswers);
     h.message = response.message;
     h.respondedAt = at;
+    h.answeredBy = by;
     for (const name of response.requests) h.requests.push({ id: this.id("request"), name, status: "pending", createdAt: at, decidedAt: null });
   }
   async decideRequest(weddingId: string, requestId: string, status: "added" | "declined", at: Date) {

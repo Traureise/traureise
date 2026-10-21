@@ -29,6 +29,8 @@ import {
   SavePoll,
   SaveRsvpSettings,
   SubmitGuestResponse,
+  GetCoupleAnswerForm,
+  SaveCoupleAnswer,
 } from "@/application/guests";
 import { createGuestMailTemplates } from "@/infrastructure/mail/guest-templates";
 import {
@@ -237,6 +239,8 @@ function build() {
     exportGuestsCsv: new ExportGuestsCsv(deps),
     getGuestFormPreview: new GetGuestFormPreview(deps),
     submitGuestResponse: new SubmitGuestResponse(deps),
+    getCoupleAnswerForm: new GetCoupleAnswerForm(deps),
+    saveCoupleAnswer: new SaveCoupleAnswer(deps),
     runGuestJobs: new RunGuestJobs(deps),
     getCardEditor: new GetCardEditor(deps),
     saveCard: new SaveCard(deps),

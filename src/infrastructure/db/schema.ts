@@ -259,6 +259,8 @@ export const households = pgTable(
     message: text("message").notNull().default(""),
     pollAnswers: jsonb("poll_answers").$type<PollAnswersJson>().notNull().default({}),
     respondedAt: timestamp("responded_at", { withTimezone: true }),
+    // "guest" through the personal link, "couple" entered for the household on the guest list.
+    answeredBy: text("answered_by").$type<"guest" | "couple">(),
     // v4: optional address for cards and reminders by email, a line for the thank-you card, and the unsubscribe.
     email: text("email"),
     personalLine: text("personal_line").notNull().default(""),

@@ -1,7 +1,7 @@
 import type { BlockData, BlockType, EventData, SectionTemplate } from "@/domain/sections";
 import type { Entitlement, PaidTier, Tier, TierOffer } from "@/domain/billing";
 import type { ThemeManifest } from "@/domain/theme";
-import type { Household, HouseholdInput, HouseholdResponse, Poll, PollInput, RequestStatus, RsvpSettings } from "@/domain/guests";
+import type { AnswerSource, Household, HouseholdInput, HouseholdResponse, Poll, PollInput, RequestStatus, RsvpSettings } from "@/domain/guests";
 import type { CardContent, CardInput, CardKind, CardLabels, CardModel, Delivery, HouseholdCardKind, SharedVia } from "@/domain/cards";
 import type { AssignableItem, Assignment } from "@/domain/weddings";
 
@@ -304,7 +304,8 @@ export interface GuestRepository {
   updateHousehold(weddingId: string, householdId: string, data: HouseholdData): Promise<void>;
   deleteHousehold(weddingId: string, householdId: string): Promise<void>;
   /** Stores a household's answer and its new requests in one transaction. */
-  saveResponse(householdId: string, response: HouseholdResponse, at: Date): Promise<void>;
+  /** `by`: the household through its link, or the couple for it. */
+  saveResponse(householdId: string, response: HouseholdResponse, at: Date, by: AnswerSource): Promise<void>;
   /** Adding puts the requested person into the household. Returns false for unknown or decided requests. */
   decideRequest(weddingId: string, requestId: string, status: Exclude<RequestStatus, "pending">, at: Date): Promise<boolean>;
 

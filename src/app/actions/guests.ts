@@ -43,6 +43,11 @@ export async function decideGuestRequestAction(weddingId: string, requestId: str
   return guests(weddingId, (userId) => container().decideGuestRequest.execute(userId, weddingId, requestId, decision));
 }
 
+/** The couple enters a household's answer for it (grandparents without a phone). */
+export async function saveCoupleAnswerAction(weddingId: string, householdId: string, input: unknown): Promise<ActionResult<void>> {
+  return guests(weddingId, (userId) => container().saveCoupleAnswer.execute(userId, weddingId, householdId, input));
+}
+
 /** The guests' side: the personal link's token is the only key. */
 export async function submitGuestResponseAction(token: string, input: unknown): Promise<ActionResult<void>> {
   const ip = await clientIp();

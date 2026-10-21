@@ -506,6 +506,13 @@
     "title": "Gäste",
     "backToDashboard": "Zur Hochzeit",
     "editWebsite": "Website bearbeiten",
+    "answerFor": {
+      "title": "Antwort für {household} eintragen",
+      "back": "Zur Gästeliste",
+      "menu": "Antwort eintragen",
+      "change": "Antwort ändern",
+      "byCouple": "von euch eingetragen"
+    },
     "tabs": {
       "label": "Gäste",
       "overview": "Übersicht",
@@ -786,6 +793,10 @@
     "closed": "Die Antwortfrist ist vorbei. Hier seht ihr eure Antwort. Wenn sich etwas ändert, meldet euch bitte direkt bei {title}.",
     "answered": "Danke für eure Antwort! Ihr könnt sie hier jederzeit ändern.",
     "answeredUntil": "Danke für eure Antwort! Ihr könnt sie hier bis zum {date} ändern.",
+    "answeredByCouple": "{title} haben eure Antwort schon für euch eingetragen. Ihr könnt sie hier ändern.",
+    "coupleNote": "Ihr tragt die Antwort für {household} ein, etwa nach einem Anruf. Sie zählt wie eine Antwort über den Link; öffnet der Haushalt später seinen Link, sieht er das Eingetragene und kann es ändern.",
+    "savedByCouple": "Antwort für {household} gespeichert.",
+    "saveByCouple": "Antwort speichern",
     "child": "Kind",
     "attendingLabel": "Kommt {name}?",
     "yes": "Ich komme",

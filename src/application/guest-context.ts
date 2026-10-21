@@ -110,7 +110,8 @@ export async function householdContent(deps: Deps, ctx: GuestContext, household:
 
 type FormWebsite = Pick<Wedding, "title" | "weddingDate" | "timezone">;
 export type GuestForm = {
-  state: "open" | "closed" | "preview";
+  /** "couple": filled in by the couple for the household, always open. */
+  state: "open" | "closed" | "preview" | "couple";
   website: FormWebsite;
   design: ResolvedDesign;
   household: Household;

@@ -6,9 +6,11 @@ import {
   DeleteHousehold,
   DeletePoll,
   ExportGuestsCsv,
+  GetCoupleAnswerForm,
   GetGuestFormPreview,
   GetGuestPage,
   RunGuestJobs,
+  SaveCoupleAnswer,
   SaveHousehold,
   SavePoll,
   SaveRsvpSettings,
@@ -235,6 +237,48 @@ describe("the guest form", () => {
     const preview = await new GetGuestFormPreview(f.deps).execute(anna.id, weddingId, { household: "Familie Muster", people: ["Alex", "Sam"] });
     expect(preview.state).toBe("preview");
     expect(preview.household.people.length).toBeGreaterThan(0);
+  });
+});
+
+describe("answers the couple enters for a household", () => {
+  const answerFor = (householdId: string, input: unknown, userId = anna.id) => new SaveCoupleAnswer(f.deps).execute(userId, weddingId, householdId, input);
+
+  it("is always open, also without a package and after the reply-by date, and needs no link", async () => {
+    f.deps.billing.enabled = true;
+    await new SaveRsvpSettings(f.deps).execute(anna.id, weddingId, { replyBy: "2026-10-01", notify: "each" });
+    const household = await weber();
+    const form = await new GetCoupleAnswerForm(f.deps).execute(anna.id, weddingId, household.id);
+    expect(form).toMatchObject({ state: "couple", household: { name: "Familie Weber" } });
+
+    const [clara, max] = household.people;
+    await answerFor(household.id, { people: { [clara!.id]: { attending: true, eventIds: [party], allergies: "Nüsse" }, [max!.id]: { attending: false } }, requests: ["Lena"] });
+    const view = await page();
+    expect(view.households[0]).toMatchObject({ status: "answered", answeredBy: "couple" });
+    // Requests are the guests' way to ask; the couple adds people instead. Nobody is notified of their own entry.
+    expect(view.overview.requests).toEqual([]);
+    expect(f.mailer.sent).toHaveLength(0);
+  });
+
+  it("is the household's answer: its link shows it, and its own change takes over", async () => {
+    const household = await weber();
+    const input = { people: { [household.people[0]!.id]: { attending: true, eventIds: [party] }, [household.people[1]!.id]: { attending: false } } };
+    await answerFor(household.id, input);
+    expect(await guestForm(tokenOf(household.id))).toMatchObject({ state: "open", household: { answeredBy: "couple", people: [{ attending: true }, { attending: false }] } });
+    await submit(tokenOf(household.id), { ...input, message: "Wir freuen uns" });
+    expect((await page()).households[0]).toMatchObject({ answeredBy: "guest", message: "Wir freuen uns" });
+    // A later entry by the couple keeps the household's message.
+    await answerFor(household.id, { ...input, message: "" });
+    expect((await page()).households[0]).toMatchObject({ answeredBy: "couple", message: "Wir freuen uns" });
+  });
+
+  it("belongs to the wedding's owner and checks the answer like the guests' form", async () => {
+    const household = await weber();
+    const ben = await f.users.create("ben@example.org");
+    await expect(new GetCoupleAnswerForm(f.deps).execute(ben.id, weddingId, household.id)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(answerFor(household.id, {}, ben.id)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(new GetCoupleAnswerForm(f.deps).execute(anna.id, weddingId, "00000000-0000-0000-0000-000000000000")).rejects.toBeInstanceOf(NotFoundError);
+    const other = await saveHousehold({ name: "Müller", people: [{ name: "Tom" }] });
+    await expect(answerFor(household.id, { people: { [other.people[0]!.id]: { attending: true, eventIds: [party] } } })).rejects.toBeInstanceOf(ValidationError);
   });
 });
 

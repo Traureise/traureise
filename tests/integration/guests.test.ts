@@ -121,9 +121,10 @@ describe("DrizzleGuestRepository", () => {
         requests: ["Lena"],
       },
       at,
+      "guest",
     );
     const saved = (await repo.findHousehold(weddingId, household.id))!;
-    expect(saved).toMatchObject({ message: "Bis bald", respondedAt: at, pollAnswers: { s: { optionIds: [], other: "Taxi" } } });
+    expect(saved).toMatchObject({ message: "Bis bald", respondedAt: at, answeredBy: "guest", pollAnswers: { s: { optionIds: [], other: "Taxi" } } });
     expect(saved.people[0]).toMatchObject({ attending: true, eventIds: [party], mealOptionId: "fish", allergies: "Nüsse" });
     const [request] = saved.requests;
     expect(request).toMatchObject({ name: "Lena", status: "pending" });
@@ -160,7 +161,7 @@ describe("DrizzleGuestRepository", () => {
 
   it("removes every guest row with the wedding and with the account", async () => {
     const household = await newHousehold();
-    await repo.saveResponse(household.id, { people: [], pollAnswers: {}, message: "", requests: ["Lena"] }, new Date());
+    await repo.saveResponse(household.id, { people: [], pollAnswers: {}, message: "", requests: ["Lena"] }, new Date(), "guest");
     await repo.saveSettings(weddingId, { replyBy: null, eventIds: null, meal: null, notify: "off", whatsappMessage: null });
     await repo.createPoll(weddingId, { question: "Q", multiple: false, allowOther: false, per: "person", options: [] });
     await weddings.delete(weddingId);
@@ -179,7 +180,7 @@ describe("retention", () => {
   it("deletes households, people, answers and requests after the package end, and nothing of other weddings", async () => {
     const { deps: d, clock } = deps();
     const household = await newHousehold();
-    await repo.saveResponse(household.id, { people: [], pollAnswers: {}, message: "Hallo", requests: ["Lena"] }, new Date());
+    await repo.saveResponse(household.id, { people: [], pollAnswers: {}, message: "Hallo", requests: ["Lena"] }, new Date(), "guest");
     const otherSite = (await newWedding("spaet", "Später", "2030-01-01")).id;
     await repo.createHousehold(otherSite, { name: "Bleibt", invitedEventIds: null, email: null, personalLine: "", people: [{ id: null, name: "Tom", isChild: false }] }, (id) => `hash-${id}`);
     const ids = [household.id];

@@ -35,6 +35,14 @@ gewünscht"; its address is gone.
 A household is invited to all RSVP events unless you untick some; its form then shows only those events,
 and the meal choice only if it is invited to the meal's event.
 
+**Antwort eintragen** (in a household's "⋯" menu, and under "Antworten ansehen") is for households without a
+phone or a computer, such as grandparents who answer by phone. The couple fills in the household's own form, at
+`/hochzeiten/<id>/gaeste/<household>/antwort`. It is always open: before anything was sent, after the reply-by date
+and without a package, because nothing goes out. The answer counts like one through the link and is marked "von
+euch eingetragen"; the couple gets no notification of their own entry. Requests to bring someone and the message to
+the couple are the household's, so that form leaves them out (a message the household wrote stays). If the household
+opens its link later, it sees what was entered and can change it; its answer then counts as its own.
+
 **WhatsApp** opens `https://wa.me/?text=…` with the text and link, in your own WhatsApp. Traureise sends
 nothing to WhatsApp or anyone else. **Erinnerung senden** sends a reminder to a household that has not
 answered (an email where there is an address and the Einladungen package, otherwise WhatsApp), and the

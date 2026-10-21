@@ -3,10 +3,11 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useFormatter, useTranslations } from "next-intl";
-import { submitGuestResponseAction } from "@/app/actions/guests";
+import { toast } from "sonner";
 import type { GuestForm as GuestFormData } from "@/application/guests";
 import { mealApplies, type Poll, type PollAnswer } from "@/domain/guests";
 import type { FieldErrors } from "@/domain/result";
+import type { ActionResult } from "@/lib/action-result";
 import { dateFromIso } from "@/lib/format";
 
 type PersonState = { attending: boolean | null; eventIds: string[]; mealOptionId: string | null; allergies: string; polls: Record<string, PollAnswer> };
@@ -61,9 +62,21 @@ function PollField({ poll, value, onChange, name, errors }: { poll: Poll; value:
 
 /**
  * One form per household: who is coming, to which events, meal, allergies, polls, requests to bring
- * someone, and a message. The same component is the couple's preview (`token` null, nothing is sent).
+ * someone, and a message. The same component is the couple's preview (`save` null, nothing is sent) and the form
+ * the couple fills in for a household (state "couple": no requests to bring someone, they add people instead).
  */
-export function GuestForm({ form, token, belowCards = false }: { form: GuestFormData; token: string | null; belowCards?: boolean }) {
+export function GuestForm({
+  form,
+  save,
+  belowCards = false,
+  doneHref,
+}: {
+  form: GuestFormData;
+  save: ((input: unknown) => Promise<ActionResult<void>>) | null;
+  belowCards?: boolean;
+  /** Where saving leads (the couple's entry goes back to the guest list); without it the form stays and says it saved. */
+  doneHref?: string;
+}) {
   const t = useTranslations("rsvp");
   const tRequest = useTranslations("rsvp.requestStatus");
   const format = useFormatter();
@@ -85,21 +98,25 @@ export function GuestForm({ form, token, belowCards = false }: { form: GuestForm
   const [message, setMessage] = useState(household.message);
   const [requests, setRequests] = useState<string[]>([""]);
   const readOnly = form.state === "closed";
+  const byCouple = form.state === "couple";
   const date = (iso: string, style: "long" | "full" = "long") => format.dateTime(dateFromIso(iso), { dateStyle: style, timeZone: "UTC" });
   const update = (id: string, patch: Partial<PersonState>) => setPeople((all) => ({ ...all, [id]: { ...all[id]!, ...patch } }));
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!token) return;
+    if (!save) return;
     setSaved(false);
     start(async () => {
-      const result = await submitGuestResponseAction(token, {
+      const result = await save({
         people: Object.fromEntries(Object.entries(people).map(([id, p]) => [id, { ...p, polls: p.attending ? p.polls : {} }])),
         polls: householdPolls,
         message,
         requests,
       });
-      if (result.ok) {
+      if (result.ok && doneHref) {
+        toast.success(t("savedByCouple", { household: household.name }));
+        router.push(doneHref);
+      } else if (result.ok) {
         setErrors({});
         setRequests([""]);
         setSaved(true);
@@ -138,9 +155,18 @@ export function GuestForm({ form, token, belowCards = false }: { form: GuestForm
           {t("closed", { title: website.title })}
         </p>
       )}
-      {!readOnly && household.respondedAt && !saved && (
+      {byCouple && (
+        <p className="site-surface rounded-xl p-4 text-sm" role="note" data-testid="couple-note">
+          {t("coupleNote", { household: household.name })}
+        </p>
+      )}
+      {!readOnly && !byCouple && household.respondedAt && !saved && (
         <p className="site-surface rounded-xl p-4 text-sm" role="note" data-testid="answered-note">
-          {form.replyBy ? t("answeredUntil", { date: date(form.replyBy) }) : t("answered")}
+          {household.answeredBy === "couple"
+            ? t("answeredByCouple", { title: website.title })
+            : form.replyBy
+              ? t("answeredUntil", { date: date(form.replyBy) })
+              : t("answered")}
         </p>
       )}
 
@@ -234,6 +260,7 @@ export function GuestForm({ form, token, belowCards = false }: { form: GuestForm
           </section>
         )}
 
+        {!byCouple && (
         <section className="site-surface space-y-4 rounded-2xl p-6" aria-label={t("bringSomeone")}>
           <h2 className="text-2xl">{t("bringSomeone")}</h2>
           <p className="site-muted text-sm">{t("bringSomeoneHint")}</p>
@@ -261,7 +288,10 @@ export function GuestForm({ form, token, belowCards = false }: { form: GuestForm
           )}
           <FormError code={errors.requests} />
         </section>
+        )}
 
+        {/* The household's message to the couple: not theirs to write; what the household wrote stays as it is. */}
+        {!byCouple && (
         <section className="space-y-2">
           <label htmlFor="guest-message" className="font-medium">
             {t("message", { title: website.title })}
@@ -269,18 +299,19 @@ export function GuestForm({ form, token, belowCards = false }: { form: GuestForm
           <textarea id="guest-message" className="site-field" rows={4} value={message} onChange={(e) => setMessage(e.target.value)} />
           <FormError code={errors.message} />
         </section>
+        )}
       </fieldset>
 
       <div className="space-y-3 text-center">
         <FormError code={errors._ ?? errors.people} />
         {saved && (
           <p role="status" className="font-medium" data-testid="guest-form-saved">
-            {t("saved")}
+            {byCouple ? t("savedByCouple", { household: household.name }) : t("saved")}
           </p>
         )}
         {!readOnly && (
-          <button type="submit" className="site-submit" disabled={pending || !token}>
-            {household.respondedAt ? t("update") : t("submit")}
+          <button type="submit" className="site-submit" disabled={pending || !save}>
+            {byCouple ? t("saveByCouple") : household.respondedAt ? t("update") : t("submit")}
           </button>
         )}
       </div>

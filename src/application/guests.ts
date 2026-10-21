@@ -237,6 +237,7 @@ export class GetGuestFormPreview {
       message: "",
       pollAnswers: {},
       respondedAt: null,
+      answeredBy: null,
       createdAt: ctx.now,
       email: null,
       personalLine: "",
@@ -245,6 +246,38 @@ export class GetGuestFormPreview {
       people: sample.people.map((name, i) => ({ id: `preview-${i}`, name, isChild: false, attending: null, eventIds: [], mealOptionId: null, allergies: "", pollAnswers: {}, fromRequest: false })),
     };
     return formFor(this.deps, ctx, household, "preview");
+  }
+}
+
+export class GetCoupleAnswerForm {
+  constructor(private deps: Deps) {}
+
+  /**
+   * A household's form for the couple to fill in for it, for grandparents without a phone. Always open: before any
+   * card went out, after the reply-by date and without a package, because nothing is sent.
+   */
+  async execute(userId: string, weddingId: string, householdId: string): Promise<GuestForm> {
+    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const household = await this.deps.guests.findHousehold(weddingId, householdId);
+    if (!household) throw new NotFoundError();
+    return formFor(this.deps, await loadGuestContext(this.deps, wedding), household, "couple");
+  }
+}
+
+export class SaveCoupleAnswer {
+  constructor(private deps: Deps) {}
+
+  /** The couple's entry counts like the household's own answer, marked as theirs; nobody is notified. */
+  async execute(userId: string, weddingId: string, householdId: string, input: unknown): Promise<void> {
+    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const household = await this.deps.guests.findHousehold(weddingId, householdId);
+    if (!household) throw new NotFoundError();
+    const ctx = await loadGuestContext(this.deps, wedding);
+    const parsed = parseResponse(input, { household, events: ctx.events, meal: ctx.meal, polls: ctx.polls });
+    if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
+    // The couple adds people on the guest list (a request is the guests' way to ask), and the message to the couple
+    // stays what the household wrote.
+    await this.deps.guests.saveResponse(household.id, { ...parsed.value, message: household.message, requests: [] }, this.deps.clock.now(), "couple");
   }
 }
 
@@ -267,7 +300,7 @@ export class SubmitGuestResponse {
 
     const parsed = parseResponse(input.input, { household, events: ctx.events, meal: ctx.meal, polls: ctx.polls });
     if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
-    await guests.saveResponse(household.id, parsed.value, now);
+    await guests.saveResponse(household.id, parsed.value, now, "guest");
 
     if (ctx.settings.notify !== "each") return;
     try {

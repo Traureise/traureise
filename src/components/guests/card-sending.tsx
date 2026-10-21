@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { BellRing, CheckCheck, CircleSlash, Mail, MoreHorizontal, PencilLine, Send, Trash2, Undo2 } from "lucide-react";
+import { BellRing, CheckCheck, CircleSlash, ClipboardPen, Mail, MoreHorizontal, PencilLine, Send, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteHouseholdAction } from "@/app/actions/guests";
 import { markCardsSentAction, sendCardEmailsAction, sendRemindersAction, setCardExcludedAction, shareCardAction } from "@/app/actions/cards";
@@ -107,6 +108,7 @@ export function HouseholdMenu({
 }) {
   const t = useTranslations("guests.sending");
   const tHousehold = useTranslations("guests.household");
+  const tAnswer = useTranslations("guests.answerFor");
   const tList = useTranslations("guests.list");
   const tKinds = useTranslations("cardKinds");
   const { pending, run } = useRun();
@@ -159,6 +161,13 @@ export function HouseholdMenu({
             </DropdownMenuItem>
           )}
           {(reminder || cardItems) && <DropdownMenuSeparator />}
+          {/* For households without a phone: the couple enters the answer, in the household's own form. */}
+          <DropdownMenuItem asChild>
+            <Link href={`/hochzeiten/${weddingId}/gaeste/${id}/antwort`}>
+              <ClipboardPen aria-hidden />
+              {tAnswer("menu")}
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setEditing(true)}>
             <PencilLine aria-hidden />
             {tHousehold("edit")}

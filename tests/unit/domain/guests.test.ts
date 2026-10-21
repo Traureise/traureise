@@ -47,6 +47,7 @@ const household = (over: Partial<Household> = {}): Household => ({
   message: "",
   pollAnswers: {},
   respondedAt: null,
+  answeredBy: null,
   createdAt: new Date("2026-10-01T00:00:00Z"),
   email: null,
   personalLine: "",

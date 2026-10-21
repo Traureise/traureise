@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { CalendarClock, ChevronRight, Download, Lock, Mail, MessageCircle } from "lucide-react";
+import { CalendarClock, ChevronRight, ClipboardPen, Download, Lock, Mail, MessageCircle } from "lucide-react";
 import type { GuestListEntry, GuestPage } from "@/application/guests";
 import { CardShareButtons, HouseholdMenu, MarkAllSentButton, RemindAllButton, SendAllButton } from "@/components/guests/card-sending";
 import { RequestActions } from "@/components/guests/guest-actions";
@@ -153,6 +153,7 @@ async function Overview({ page }: { page: GuestPage }) {
 }
 
 async function HouseholdDetails({ entry, page }: { entry: GuestListEntry; page: GuestPage }) {
+  const tAnswer = await getTranslations("guests.answerFor");
   const t = await getTranslations("guests.details");
   const tRequest = await getTranslations("guests.requestStatus");
   const meal = page.settings.meal;
@@ -209,6 +210,10 @@ async function HouseholdDetails({ entry, page }: { entry: GuestListEntry; page: 
           </ul>
         )}
         {!entry.respondedAt && <p className="text-muted-foreground">{t("noAnswer")}</p>}
+        <Link href={`/hochzeiten/${page.wedding.id}/gaeste/${entry.id}/antwort`} className="inline-flex items-center gap-1.5 font-medium text-primary underline-offset-4 hover:underline">
+          <ClipboardPen className="size-4" aria-hidden />
+          {entry.respondedAt ? tAnswer("change") : tAnswer("menu")}
+        </Link>
       </div>
     </details>
   );
@@ -220,6 +225,7 @@ export default async function GuestsPage({ params, searchParams }: Props) {
   const { page } = await loadGuestPage(id);
   const t = await getTranslations("guests");
   const tStatus = await getTranslations("guests.status");
+  const tAnswer = await getTranslations("guests.answerFor");
   const tSending = await getTranslations("guests.sending");
   const tKinds = await getTranslations("cardKinds");
   const format = await getFormatter();
@@ -379,6 +385,7 @@ export default async function GuestsPage({ params, searchParams }: Props) {
                         <h3 className="font-heading text-xl font-medium">{h.name}</h3>
                         <span className={cn("text-xs font-medium", h.status === "open" ? "text-muted-foreground" : "text-primary")} data-testid="household-status">
                           {tStatus(h.status)}
+                          {h.respondedAt && h.answeredBy === "couple" && <span className="font-normal text-muted-foreground"> · {tAnswer("byCouple")}</span>}
                         </span>
                         {card && <DeliveryBadge entry={h} kind={card.kind} timeZone={page.wedding.timezone} version={versionLabel(h, card.kind)} />}
                       </div>
