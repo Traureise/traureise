@@ -30,6 +30,9 @@ import { cn } from "@/lib/utils";
 
 type Version = { id: string; label: string };
 
+/** One height and baseline for every chip in the row: the versions and "+ Version". */
+const CHIP = "flex h-6 items-center gap-1 rounded-full border px-2.5 text-xs leading-none whitespace-nowrap";
+
 /**
  * An item's versions as chips ("Familie", "Freunde"), then "+ Version". `current` marks the version being
  * edited. Without the package for extra versions, "+ Version" leads to the prices.
@@ -51,24 +54,25 @@ export function VersionChips({
   return (
     <ul className="flex flex-wrap items-center gap-1.5" aria-label={t("label")} data-testid="version-chips">
       {versions.map((v) => (
-        <li key={v.id}>
+        <li key={v.id} className="flex">
           <Link
             href={versionHref(weddingId, item, v.id)}
             aria-current={v.id === current ? "page" : undefined}
             className={cn(
-              "inline-block max-w-48 truncate rounded-full border px-2.5 py-0.5 text-xs",
+              CHIP,
+              "max-w-48",
               v.id === current ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-primary hover:border-primary/40",
             )}
           >
-            {v.label}
+            <span className="truncate">{v.label}</span>
           </Link>
         </li>
       ))}
-      <li>
+      <li className="flex">
         {canAdd ? (
           <AddVersionButton weddingId={weddingId} item={item} versions={versions} />
         ) : (
-          <Link href="/preise" className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-0.5 text-xs text-muted-foreground" title={t("locked")} data-testid="add-version-locked">
+          <Link href="/preise" className={cn(CHIP, "border-dashed border-border text-muted-foreground")} title={t("locked")} data-testid="add-version-locked">
             <Lock className="size-3" aria-hidden />
             {t("add")}
           </Link>
@@ -84,7 +88,7 @@ function AddVersionButton({ weddingId, item, versions }: { weddingId: string; it
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-0.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary">
+      <button type="button" onClick={() => setOpen(true)} className={cn(CHIP, "border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-primary")}>
         {t("add")}
       </button>
       <AddVersionDialog weddingId={weddingId} item={item} versions={versions} open={open} onOpenChange={setOpen} />
