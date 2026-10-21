@@ -11,8 +11,16 @@ exclude_docs: |
   superpowers/
   overrides/
 
+# docs.traureise.de's Impressum, Datenschutz and AGB: copied in by the Pages workflow from Traureise/stacks, only
+# for this repository, and linked from the footer (overrides/partials/copyright.html), not the navigation.
+not_in_nav: |
+  /impressum.md
+  /datenschutz.md
+  /agb.md
+
 nav:
   - Home: index.md
+  - Hosted or your own: hosted.md
   - Self-hosting:
       - Quick start: getting-started.md
       - Configuration: configuration.md
@@ -21,6 +29,7 @@ nav:
       - Reverse proxy and HTTPS: reverse-proxy.md
       - Backups and restore: backups.md
       - Legal pages, account rights and billing: legal-and-billing.md
+  - What couples get:
       - Weddings, the timeline and versions: weddings.md
       - Guests and RSVP: guests.md
       - Save the Dates, invitations and cards: cards.md
@@ -58,6 +67,7 @@ nav:
           - Versions for audiences: adr/0024-versions-for-audiences.md
           - Sections built from typed blocks: adr/0025-sections-built-from-typed-blocks.md
           - OpenStreetMap location picker after consent: adr/0026-openstreetmap-location-picker-after-consent.md
+          - Legal pages are links: adr/0027-legal-pages-are-links.md
 
 theme:
   name: material
@@ -100,6 +110,10 @@ plugins:
   - search
   # Downloads fonts and scripts at build time, so readers' browsers only talk to this site.
   - privacy
+
+extra:
+  # Set by the Pages workflow when it copied the legal pages in; without them the footer links nothing.
+  legal: !ENV [TRAUREISE_LEGAL, false]
 
 extra_css:
   - stylesheets/extra.css

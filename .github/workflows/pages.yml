@@ -2,6 +2,7 @@ name: Publish docs
 
 # Build the documentation site from docs/ with Material for MkDocs and publish it to GitHub Pages.
 # --strict fails the build on broken internal links. Pull requests build without publishing.
+# After changing the legal texts in Traureise/stacks, run this workflow by hand (workflow_dispatch) to publish them.
 
 on:
   push:
@@ -25,6 +26,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # docs.traureise.de's Impressum, Datenschutz and AGB are the instance's, kept in Traureise/stacks (ADR 0027).
+      # Only this repository publishes them; a fork's documentation has no legal pages and links none.
+      - uses: actions/checkout@v4
+        if: github.repository == 'Traureise/traureise'
+        with:
+          repository: Traureise/stacks
+          path: .stacks
+      - name: Copy the legal pages
+        if: github.repository == 'Traureise/traureise'
+        run: |
+          cp .stacks/traureise/legal/{impressum,datenschutz,agb}.md docs/
+          echo "TRAUREISE_LEGAL=true" >> "$GITHUB_ENV"
       - uses: astral-sh/setup-uv@v6
       # mkdocs<2: Material 9 isn't compatible with MkDocs 2.0.
       - run: uvx --with mkdocs-material==9.7.7 --with 'mkdocs<2' mkdocs build --strict

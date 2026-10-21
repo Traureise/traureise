@@ -1,10 +1,12 @@
 ---
-status: accepted
+status: superseded by ADR 0027
 date: 2026-10-18
 decision-makers: Traureise maintainers
 ---
 
 # Legal pages are the operator's own Markdown files
+
+Superseded by [ADR 0027](0027-legal-pages-are-links.md): the app now links the pages instead of rendering them.
 
 ## Context and Problem Statement
 

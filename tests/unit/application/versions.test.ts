@@ -102,14 +102,14 @@ describe("adding versions", () => {
     expect(f.storage.files.has(key)).toBe(false);
   });
 
-  it("are paid: Einladungen for Save the Dates and invitations, Komplett for the others, any package for a website", async () => {
+  it("are paid: RSVP for websites and Save the Dates, Einladungen for invitations, Komplett for the others", async () => {
     f.deps.billing.enabled = true;
     for (const item of ["engagement", "saveTheDate", "website", "invitation", "thankYou"] as const) await expect(add(item, "Familie")).rejects.toBeInstanceOf(LockedError);
     await grant("rsvp");
     await add("website", "Freunde");
-    await expect(add("saveTheDate", "Familie")).rejects.toBeInstanceOf(LockedError);
-    await grant("invitations");
     await add("saveTheDate", "Familie");
+    await expect(add("invitation", "Familie")).rejects.toBeInstanceOf(LockedError);
+    await grant("invitations");
     await add("invitation", "Familie");
     await expect(add("thankYou", "Familie")).rejects.toBeInstanceOf(LockedError);
     await grant("complete");

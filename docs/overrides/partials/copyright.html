@@ -1,0 +1,16 @@
+{#-
+  Material's partials/copyright.html plus the links to docs.traureise.de's legal pages. They exist only when the
+  Pages workflow copied them in (extra.legal), so a fork's documentation links none.
+-#}
+<div class="md-copyright">
+  {% if config.copyright %}
+    <div class="md-copyright__highlight">{{ config.copyright }}</div>
+  {% endif %}
+  {% if config.extra.legal %}
+    <nav class="md-copyright__legal" aria-label="Rechtliches">
+      <a href="{{ base_url }}/impressum/">Impressum</a> ·
+      <a href="{{ base_url }}/datenschutz/">Datenschutz</a> ·
+      <a href="{{ base_url }}/agb/">AGB</a>
+    </nav>
+  {% endif %}
+</div>

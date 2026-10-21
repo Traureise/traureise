@@ -41,13 +41,15 @@ export class ExportAccount {
       ]);
       const householdName = (id: string) => households.find((h) => h.id === id)?.name ?? null;
       const versionLabel = (id: string) => weddingCards.find((c) => c.id === id)?.label ?? sites.find((w) => w.id === id)?.label ?? null;
-      const { id, slug, title, weddingDate, location, timezone, lastOpenedAt, createdAt, updatedAt } = wedding;
+      const { id, slug, title, weddingDate, location, latitude, longitude, timezone, lastOpenedAt, createdAt, updatedAt } = wedding;
       exported.push({
         id,
         slug,
         title,
         weddingDate,
         location,
+        latitude,
+        longitude,
         timezone,
         lastOpenedAt,
         createdAt,

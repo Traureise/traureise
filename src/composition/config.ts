@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { PAID_TIERS } from "@/domain/billing";
 
+/** An http(s) link, or unset (an empty value counts as unset). */
+const legalUrl = z.preprocess((v) => (v === "" ? undefined : v), z.url({ protocol: /^https?$/ }).optional());
+
 const schema = z.object({
   APP_URL: z.url().default("http://localhost:3000"),
   DATABASE_URL: z.string().min(1),
@@ -33,10 +36,10 @@ const schema = z.object({
   // Linked in the footer (AGPL § 13). Point it at your own source if you run a modified version.
   SOURCE_CODE_URL: z.url().default("https://github.com/Traureise/traureise"),
 
-  // The operator's own Impressum, privacy policy and terms as Markdown files; Traureise ships none of the texts.
-  IMPRINT_FILE: z.string().optional(),
-  PRIVACY_FILE: z.string().optional(),
-  TERMS_FILE: z.string().optional(),
+  // Where the operator's own Impressum, privacy policy and terms are; Traureise only links them (ADR 0027).
+  IMPRINT_URL: legalUrl,
+  PRIVACY_URL: legalUrl,
+  TERMS_URL: legalUrl,
 
   // Billing: off unless enabled and every Creem setting is present.
   BILLING_ENABLED: z.stringbool().default(false),
@@ -88,8 +91,8 @@ export function startupWarnings(config: AppConfig): string[] {
     warnings.push("APP_SECRET is missing, the placeholder or shorter than 32 characters: set a long random value (openssl rand -base64 48) before sending guest links.");
   }
   if (config.TEST_HOOKS) warnings.push("TEST_HOOKS=true lets anyone move this instance's clock and delete guest data. Never use it outside tests.");
-  if (!config.IMPRINT_FILE || !config.PRIVACY_FILE) {
-    warnings.push("No Impressum or privacy policy: set IMPRINT_FILE and PRIVACY_FILE before running a public instance.");
+  if (!config.IMPRINT_URL || !config.PRIVACY_URL) {
+    warnings.push("No Impressum or privacy policy: set IMPRINT_URL and PRIVACY_URL before running a public instance.");
   }
   const billing = billingProblems(config);
   if (billing.length > 0) warnings.push(`BILLING_ENABLED=true but ${billing.join(", ")} missing: billing stays off.`);

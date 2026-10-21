@@ -1,6 +1,10 @@
 .secrets/
 .playwright-mcp/
 docs/superpowers/
+# The docs.traureise.de legal pages, copied from Traureise/stacks by the Pages workflow only.
+docs/impressum.md
+docs/datenschutz.md
+docs/agb.md
 node_modules/
 .next/
 .env*

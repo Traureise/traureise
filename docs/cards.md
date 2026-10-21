@@ -92,7 +92,8 @@ Designing and the preview are free. On instances with billing:
 
 | Package | Unlocks |
 |---|---|
-| Einladungen | Save the Date and invitation (links, export), email sending, email reminders |
+| RSVP | the Save the Date (links, export), which goes out months before the invitation |
+| Einladungen | also the invitation (links, export), email sending, email reminders |
 | Komplett | also the thank-you card and the engagement announcement |
 
 The WhatsApp reminder button belongs to RSVP. Locked buttons lead to `/preise`. Without billing everything

@@ -1,18 +1,10 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { container } from "@/composition/container";
-import type { LegalPage } from "@/infrastructure/legal/files";
-
-export const LEGAL_HREFS: Record<LegalPage, string> = { imprint: "/impressum", privacy: "/datenschutz", terms: "/agb" };
-
 export async function AppFooter() {
   const t = await getTranslations("footer");
   const c = container();
-  const legal = await c.legalPages.available();
-  const links = [
-    ...legal.map((page) => ({ href: LEGAL_HREFS[page], label: t(page) })),
-    ...(c.billingEnabled ? [{ href: "/preise", label: t("pricing") }] : []),
-  ];
+  const links = [...c.legalLinks.map(({ page, href }) => ({ href, label: t(page) })), ...(c.billingEnabled ? [{ href: "/preise", label: t("pricing") }] : [])];
   return (
     <footer className="border-t border-border/70" data-testid="app-footer">
       <nav aria-label={t("label")} className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-6 text-sm text-muted-foreground sm:px-6">

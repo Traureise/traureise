@@ -53,3 +53,14 @@
   border: 1px solid var(--md-default-fg-color--lightest);
   border-radius: 0.6rem;
 }
+
+/* docs.traureise.de's legal pages, below the copyright (overrides/partials/copyright.html). */
+.md-copyright__legal {
+  margin-top: 0.25rem;
+}
+.md-copyright__legal a {
+  color: inherit;
+}
+.md-copyright__legal a:hover {
+  text-decoration: underline;
+}

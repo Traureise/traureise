@@ -34,7 +34,7 @@ DATABASE_URL=postgres://traureise:<password>@localhost:5432/traureise SMTP_HOST=
   from the Mailpit API and cover the Hochzeit form and the wedding's timeline with versions and their
   assignment on the guest list, a walk over every couple page checking the way back, every editor section and field with the live preview,
   the public page, calendar export, sharing, theming, authorization, deletion and logout, plus the legal
-  pages, data export and account deletion, and guests and RSVP (guest list, settings, polls, preview,
+  links, data export and account deletion, and guests and RSVP (guest list, settings, polls, preview,
   answers through personal links, isolation between households, overview, CSV and account export,
   notification email, reply-by date and retention). Every E2E test fails if the browser makes a request to
   a host other than the app; guest browsers opened by a test are checked the same way.

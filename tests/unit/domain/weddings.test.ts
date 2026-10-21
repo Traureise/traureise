@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  addMonths,
   ASSIGNABLE_ITEMS,
   assignedVersion,
   daysUntil,
@@ -8,6 +9,7 @@ import {
   needsDate,
   parseNewWedding,
   parseVersionLabel,
+  stepTiming,
   parseWeddingDetails,
   timelineStates,
   VERSION_FEATURES,
@@ -30,15 +32,19 @@ describe("parseNewWedding", () => {
 });
 
 describe("parseWeddingDetails", () => {
-  it("takes names, date, place and time zone; no date means not planned yet", () => {
-    expect(parseWeddingDetails({ title: "Anna & Ben", hasDate: true, weddingDate: "2027-06-12", location: " Kempten ", timezone: "Europe/Vienna" })).toEqual({
+  it("takes names, date, place with its spot on the map and time zone; no date means not planned yet", () => {
+    expect(
+      parseWeddingDetails({ title: "Anna & Ben", hasDate: true, weddingDate: "2027-06-12", location: " Kempten ", latitude: "47.72674", longitude: "10.31389", timezone: "Europe/Vienna" }),
+    ).toEqual({
       ok: true,
-      value: { title: "Anna & Ben", weddingDate: "2027-06-12", location: "Kempten", timezone: "Europe/Vienna" },
+      value: { title: "Anna & Ben", weddingDate: "2027-06-12", location: "Kempten", latitude: 47.72674, longitude: 10.31389, timezone: "Europe/Vienna" },
     });
-    expect(parseWeddingDetails({ title: "Anna & Ben", hasDate: false, weddingDate: "2027-06-12", location: "" })).toEqual({
+    expect(parseWeddingDetails({ title: "Anna & Ben", hasDate: false, weddingDate: "2027-06-12", location: "", latitude: "", longitude: "" })).toEqual({
       ok: true,
-      value: { title: "Anna & Ben", weddingDate: null, location: null, timezone: "Europe/Berlin" },
+      value: { title: "Anna & Ben", weddingDate: null, location: null, latitude: null, longitude: null, timezone: "Europe/Berlin" },
     });
+    expect(parseWeddingDetails({ title: "Anna & Ben", hasDate: false, latitude: "47.7" })).toMatchObject({ ok: false, fieldErrors: { latitude: "invalid_option" } });
+    expect(parseWeddingDetails({ title: "Anna & Ben", hasDate: false, latitude: "95", longitude: "10" })).toMatchObject({ ok: false, fieldErrors: { latitude: "invalid_option" } });
     expect(parseWeddingDetails({ title: "Anna & Ben", hasDate: false, timezone: "Mars/Olympus" })).toMatchObject({ ok: false, fieldErrors: { timezone: "invalid_timezone" } });
   });
 });
@@ -85,7 +91,7 @@ describe("versions", () => {
     const now = new Date("2026-10-19T10:00:00Z");
     const allowed = (tier: Parameters<typeof billing>[0]) => VERSION_ITEMS.filter((item) => canUse(VERSION_FEATURES[item], billing(tier), now));
     expect(allowed(null)).toEqual([]);
-    expect(allowed("rsvp")).toEqual(["website"]);
+    expect(allowed("rsvp")).toEqual(["saveTheDate", "website"]);
     expect(allowed("invitations")).toEqual(["saveTheDate", "website", "invitation"]);
     expect(allowed("complete")).toEqual(["engagement", "saveTheDate", "website", "invitation", "thankYou"]);
     expect(VERSION_ITEMS.every((item) => canUse(VERSION_FEATURES[item], { billingEnabled: false, entitlements: [] }, now))).toBe(true);
@@ -127,5 +133,28 @@ describe("timeline", () => {
 
   it("Save the Date and invitation wait for a date; the engagement and thank-you card do not", () => {
     expect(["engagement", "saveTheDate", "invitation", "thankYou"].filter((k) => needsDate(k as never))).toEqual(["saveTheDate", "invitation"]);
+  });
+});
+
+describe("stepTiming", () => {
+  it("dates each step's window from the wedding day and says where today is", () => {
+    expect(stepTiming("saveTheDate", "2026-10-30", "2026-03-01")).toEqual({ kind: "dated", start: "2025-10-30", end: "2026-04-30", phase: "open" });
+    expect(stepTiming("saveTheDate", "2026-10-30", "2026-10-21")).toMatchObject({ phase: "late" });
+    expect(stepTiming("invitation", "2026-10-30", "2026-05-01")).toEqual({ kind: "dated", start: "2026-06-30", end: "2026-07-30", phase: "before" });
+    // The website has no start: it is due until the invitation window opens.
+    expect(stepTiming("website", "2026-10-30", "2026-03-01")).toEqual({ kind: "dated", start: null, end: "2026-06-30", phase: "open" });
+    expect(stepTiming("website", "2026-10-30", "2026-07-01")).toMatchObject({ phase: "late" });
+    expect(stepTiming("thankYou", "2026-10-30", "2026-10-30")).toEqual({ kind: "dated", start: "2026-10-31", end: "2026-12-30", phase: "before" });
+  });
+
+  it("has only the rule without a date, and no window for the engagement", () => {
+    expect(stepTiming("invitation", null, "2026-10-21")).toEqual({ kind: "relative" });
+    expect(stepTiming("engagement", "2026-10-30", "2026-10-21")).toEqual({ kind: "anytime" });
+    expect(stepTiming("website", null, "2026-10-21")).toEqual({ kind: "relative" });
+  });
+
+  it("clamps to the end of a shorter month", () => {
+    expect(addMonths("2027-08-31", -6)).toBe("2027-02-28");
+    expect(addMonths("2028-05-31", -3)).toBe("2028-02-29");
   });
 });

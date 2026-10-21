@@ -1,11 +1,8 @@
 /** Node.js only (see instrumentation.ts): startup warnings and the guest jobs. */
 export async function registerNode() {
   const { loadConfig, startupWarnings } = await import("@/composition/config");
-  const { FileLegalPages } = await import("@/infrastructure/legal/files");
   const config = loadConfig();
-  const unreadable = await new FileLegalPages({ imprint: config.IMPRINT_FILE, privacy: config.PRIVACY_FILE, terms: config.TERMS_FILE }).unreadableSettings();
-  const warnings = [...startupWarnings(config), ...(unreadable.length ? [`${unreadable.join(", ")} set but not readable: those pages do not exist.`] : [])];
-  for (const warning of warnings) console.warn(`[traureise] WARNING: ${warning}`);
+  for (const warning of startupWarnings(config)) console.warn(`[traureise] WARNING: ${warning}`);
   if (config.GUEST_JOBS_INTERVAL_MINUTES > 0) startGuestJobs(config.GUEST_JOBS_INTERVAL_MINUTES * 60_000);
 }
 

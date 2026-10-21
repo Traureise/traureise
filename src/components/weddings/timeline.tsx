@@ -1,18 +1,63 @@
 import Link from "next/link";
-import { getTranslations } from "next-intl/server";
-import { Check, Eye, Send } from "lucide-react";
+import { getFormatter, getTranslations } from "next-intl/server";
+import { Check, Eye, PencilLine, Send } from "lucide-react";
 import type { HomeStep, WeddingHome } from "@/application/weddings";
 import { markEngagementSharedAction } from "@/app/actions/cards";
 import { CardFrame } from "@/components/cards/card-frame";
 import { ShareDialog } from "@/components/share/share-dialog";
 import { Button } from "@/components/ui/button";
 import { container } from "@/composition/container";
-import { themeAssetUrl, uploadUrl } from "@/lib/format";
+import { dateFromIso, themeAssetUrl, uploadUrl } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { versionHref } from "@/lib/routes";
 import { VersionChips } from "./versions";
 
-/** One step of the timeline: preview, when couples usually do it, status, versions, and a way in. */
+/** The column left of the line: when couples usually do this step, dated from the wedding day once there is one. */
+async function When({ step, weddingId }: { step: HomeStep; weddingId: string }) {
+  const t = await getTranslations("weddings.home");
+  const format = await getFormatter();
+  const day = (iso: string) => format.dateTime(dateFromIso(iso), { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  const { timing } = step;
+  const done = step.state === "done";
+  const rule = t(`when.${step.item}`);
+  let title = rule;
+  let detail: React.ReactNode = null;
+  let tone: "open" | "late" | "quiet" = "quiet";
+  if (timing.kind === "relative") {
+    detail = (
+      <Link href={`/hochzeiten/${weddingId}/hochzeit`} className="text-primary underline-offset-4 hover:underline">
+        {t("timing.setDate")}
+      </Link>
+    );
+  } else if (timing.kind === "dated") {
+    if (timing.phase === "open") {
+      // Without a start (the website), the deadline itself is the headline: "Bis 30. Juni 2026".
+      title = timing.start ? t("timing.now") : t("timing.by", { date: day(timing.end) });
+      detail = timing.start ? t("timing.until", { date: day(timing.end) }) : rule;
+      tone = done ? "quiet" : "open";
+    } else if (timing.phase === "before") {
+      title = t("timing.from", { date: day(timing.start!) });
+      detail = rule;
+    } else if (done) {
+      detail = timing.start ? t("timing.range", { start: day(timing.start), end: day(timing.end) }) : t("timing.until", { date: day(timing.end) });
+    } else {
+      title = t("timing.catchUp");
+      detail = t("timing.recommended", { date: day(timing.end) });
+      tone = "late";
+    }
+  }
+  return (
+    <div className="mb-2 sm:mb-0 sm:pt-5 sm:text-right" data-testid="step-when">
+      <p className={cn("font-heading text-lg leading-tight font-medium text-balance", tone === "open" && "text-primary", tone === "late" && "text-destructive", tone === "quiet" && done && "text-muted-foreground")}>
+        {title}
+      </p>
+      {detail && <p className={cn("mt-0.5 text-sm text-balance", tone === "late" ? "text-destructive" : "text-muted-foreground")}>{detail}</p>}
+    </div>
+  );
+}
+
+
+/** One step of the timeline: when it is due, preview, status, versions, and its actions. */
 async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) {
   const t = await getTranslations("weddings.home");
   const tItems = await getTranslations("weddings.items");
@@ -33,12 +78,15 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
             : t("status.household", status.counts);
   const now = step.state === "now";
   const theme = "website" in step.preview ? container().themes.get(step.preview.website.themeId) : null;
+  const online = step.item === "website" ? step.versions.filter((v) => v.online) : [];
+  const labelled = (label: string, version: string) => (step.versions.length > 1 ? `${label}: ${version}` : label);
   return (
-    <li className="relative pl-12" data-testid="timeline-step" data-item={step.item} data-state={step.state}>
+    <li className="relative pl-12 sm:grid sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-x-14 sm:pl-0" data-testid="timeline-step" data-item={step.item} data-state={step.state}>
+      <When step={step} weddingId={weddingId} />
       <span
         aria-hidden
         className={cn(
-          "absolute top-6 left-1 flex size-7 items-center justify-center rounded-full border-2",
+          "absolute top-6 left-1 flex size-7 items-center justify-center rounded-full border-2 max-sm:top-1 sm:left-[calc(11.75rem-0.875rem)]",
           step.state === "done" && "border-primary bg-primary text-primary-foreground",
           now && "border-primary bg-background ring-6 ring-primary/15",
           step.state === "later" && "border-border bg-background",
@@ -47,7 +95,7 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
         {step.state === "done" && <Check className="size-4" />}
       </span>
       <article className={cn("flex flex-col gap-4 rounded-2xl border bg-card p-4 sm:flex-row sm:items-center", now ? "border-primary shadow-lg shadow-primary/10" : "border-border", step.state === "later" && "opacity-80")}>
-        <Link href={versionHref(weddingId, step.item, first.id)} className="shrink-0 self-start" tabIndex={-1} aria-hidden>
+        <Link href={versionHref(weddingId, step.item, first.id)} className="shrink-0 self-start max-sm:hidden" tabIndex={-1} aria-hidden>
           {"card" in step.preview ? (
             <CardFrame model={step.preview.card} className="w-16" label={t("cardPreviewAlt", { item: name })} />
           ) : (
@@ -55,12 +103,11 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
             <img
               src={step.preview.website.coverImageKey ? uploadUrl(step.preview.website.coverImageKey) : theme ? themeAssetUrl(theme.id, theme.assets.preview) : ""}
               alt={t("websitePreviewAlt")}
-              className="aspect-[32/22] w-24 rounded-md border border-border object-cover"
+              className="aspect-[3/4] w-16 rounded-md border border-border object-cover"
             />
           )}
         </Link>
         <div className="min-w-0 flex-1 space-y-1">
-          <p className="text-xs tracking-[0.12em] text-accent-foreground uppercase">{now ? t("next") : t(`when.${step.item}`)}</p>
           <h2 className="font-heading text-2xl font-medium">{name}</h2>
           <p className="text-sm text-muted-foreground" data-testid="step-status">
             {statusText}
@@ -69,9 +116,35 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
             <VersionChips weddingId={weddingId} item={step.item} versions={step.versions} canAdd={step.canAddVersion} />
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 sm:flex-col sm:items-end">
-          <Button asChild size="sm" variant={now ? "default" : "outline"}>
-            <Link href={versionHref(weddingId, step.item, first.id)}>{now ? t("continue") : t("openStep")}</Link>
+        {/*
+          Two rows in two even columns: above, what the couple does with the item (Ansehen, Bearbeiten); below, what
+          goes to the guests (Teilen, Versenden). Each kind has its own style; Bearbeiten is filled for the next step.
+        */}
+        <div className="grid grid-cols-2 gap-2 sm:w-72 sm:shrink-0 [&>*]:w-full">
+          {"card" in step.preview ? (
+            <Button asChild size="sm" variant="secondary">
+              <Link href={`${versionHref(weddingId, step.item, first.id)}/vorschau`}>
+                <Eye aria-hidden />
+                {t("view")}
+              </Link>
+            </Button>
+          ) : online.length > 0 ? (
+            online.map((v) => (
+              <Button key={v.id} asChild size="sm" variant="secondary">
+                <a href={v.publicUrl!} target="_blank" rel="noopener">
+                  <Eye aria-hidden />
+                  {labelled(t("view"), v.label)}
+                </a>
+              </Button>
+            ))
+          ) : (
+            <span aria-hidden />
+          )}
+          <Button asChild size="sm" variant={now ? "default" : "outline"} className={cn("col-start-2", !now && "border-primary/40 text-primary")}>
+            <Link href={versionHref(weddingId, step.item, first.id)}>
+              <PencilLine aria-hidden />
+              {now ? t("continue") : t("openStep")}
+            </Link>
           </Button>
           {step.item === "engagement" &&
             status.kind === "household" &&
@@ -84,31 +157,21 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
                 title={t("shareTitle", { item: step.versions.length > 1 ? `${name} (${v.label})` : name })}
                 message={step.messages[v.id] ?? ""}
                 onShared={markEngagementSharedAction.bind(null, weddingId, v.id)}
-                triggerLabel={step.versions.length > 1 ? `${t("share")}: ${v.label}` : t("share")}
+                triggerLabel={labelled(t("share"), v.label)}
               />
             ))}
-          {status.kind === "household" && (
-            <Button asChild size="sm" variant="ghost">
-              <Link href={`/hochzeiten/${weddingId}/gaeste?karte=${step.item}`}>
+          {online.map((v) => (
+            <ShareDialog key={v.id} url={v.publicUrl!} slug={new URL(v.publicUrl!).pathname.slice(1)} triggerLabel={labelled(t("share"), v.label)} />
+          ))}
+          {(status.kind === "household" || online.length > 0) && (
+            <Button asChild size="sm" className="col-start-2 bg-accent text-accent-foreground hover:bg-accent/70">
+              {/* A card: the guest list with that card chosen; the website: each household's personal link. */}
+              <Link href={status.kind === "household" ? `/hochzeiten/${weddingId}/gaeste?karte=${step.item}` : `/hochzeiten/${weddingId}/gaeste`} data-testid={step.item === "website" ? "website-send" : undefined}>
                 <Send aria-hidden />
                 {t("send")}
               </Link>
             </Button>
           )}
-          {step.item === "website" &&
-            step.versions
-              .filter((v) => v.online)
-              .map((v) => (
-                <span key={v.id} className="flex flex-wrap gap-2">
-                  <Button asChild size="sm" variant="ghost">
-                    <a href={v.publicUrl!} target="_blank" rel="noopener">
-                      <Eye aria-hidden />
-                      {step.versions.length > 1 ? `${t("view")}: ${v.label}` : t("view")}
-                    </a>
-                  </Button>
-                  <ShareDialog url={v.publicUrl!} slug={new URL(v.publicUrl!).pathname.slice(1)} triggerLabel={step.versions.length > 1 ? `${t("share")}: ${v.label}` : t("share")} />
-                </span>
-              ))}
         </div>
       </article>
     </li>
@@ -121,7 +184,7 @@ export async function Timeline({ home }: { home: WeddingHome }) {
   const done = home.steps.filter((s) => s.state === "done").length;
   return (
     <section aria-label={t("timeline")} className="relative">
-      <div aria-hidden className="absolute top-8 bottom-8 left-[1.05rem] w-0.5 bg-border">
+      <div aria-hidden className="absolute top-8 bottom-8 left-[1.05rem] w-0.5 bg-border sm:left-[calc(11.75rem-1px)]">
         <div className="w-full bg-primary" style={{ height: `${(done / home.steps.length) * 100}%` }} />
       </div>
       <ol className="relative space-y-4" data-testid="timeline">

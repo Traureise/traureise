@@ -2,8 +2,8 @@ import { expect, test } from "./fixtures";
 import { login, uniqueEmail } from "./helpers/auth";
 import { createWebsite } from "./helpers/editor";
 
-// This instance has no IMPRINT_FILE, PRIVACY_FILE or TERMS_FILE (see docker-compose.e2e.yml).
-test("without the operator's files the legal pages do not exist and nothing links to them", async ({ page, request }) => {
+// This instance has no IMPRINT_URL, PRIVACY_URL or TERMS_URL (see docker-compose.e2e.yml).
+test("without the operator's links there are no legal pages and nothing links to them", async ({ page, request }) => {
   for (const path of ["/impressum", "/datenschutz", "/agb"]) expect((await request.get(path)).status()).toBe(404);
 
   await page.goto("/");
@@ -16,8 +16,9 @@ test("without the operator's files the legal pages do not exist and nothing link
   await createWebsite(page, slug);
   await page.goto(`/${slug}`);
   const siteFooter = page.getByTestId("site-footer");
-  await expect(siteFooter).toContainText("Erstellt mit Traureise");
-  await expect(siteFooter.getByRole("link")).toHaveCount(0);
+  // Only the credit, which leads to this instance's start page.
+  await expect(siteFooter.getByRole("link")).toHaveText(["Erstellt mit Traureise"]);
+  await expect(siteFooter.getByRole("link", { name: "Erstellt mit Traureise" })).toHaveAttribute("href", "/");
 });
 
 test("without billing there are no prices, plans or purchases anywhere", async ({ page, request }) => {

@@ -53,7 +53,13 @@ test("a couple creates their wedding, gets every item, adds versions, chooses wh
       await expect(steps.first().getByRole("link", { name: "Weitermachen" })).toBeVisible();
       for (const name of ["Save the Date", "Einladung", "Dankeskarte"]) await expect(step(page, name).getByTestId("version-chips")).toContainText("Standard");
       await expect(step(page, "Hochzeitswebsite").getByTestId("step-status")).toHaveText("Entwurf · noch nicht veröffentlicht");
-      await expect(page.getByTestId("guest-summary")).toContainText("Noch keine Haushalte");
+      // The wedding's tabs; a tab stays current on its subpages.
+      await expect(page.getByTestId("wedding-tabs").getByRole("link")).toHaveText(["Vorbereitung", "Hochzeit", "Gästeliste", "Ablauf"]);
+      await expect(page.getByTestId("tab-preparation")).toHaveAttribute("aria-current", "page");
+      await page.getByTestId("tab-guests").click();
+      await page.getByTestId("guest-tabs").getByRole("link", { name: "Einstellungen" }).click();
+      await expect(page.getByTestId("tab-guests")).toHaveAttribute("aria-current", "page");
+      await expect(page.getByTestId("tab-preparation")).not.toHaveAttribute("aria-current", "page");
 
       await setWeddingSlug(page, weddingId, slug);
       expect((await request.get(`/${slug}`)).status()).toBe(404);
@@ -187,7 +193,7 @@ test("a couple creates their wedding, gets every item, adds versions, chooses wh
       await expect(guest.getByTestId("page-card-saveTheDate")).not.toContainText("Für die ganze Familie");
       // The last version of an item cannot be deleted.
       await page.goto(homeUrl(weddingId));
-      await step(page, "Save the Date").getByRole("link", { name: "Öffnen" }).click();
+      await step(page, "Save the Date").getByRole("link", { name: "Bearbeiten" }).click();
       await expect(page.getByRole("button", { name: "Version löschen" })).toHaveCount(0);
     });
 
@@ -229,7 +235,7 @@ test("a couple creates their wedding, gets every item, adds versions, chooses wh
       const second = await createWedding(page, { names: "Lena & Jo", date: null });
       await expect(page.getByTestId("wedding-badge")).toHaveText("Datum noch offen");
       for (const name of ["Save the Date", "Einladung"]) await expect(step(page, name).getByTestId("step-status")).toHaveText("Entwurf · wartet auf euer Datum");
-      await step(page, "Save the Date").getByRole("link", { name: "Öffnen" }).click();
+      await step(page, "Save the Date").getByRole("link", { name: "Bearbeiten" }).click();
       await expect(page.getByTestId("card-waits-for-date")).toBeVisible();
       await expect(page.getByTestId("card-preview")).toContainText("Datum folgt");
       await page.goto(guestsUrl(second));

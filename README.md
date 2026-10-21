@@ -63,26 +63,22 @@ For production (real SMTP, HTTPS, backups), follow the
 All settings are environment variables in `.env` (see [`.env.example`](.env.example) and the
 [configuration reference](https://docs.traureise.de/configuration/)).
 
-**Legal pages.** Traureise ships no Impressum, privacy policy or terms: who runs an instance and what it does
-with personal data differs for each one. Write them as Markdown files and point Traureise at them:
+**Legal pages.** Traureise ships no Impressum, privacy policy or terms and shows none itself: who runs an
+instance and what it does with personal data differs for each one. Publish them wherever you publish pages and
+link them:
 
 ```yaml
 services:
   app:
     environment:
-      IMPRINT_FILE: /legal/impressum.md     # /impressum, "Impressum" in the footers
-      PRIVACY_FILE: /legal/datenschutz.md   # /datenschutz, "Datenschutz"
-      TERMS_FILE: /legal/agb.md             # /agb, "AGB"
-    volumes:
-      - ./legal:/legal:ro
+      IMPRINT_URL: https://example.org/impressum/     # "Impressum" in the footers
+      PRIVACY_URL: https://example.org/datenschutz/   # "Datenschutz"
+      TERMS_URL: https://example.org/agb/             # "AGB"
 ```
 
-- Each file is optional. Without one the page is a 404 and nothing links to it. With one, the app footer
-  and a discreet footer on every wedding website link to it.
-- Files are read on every request, so an edit shows at once. Keep them in version control: for a privacy
-  policy it matters what it said on which day.
-- Raw HTML in a file is shown as text, and only web, mail and phone links are kept.
-- The app logs a warning at startup when `IMPRINT_FILE` or `PRIVACY_FILE` is missing or unreadable.
+- Each link is optional; unset, there is none. The app footer and a discreet footer on every wedding website
+  link the ones that are set.
+- The app logs a warning at startup when `IMPRINT_URL` or `PRIVACY_URL` is missing.
 
 > **Have your legal texts reviewed.** A privacy policy says who is responsible, where the instance is hosted,
 > what it stores (accounts, websites, images, login links for 15 minutes, sessions for 30 days, rate-limit

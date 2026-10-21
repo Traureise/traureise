@@ -2,32 +2,26 @@ import { expect, test } from "./fixtures";
 import { login, uniqueEmail } from "./helpers/auth";
 import { createWebsite } from "./helpers/editor";
 
-// This instance mounts e2e/legal as the operator's files (see docker-compose.e2e.yml).
-test("the operator's Markdown files are the legal pages, linked from the app footer", async ({ page }) => {
+// This instance links a fictitious operator's legal pages (see docker-compose.e2e.yml). They live elsewhere, so the
+// tests check the links and never follow them: the fixture fails any request to another host.
+const LINKS = {
+  Impressum: "https://docs.example.org/impressum/",
+  Datenschutz: "https://docs.example.org/datenschutz/",
+  AGB: "https://docs.example.org/agb/",
+};
+
+test("the app footer links the operator's legal pages; Traureise shows none itself", async ({ page, request }) => {
+  for (const path of ["/impressum", "/datenschutz", "/agb"]) expect((await request.get(path)).status()).toBe(404);
   await page.goto("/");
   const footer = page.getByTestId("app-footer");
+  for (const [name, href] of Object.entries(LINKS)) await expect(footer.getByRole("link", { name })).toHaveAttribute("href", href);
+  await expect(footer.getByRole("link", { name: "Preise" })).toHaveAttribute("href", "/preise");
 
-  await footer.getByRole("link", { name: "Impressum" }).click();
-  await expect(page).toHaveURL(/\/impressum$/);
-  await expect(page).toHaveTitle(/^Impressum/);
-  const content = page.getByTestId("legal-content");
-  await expect(content.getByRole("heading", { level: 1, name: "Impressum" })).toBeVisible();
-  await expect(content.getByRole("heading", { level: 2, name: "Angaben gemäß § 5 DDG" })).toBeVisible();
-  await expect(content).toContainText("Erika Musterfrau");
-  await expect(content.getByRole("link", { name: "kontakt@example.org" })).toHaveAttribute("href", "mailto:kontakt@example.org");
-  // Raw HTML in a file is shown as text, never run.
-  await expect(content).toContainText("<script>window.injected = true</script>");
-  expect(await page.evaluate(() => (window as unknown as { injected?: boolean }).injected)).toBeUndefined();
-
-  await page.getByTestId("app-footer").getByRole("link", { name: "Datenschutz" }).click();
-  await expect(page).toHaveURL(/\/datenschutz$/);
-  await expect(page.getByTestId("legal-content").getByRole("heading", { level: 1, name: "Datenschutzerklärung" })).toBeVisible();
-
-  await page.getByTestId("app-footer").getByRole("link", { name: "AGB" }).click();
-  await expect(page).toHaveURL(/\/agb$/);
-  await expect(page.getByTestId("legal-content")).toContainText("Diese Testbedingungen");
-
-  await expect(page.getByTestId("app-footer").getByRole("link", { name: "Preise" })).toHaveAttribute("href", "/preise");
+  // Where people buy, the terms are named too.
+  await page.goto("/preise");
+  const terms = page.getByTestId("pricing-terms");
+  await expect(terms.getByRole("link", { name: "AGB" })).toHaveAttribute("href", LINKS.AGB);
+  await expect(terms.getByRole("link", { name: "Datenschutzerklärung" })).toHaveAttribute("href", LINKS.Datenschutz);
 });
 
 test("every public wedding website links the legal pages in a discreet footer", async ({ page }) => {
@@ -37,7 +31,6 @@ test("every public wedding website links the legal pages in a discreet footer", 
   await page.goto(`/${slug}`);
   const footer = page.getByTestId("site-footer");
   await expect(footer).toContainText("Erstellt mit Traureise");
-  await expect(footer.getByRole("link")).toHaveText(["Impressum", "Datenschutz", "AGB"]);
-  await footer.getByRole("link", { name: "Datenschutz" }).click();
-  await expect(page).toHaveURL(/\/datenschutz$/);
+  await expect(footer.getByRole("link")).toHaveText(["Erstellt mit Traureise", ...Object.keys(LINKS)]);
+  for (const [name, href] of Object.entries(LINKS)) await expect(footer.getByRole("link", { name })).toHaveAttribute("href", href);
 });

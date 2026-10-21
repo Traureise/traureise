@@ -9,7 +9,7 @@ import { waitForMessages } from "./helpers/mailpit";
 
 const STUB_URL = process.env.E2E_CREEM_STUB_URL ?? "http://localhost:4010";
 
-async function buy(page: Page, tier: "invitations" | "complete") {
+async function buy(page: Page, tier: "rsvp" | "invitations" | "complete") {
   await page.goto("/preise");
   await page.getByTestId(`tier-${tier}`).getByRole("button", { name: "Jetzt kaufen" }).click();
   await expect(page).toHaveURL(new RegExp(`^${STUB_URL}/checkout/ch_`));
@@ -61,8 +61,8 @@ test.describe("Einladungen and Komplett packages", () => {
       await expect(page.getByTestId("add-version-locked")).toHaveCount(5);
     });
 
-    await test.step("buying Einladungen activates Save the Dates: links, export and email sending", async () => {
-      await buy(page, "invitations");
+    await test.step("buying RSVP activates Save the Dates: links and export, but not email sending", async () => {
+      await buy(page, "rsvp");
       await page.goto(cards.saveTheDate!);
       await expect(page.getByTestId("card-editor-locked")).toHaveCount(0);
       const downloading = page.waitForEvent("download");
@@ -73,6 +73,18 @@ test.describe("Einladungen and Komplett packages", () => {
       await page.goto(guestsUrl(editorUrl));
       link = await guestLink(page, "Familie Kern");
       await chooseCard(page, "Save the Date");
+      await expect(page.getByTestId("card-sending").getByRole("link", { name: "E-Mail-Versand freischalten" })).toHaveAttribute("href", "/preise");
+
+      // RSVP unlocks extra Save the Dates and websites; the invitation needs Einladungen.
+      await page.goto(homeUrl(weddingId));
+      for (const name of ["Save the Date", "Hochzeitswebsite"]) await expect(step(page, name).getByTestId("add-version-locked")).toHaveCount(0);
+      await expect(step(page, "Einladung").getByTestId("add-version-locked")).toHaveCount(1);
+    });
+
+    await test.step("buying Einladungen adds email sending", async () => {
+      await buy(page, "invitations");
+      await page.goto(guestsUrl(editorUrl));
+      await chooseCard(page, "Save the Date");
       await page.getByRole("button", { name: "Per E-Mail an alle senden (1)" }).click();
       await page.getByRole("alertdialog").getByRole("button", { name: "Jetzt senden" }).click();
       const [message] = await waitForMessages(request, guestEmail, "Save the Date von Anna & Ben");
@@ -81,7 +93,7 @@ test.describe("Einladungen and Komplett packages", () => {
       await page.getByTestId("envelope").click();
       await expect(page.getByTestId("page-card-saveTheDate")).toBeVisible();
 
-      // Einladungen unlocks extra Save the Dates, invitations and websites; the other two need Komplett.
+      // Einladungen unlocks extra invitations too; the other two need Komplett.
       await page.goto(homeUrl(weddingId));
       for (const name of ["Save the Date", "Einladung", "Hochzeitswebsite"]) await expect(step(page, name).getByTestId("add-version-locked")).toHaveCount(0);
       for (const name of ["Verlobungsanzeige", "Dankeskarte"]) await expect(step(page, name).getByTestId("add-version-locked")).toHaveCount(1);

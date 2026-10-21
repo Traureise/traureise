@@ -4,16 +4,17 @@ import { useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { PencilLine, Plus, Trash2 } from "lucide-react";
+import { MapPin, PencilLine, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteEventAction, saveEventAction } from "@/app/actions/schedule";
 import type { WeddingEvent } from "@/application/ports";
 import { EVENT_FIELDS } from "@/components/editor/block-fields";
 import { FieldForm } from "@/components/editor/field-form";
+import type { Coordinates } from "@/components/editor/location-picker";
 import { Button } from "@/components/ui/button";
 
 /** The Ablauf: the wedding's events, chronological; add, edit and delete. */
-export function EventList({ weddingId, events }: { weddingId: string; events: WeddingEvent[] }) {
+export function EventList({ weddingId, events, near }: { weddingId: string; events: WeddingEvent[]; near: Coordinates | null }) {
   const t = useTranslations("schedule");
   const tErrors = useTranslations("errors");
   const tTypes = useTranslations("sections.eventTypes");
@@ -40,7 +41,7 @@ export function EventList({ weddingId, events }: { weddingId: string; events: We
             <h2 id={`day-${day}`} className="font-heading text-xl font-medium">
               {format(new Date(`${day}T12:00:00`), "EEEE, d. MMMM yyyy", { locale: de })}
             </h2>
-            <ol className="relative space-y-1 border-l border-border pl-6">
+            <ol className="relative space-y-3 border-l-2 border-border pl-6">
               {dayEvents.map((event) =>
                 editing === event.id ? (
                   <li key={event.id} className="py-2">
@@ -52,26 +53,40 @@ export function EventList({ weddingId, events }: { weddingId: string; events: We
                       label={t("editEvent")}
                       onSubmit={(data) => saveEventAction(weddingId, event.id, data)}
                       onDone={() => setEditing(null)}
+                      near={near}
                     />
                   </li>
                 ) : (
-                  <li key={event.id} className="group relative grid grid-cols-[4.5rem_1fr_auto] items-start gap-x-4 rounded-xl py-3 pr-2 hover:bg-card" data-testid="event">
-                    <span className="absolute top-[1.35rem] -left-[1.8rem] size-2.5 rounded-full border-2 border-background bg-primary" aria-hidden />
+                  // A card like the timeline's steps: the time large, then what and where, then labelled actions.
+                  <li
+                    key={event.id}
+                    className="relative grid grid-cols-[4.5rem_minmax(0,1fr)] items-start gap-x-4 gap-y-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-[5rem_minmax(0,1fr)_auto]"
+                    data-testid="event"
+                  >
+                    <span className="absolute top-6 -left-[1.95rem] size-3 rounded-full border-2 border-background bg-primary" aria-hidden />
                     <span className="font-heading text-2xl leading-none font-medium tabular-nums">{event.data.startTime}</span>
-                    <div className="min-w-0 space-y-0.5">
-                      <p className="font-medium" data-testid="event-headline">
+                    <div className="min-w-0 space-y-1">
+                      <p className="font-heading text-xl leading-tight font-medium" data-testid="event-headline">
                         {event.data.name}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {[tTypes(event.data.eventType) !== event.data.name && tTypes(event.data.eventType), event.data.endTime && t("until", { time: event.data.endTime }), event.data.venueName].filter(Boolean).join(", ")}
+                        {[tTypes(event.data.eventType) !== event.data.name && tTypes(event.data.eventType), event.data.endTime && t("until", { time: event.data.endTime })].filter(Boolean).join(", ")}
                       </p>
+                      {(event.data.venueName || event.data.address) && (
+                        <p className="flex items-start gap-1.5 text-sm">
+                          <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                          <span>{[event.data.venueName, event.data.address].filter(Boolean).join(", ")}</span>
+                        </p>
+                      )}
                     </div>
-                    <div className="flex gap-1">
-                      <Button size="icon-sm" variant="ghost" aria-label={`${t("edit")}: ${event.data.name}`} onClick={() => setEditing(event.id)}>
+                    <div className="col-span-2 flex justify-end gap-2 sm:col-span-1">
+                      <Button size="sm" variant="outline" className="border-primary/40 text-primary" aria-label={`${t("edit")}: ${event.data.name}`} onClick={() => setEditing(event.id)}>
                         <PencilLine aria-hidden />
+                        {t("edit")}
                       </Button>
-                      <Button size="icon-sm" variant="ghost" className="text-destructive" aria-label={`${t("delete")}: ${event.data.name}`} disabled={busy} onClick={() => remove(event)}>
+                      <Button size="sm" variant="destructive" aria-label={`${t("delete")}: ${event.data.name}`} disabled={busy} onClick={() => remove(event)}>
                         <Trash2 aria-hidden />
+                        {t("delete")}
                       </Button>
                     </div>
                   </li>
@@ -90,6 +105,7 @@ export function EventList({ weddingId, events }: { weddingId: string; events: We
           label={t("newEvent")}
           onSubmit={(data) => saveEventAction(weddingId, null, data)}
           onDone={() => setEditing(null)}
+          near={near}
         />
       ) : (
         <Button variant="outline" className="w-full" onClick={() => setEditing("new")}>

@@ -58,7 +58,7 @@ import { AddEvent, DeleteEvent, ListEvents, UpdateEvent } from "@/application/sc
 import { AddBlock, AddSection, DeleteBlock, DeleteSection, MoveBlock, MoveSection, UpdateBlock, UpdateSection } from "@/application/sections";
 import { GetUpload, UploadImage } from "@/application/uploads";
 import { AddVersion, AssignVersion, DeleteVersion, RenameVersion } from "@/application/versions";
-import { CreateWedding, DeleteWedding, GetRecentWedding, GetWeddingHome, ListWeddings, MarkWeddingUsed, UpdateWeddingDetails, UpdateWeddingSlug } from "@/application/weddings";
+import { CreateWedding, DeleteWedding, GetRecentWedding, GetWeddingFrame, GetWeddingHome, ListWeddings, MarkWeddingUsed, UpdateWeddingDetails, UpdateWeddingSlug } from "@/application/weddings";
 import { GetWebsiteForOwner, SelectTheme, SetCoverImage, SetPublished, UpdateDesign, UpdateHome, UpdateSlug } from "@/application/websites";
 import { createDatabase } from "@/infrastructure/db/client";
 import { SharpImageProcessor } from "@/infrastructure/images/sharp";
@@ -73,7 +73,6 @@ import { LocalFileStorage } from "@/infrastructure/storage/local";
 import { S3FileStorage } from "@/infrastructure/storage/s3";
 import { adjustableClock, cryptoTokens, hmacGuestLinks, systemClock } from "@/infrastructure/system";
 import { FsThemeCatalog } from "@/infrastructure/themes/fs-catalog";
-import { FileLegalPages } from "@/infrastructure/legal/files";
 import { appSecret, billingProblems, loadConfig, type AppConfig } from "./config";
 
 function createStorage(config: AppConfig): FileStorage {
@@ -163,7 +162,14 @@ function build() {
     /** Only with TEST_HOOKS=true: moves the clock (tests of deadlines and retention). */
     testHooks: config.TEST_HOOKS ? { setClockOffset: (ms: number) => adjustableClock.setOffset(ms) } : null,
     sourceCodeUrl: config.SOURCE_CODE_URL,
-    legalPages: new FileLegalPages({ imprint: config.IMPRINT_FILE, privacy: config.PRIVACY_FILE, terms: config.TERMS_FILE }),
+    /** The operator's legal pages that exist, in footer order; linked, never rendered by Traureise. */
+    legalLinks: (
+      [
+        ["imprint", config.IMPRINT_URL],
+        ["privacy", config.PRIVACY_URL],
+        ["terms", config.TERMS_URL],
+      ] as const
+    ).flatMap(([page, href]) => (href ? [{ page, href }] : [])),
     async healthCheck(): Promise<boolean> {
       try {
         await db.execute(sql`select 1`);
@@ -181,6 +187,7 @@ function build() {
     listWeddings: new ListWeddings(deps),
     getRecentWedding: new GetRecentWedding(deps),
     getWeddingHome: new GetWeddingHome(deps),
+    getWeddingFrame: new GetWeddingFrame(deps),
     markWeddingUsed: new MarkWeddingUsed(deps),
     updateWeddingDetails: new UpdateWeddingDetails(deps),
     updateWeddingSlug: new UpdateWeddingSlug(deps),

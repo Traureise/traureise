@@ -8,13 +8,15 @@ import type { CircleMarker, Map as LeafletMap } from "leaflet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export type PickedPlace = { latitude: number; longitude: number; name?: string; address?: string };
+export type Coordinates = { latitude: number; longitude: number };
+export type PickedPlace = Coordinates & { name?: string; address?: string };
 
 type Result = { place_id: number; lat: string; lon: string; name: string; display_name: string; address?: Record<string, string> };
 
 /** Remembers in this browser that the couple wants the map loaded without asking (no cookie, nothing sent). */
 const CONSENT_KEY = "traureise:osm-map";
 const SEARCH_URL = "https://nominatim.openstreetmap.org/search";
+const REVERSE_URL = "https://nominatim.openstreetmap.org/reverse";
 const TILES_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 /** Nominatim's usage policy: at most one request per second, no search-as-you-type. */
 const MIN_SEARCH_INTERVAL_MS = 1000;
@@ -32,10 +34,20 @@ function addressOf(r: Result): string {
 
 /**
  * Finds a place on an OpenStreetMap map. Nothing is loaded from OpenStreetMap until the couple agrees, because
- * tiles and search send their IP address to the OpenStreetMap Foundation (ADR 0026). Without the map the venue
- * and address fields work as before.
+ * tiles and search send their IP address to the OpenStreetMap Foundation (ADR 0026). Without the map the
+ * fields beside it work as before. Without a place yet, the map starts `near` (the wedding's place) or on Germany.
  */
-export function LocationPicker({ value, onPick, onClear }: { value: { latitude: number; longitude: number } | null; onPick: (place: PickedPlace) => void; onClear: () => void }) {
+export function LocationPicker({
+  value,
+  near = null,
+  onPick,
+  onClear,
+}: {
+  value: Coordinates | null;
+  near?: Coordinates | null;
+  onPick: (place: PickedPlace) => void;
+  onClear: () => void;
+}) {
   const t = useTranslations("editor.location");
   // The form only appears after a click (never rendered on the server), so reading storage here is safe.
   const [consented, setConsented] = useState(storedConsent);
@@ -47,8 +59,36 @@ export function LocationPicker({ value, onPick, onClear }: { value: { latitude: 
   const map = useRef<LeafletMap | null>(null);
   const marker = useRef<CircleMarker | null>(null);
   const onPickRef = useRef(onPick);
+  const nameAtRef = useRef<(latitude: number, longitude: number) => Promise<void>>(async () => {});
+  const lookup = useRef(0);
   useEffect(() => {
     onPickRef.current = onPick;
+  });
+
+  /**
+   * A click on the map, say on "Rathaus Kempten": what is there (Nominatim's reverse search) fills name and address
+   * like a search result. Within the one-request-a-second limit, only the last click is looked up.
+   */
+  async function nameAt(latitude: number, longitude: number) {
+    const id = ++lookup.current;
+    const wait = lastSearch.current + MIN_SEARCH_INTERVAL_MS - Date.now();
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    if (id !== lookup.current) return;
+    lastSearch.current = Date.now();
+    try {
+      const params = new URLSearchParams({ lat: String(latitude), lon: String(longitude), format: "jsonv2", addressdetails: "1", zoom: "18", "accept-language": "de" });
+      const response = await fetch(`${REVERSE_URL}?${params}`, { headers: { Accept: "application/json" } });
+      if (!response.ok) return;
+      const r = (await response.json()) as Partial<Result> & { error?: string };
+      if (id !== lookup.current || r.error || !r.display_name) return;
+      // The spot stays where the couple clicked; only the name and address come from the lookup.
+      onPickRef.current({ latitude, longitude, name: r.name || undefined, address: addressOf(r as Result) });
+    } catch {
+      // Offline or refused: the spot is set, the fields stay as they are.
+    }
+  }
+  useEffect(() => {
+    nameAtRef.current = nameAt;
   });
 
   function consent(always: boolean) {
@@ -68,13 +108,17 @@ export function LocationPicker({ value, onPick, onClear }: { value: { latitude: 
     let cancelled = false;
     void import("leaflet").then((L) => {
       if (cancelled || !mapElement.current) return;
-      const m = L.map(mapElement.current, { scrollWheelZoom: false }).setView(value ? [value.latitude, value.longitude] : GERMANY, value ? 16 : 5);
+      const start = value ?? near;
+      const m = L.map(mapElement.current, { scrollWheelZoom: false }).setView(start ? [start.latitude, start.longitude] : GERMANY, value ? 16 : near ? 13 : 5);
       L.tileLayer(TILES_URL, { maxZoom: 19, attribution: `<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">${t("attribution")}</a>` }).addTo(m);
       const dot = L.circleMarker(value ? [value.latitude, value.longitude] : GERMANY, { radius: 9, color: "#4a2342", weight: 3, fillColor: "#fbf7fa", fillOpacity: 1 });
       if (value) dot.addTo(m);
       m.on("click", (e) => {
         dot.setLatLng(e.latlng).addTo(m);
-        onPickRef.current({ latitude: round(e.latlng.lat), longitude: round(e.latlng.lng) });
+        const latitude = round(e.latlng.lat);
+        const longitude = round(e.latlng.lng);
+        onPickRef.current({ latitude, longitude });
+        void nameAtRef.current(latitude, longitude);
       });
       map.current = m;
       marker.current = dot;

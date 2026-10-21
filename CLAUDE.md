@@ -29,7 +29,7 @@ Layers point inward only; ESLint enforces the import bans:
 - `src/application/`: use-case classes (`new X(deps).execute(...)`) depending only on ports in
   `ports.ts`, bundled as `Deps` (`deps.ts`). Ownership checks go through `loadOwnedWebsite`
   (someone else's website is a `NotFoundError`). Errors in `errors.ts`.
-- `src/infrastructure/`: Drizzle repositories, SMTP, storage (local/S3), Creem, themes, legal files.
+- `src/infrastructure/`: Drizzle repositories, SMTP, storage (local/S3), Creem, themes.
 - `src/composition/container.ts`: the only place wiring adapters to ports; `config.ts` is the zod env schema.
 - `src/app/` + `src/components/`: thin routes and server actions (`src/app/actions/*`) that call
   `container().<useCase>.execute(...)` wrapped in `runAction` (`src/lib/action-result.ts`).
@@ -47,7 +47,7 @@ from Mailpit (`e2e/helpers/`). Billing E2E uses the Creem stub in `e2e/creem-stu
 - No hardcoded UI strings in `.tsx` (lint rule): copy goes in `messages/de.json`.
 - No runtime third-party requests (fonts via `@fontsource`, no CDNs, no analytics). Only exception: the couple's
   OpenStreetMap location picker, loaded after consent (ADR 0026).
-- Legal texts are not in the app: operators supply Markdown via `IMPRINT_FILE`/`PRIVACY_FILE`/`TERMS_FILE`.
+- Legal texts are not in the app: it only links `IMPRINT_URL`/`PRIVACY_URL`/`TERMS_URL` (ADR 0027).
 - No skipped tests, Playwright `retries: 0`.
 - No instance holds real data yet (development only): schema changes still get a Drizzle migration, but
   existing rows need no data migration or backwards compatibility.

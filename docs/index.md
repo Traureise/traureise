@@ -1,9 +1,12 @@
 # Traureise
 
 Traureise is a self-hostable, open-source wedding website builder. Couples log in with a link sent by
-email, build their wedding website in an editor with a live preview, and share it with their guests by
-link or QR code. It is German-first and built so that couples' and guests' data never leaves your
+email, plan their wedding (cards, website, guest list, schedule) and share it with their guests by link,
+WhatsApp, email or QR code. It is German-first and built so that couples' and guests' data never leaves your
 instance.
+
+These docs are for **running** Traureise: on [traureise.de](hosted.md) or on your own server. Couples need
+none of it; the app explains itself.
 
 ![The editor: forms on the left, the live preview of the public site on the right](assets/editor.png){ .screenshot }
 
@@ -11,12 +14,13 @@ instance.
 
 - **Passwordless login.** Enter your email, click the link, done. An account is created on first login.
 - **Everything revolves around the wedding.** Names and, if planned, the date are all it asks; from that it
-  makes the engagement announcement, Save the Date, website, invitation and thank-you card. Its home is a
-  timeline of those steps, each with versions for different audiences; the guest list decides who gets which.
+  makes the engagement announcement, Save the Date, website, invitation and thank-you card. A wedding has four
+  tabs: Vorbereitung (a timeline of those steps, each with versions for different audiences), Hochzeit (names,
+  date, place on the map), Gästeliste (who gets which version, and the answers) and Ablauf (the events).
   See [Weddings, the timeline and versions](weddings.md) and [Save the Dates, invitations and cards](cards.md).
 - **Share dialog** with a QR code to download or copy and the link to copy (and WhatsApp for the engagement link).
-- **Editor with live preview** for the home section (cover photo, date, location, welcome text,
-  hashtag, countdown, web address, time zone) and free sections built from blocks. A section is a title plus
+- **Website editor with live preview** for the home section (cover photo, welcome text, hashtag, countdown,
+  web address) and free sections built from blocks. A section is a title plus
   blocks of seven types: Text, Termin, Person, Ort, Link, Frage & Antwort and Bild, each with its own designed
   layout. Sections can be added, renamed, moved, hidden and deleted; blocks can be added, edited, moved and
   deleted. The standard template (Unsere Geschichte, Tagesablauf, Anreise, Empfehlungen, Geschenkideen,

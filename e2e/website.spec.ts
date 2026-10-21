@@ -120,12 +120,14 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
 
   await test.step("names, date and place are the wedding's; the home section has the rest, with live preview", async () => {
     await openSection(page, editorUrl, "Startseite");
-    await page.getByTestId("home-wedding-details").getByRole("button", { name: "Angaben ändern" }).click();
-    let details = page.getByRole("dialog", { name: "Eure Hochzeit" });
+    // "Angaben ändern" opens the Hochzeit tab, which returns to the editor after saving.
+    await page.getByTestId("home-wedding-details").getByRole("link", { name: "Angaben ändern" }).click();
+    let details = page.getByRole("form", { name: "Eure Hochzeit" });
+    await expect(page.getByTestId("tab-wedding")).toHaveAttribute("aria-current", "page");
     await details.getByLabel("Eure Namen").fill("Anna & Ben heiraten");
     await details.getByLabel("Ort (optional)").fill("Gut Sonnenhof, Beispielstadt");
     await details.getByRole("button", { name: "Speichern" }).click();
-    await expect(details).toBeHidden();
+    await expect(page).toHaveURL(new RegExp(`/website/[0-9a-f-]{36}/home$`));
     await page.locator('input[type="file"]').setInputFiles(COVER);
     await expect(preview.locator("img.site-cover")).toBeVisible();
     await page.getByLabel("Begrüßung").fill("Wir freuen uns riesig auf euch!");
@@ -149,13 +151,13 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
     await expect(preview.locator("img.site-cover")).toBeVisible();
 
     // Not planned yet shows the placeholder.
-    await page.getByTestId("home-wedding-details").getByRole("button", { name: "Angaben ändern" }).click();
-    details = page.getByRole("dialog", { name: "Eure Hochzeit" });
+    await page.getByTestId("home-wedding-details").getByRole("link", { name: "Angaben ändern" }).click();
+    details = page.getByRole("form", { name: "Eure Hochzeit" });
     await details.getByLabel("Noch nicht").check();
     await details.getByRole("button", { name: "Speichern" }).click();
     await expect(preview.getByTestId("site-date")).toHaveText("Datum noch offen");
-    await page.getByTestId("home-wedding-details").getByRole("button", { name: "Angaben ändern" }).click();
-    details = page.getByRole("dialog", { name: "Eure Hochzeit" });
+    await page.getByTestId("home-wedding-details").getByRole("link", { name: "Angaben ändern" }).click();
+    details = page.getByRole("form", { name: "Eure Hochzeit" });
     await details.getByLabel("Ja", { exact: true }).check();
     await details.getByLabel("Hochzeitsdatum").fill("12.06.2027");
     await details.getByRole("button", { name: "Speichern" }).click();
@@ -281,6 +283,8 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
     const card = step(page, "Hochzeitswebsite");
     await expect(card).toHaveAttribute("data-state", "done");
     await expect(card.getByTestId("step-status")).toHaveText("Veröffentlicht");
+    // "Versenden" leads to the guest list, where each household's personal link is sent.
+    await expect(card.getByRole("link", { name: "Versenden" })).toHaveAttribute("href", `/hochzeiten/${weddingId}/gaeste`);
 
     await card.getByRole("button", { name: "Teilen" }).click();
     const dialog = page.getByRole("dialog", { name: "Website teilen" });
@@ -343,7 +347,7 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
     await expect(page.getByTestId("publish-control")).toHaveAttribute("data-published", "false");
     expect((await page.request.get(`/${slug}`)).status()).toBe(404);
     await publishWebsite(page, editorUrl);
-    await page.goto(homeUrl(weddingId));
+    await page.goto(`${homeUrl(weddingId)}/hochzeit`);
     await page.getByRole("button", { name: "Hochzeit löschen" }).click();
     const dialog = page.getByRole("alertdialog", { name: "Hochzeit löschen?" });
     await dialog.getByRole("button", { name: "Endgültig löschen" }).click();

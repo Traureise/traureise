@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures";
 import { login, uniqueEmail } from "./helpers/auth";
 import { fillForm, scheduleUrl } from "./helpers/editor";
-import { createWeddingWithWebsite } from "./helpers/weddings";
+import { createWeddingWithWebsite, homeUrl } from "./helpers/weddings";
 
 const NOMINATIM = "nominatim.openstreetmap.org";
 const TILES = "tile.openstreetmap.org";
@@ -76,5 +76,34 @@ test("a couple finds the venue on an OpenStreetMap map, after agreeing to load i
     await edit.getByRole("button", { name: "Abbrechen" }).click();
     await page.getByRole("button", { name: "Termin hinzufügen" }).click();
     await expect(page.getByRole("form", { name: "Neuer Termin" }).getByTestId("location-picker")).toBeVisible();
+  });
+
+  await test.step("the wedding's place is found on the same map, on the Hochzeit tab", async () => {
+    await page.goto(`${homeUrl(weddingId)}/hochzeit`);
+    const form = page.getByRole("form", { name: "Eure Hochzeit" });
+    await form.getByLabel("Ort suchen").fill("Sonnenhof Kempten");
+    await form.getByLabel("Ort suchen").press("Enter");
+    await form.getByRole("button", { name: /Gut Sonnenhof/ }).click();
+    await expect(form.getByLabel("Ort (optional)")).toHaveValue("Gut Sonnenhof");
+    await form.getByRole("button", { name: "Speichern" }).click();
+    await expect(page.getByText("Gespeichert").first()).toBeVisible();
+    await page.reload();
+    await expect(form.getByLabel("Ort (optional)")).toHaveValue("Gut Sonnenhof");
+    await expect(form.getByRole("button", { name: "Punkt entfernen" })).toBeVisible();
+    await page.getByTestId("tab-preparation").click();
+    await expect(page.getByTestId("wedding-badge")).toContainText("Gut Sonnenhof");
+  });
+
+  await test.step("a click on the map takes the place there, with its name", async () => {
+    await page.route(`https://${NOMINATIM}/reverse**`, (route) =>
+      route.fulfill({ json: { place_id: 2, lat: "47.72674", lon: "10.31389", name: "Rathaus Kempten", display_name: "Rathaus Kempten, Rathausplatz 29, 87435 Kempten", address: { road: "Rathausplatz", house_number: "29", postcode: "87435", city: "Kempten" } } }),
+    );
+    await page.goto(scheduleUrl(weddingId));
+    await page.getByRole("button", { name: "Termin hinzufügen" }).click();
+    const form = page.getByRole("form", { name: "Neuer Termin" });
+    await form.getByTestId("location-map").click();
+    await expect(form.getByLabel("Veranstaltungsort")).toHaveValue("Rathaus Kempten");
+    await expect(form.getByLabel("Adresse")).toHaveValue("Rathausplatz 29, 87435 Kempten");
+    expect(osm.some((u) => u.includes("/reverse?") && u.includes("zoom=18"))).toBe(true);
   });
 });

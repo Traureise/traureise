@@ -18,13 +18,16 @@ export type Wedding = {
   /** Null while the wedding is not planned yet. */
   weddingDate: string | null;
   location: string | null;
+  /** The place on the map, both or neither. */
+  latitude: number | null;
+  longitude: number | null;
   timezone: string;
   lastOpenedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
 export type NewWedding = Pick<Wedding, "ownerId" | "slug" | "title" | "weddingDate" | "timezone">;
-export type WeddingPatch = Partial<Pick<Wedding, "slug" | "title" | "weddingDate" | "location" | "timezone">>;
+export type WeddingPatch = Partial<Pick<Wedding, "slug" | "title" | "weddingDate" | "location" | "latitude" | "longitude" | "timezone">>;
 
 /** A version of the wedding's website, for an audience. A draft (a 404 publicly) until published. */
 export type Website = {

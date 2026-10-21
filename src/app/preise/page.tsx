@@ -27,6 +27,9 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
   const t = await getTranslations("pricing");
   const user = await getCurrentUser();
   const plans = user ? await c.listWeddingPlans.execute(user.id) : [];
+  // The operator's terms apply to a purchase: said where people buy, not only in the footer.
+  const terms = c.legalLinks.find((l) => l.page === "terms")?.href;
+  const privacy = c.legalLinks.find((l) => l.page === "privacy")?.href;
 
   return (
     <PageShell header={user ? <AppHeader email={user.email} /> : <div className="mx-auto w-full max-w-5xl px-4 pt-8 sm:px-6"><Logo /></div>}>
@@ -104,6 +107,25 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
         })}
       </div>
       <p className="mt-8 max-w-2xl text-sm text-muted-foreground">{t("note")}</p>
+      {terms && (
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground" data-testid="pricing-terms">
+          {t.rich("terms", {
+            terms: (chunks) => (
+              <a href={terms} className="text-primary underline underline-offset-2">
+                {chunks}
+              </a>
+            ),
+            privacy: (chunks) =>
+              privacy ? (
+                <a href={privacy} className="text-primary underline underline-offset-2">
+                  {chunks}
+                </a>
+              ) : (
+                chunks
+              ),
+          })}
+        </p>
+      )}
     </PageShell>
   );
 }

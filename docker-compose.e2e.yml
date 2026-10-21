@@ -1,11 +1,11 @@
 # E2E test stack: the regular stack plus a second app instance with billing switched on, paying
 # through a local Creem stub. Never use this for a real deployment.
 #   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build --wait
-x-no-legal-files: &no-legal-files
-  # The default app has no legal texts, whatever the local .env says: those pages must not exist there.
-  IMPRINT_FILE: ""
-  PRIVACY_FILE: ""
-  TERMS_FILE: ""
+x-no-legal-links: &no-legal-links
+  # The default app links no legal pages, whatever the local .env says.
+  IMPRINT_URL: ""
+  PRIVACY_URL: ""
+  TERMS_URL: ""
   BILLING_ENABLED: "false"
   # The guest jobs run only when a test asks (/api/test/jobs), scoped to its own website.
   GUEST_JOBS_INTERVAL_MINUTES: "0"
@@ -14,7 +14,7 @@ x-no-legal-files: &no-legal-files
 services:
   app:
     environment:
-      <<: *no-legal-files
+      <<: *no-legal-links
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
 
   creem-stub:
@@ -51,15 +51,14 @@ services:
       CREEM_PRODUCT_COMPLETE: prod_e2e_complete
       GUEST_JOBS_INTERVAL_MINUTES: "0"
       TEST_HOOKS: "true"
-      # Legal texts of a fictitious operator, to test the pages and their links.
-      IMPRINT_FILE: /legal/impressum.md
-      PRIVACY_FILE: /legal/datenschutz.md
-      TERMS_FILE: /legal/agb.md
+      # A fictitious operator's legal pages, to test the links.
+      IMPRINT_URL: https://docs.example.org/impressum/
+      PRIVACY_URL: https://docs.example.org/datenschutz/
+      TERMS_URL: https://docs.example.org/agb/
     ports:
       - "127.0.0.1:3001:3000"
     volumes:
       - uploads:/data/uploads
-      - ./e2e/legal:/legal:ro
     depends_on:
       # The default app runs the migrations first; two instances migrating at once could collide.
       app:
