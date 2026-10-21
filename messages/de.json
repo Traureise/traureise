@@ -1042,19 +1042,19 @@
       "when": {
         "engagement": "Sobald ihr verlobt seid",
         "saveTheDate": "6–12 Monate vorher",
-        "website": "Wann ihr mögt",
+        "website": "Vor der Einladung",
         "invitation": "3–4 Monate vorher",
         "thankYou": "Nach der Hochzeit"
       },
       "timing": {
         "now": "Jetzt",
         "until": "bis {date}",
+        "by": "Bis {date}",
         "from": "Ab {date}",
         "range": "{start} – {end}",
         "catchUp": "Jetzt nachholen",
         "recommended": "empfohlen bis {date}",
-        "setDate": "Datum eintragen",
-        "websiteHint": "am besten vor dem Save the Date"
+        "setDate": "Datum eintragen"
       },
       "continue": "Weitermachen",
       "openStep": "Öffnen",

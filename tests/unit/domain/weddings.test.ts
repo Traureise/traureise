@@ -141,13 +141,16 @@ describe("stepTiming", () => {
     expect(stepTiming("saveTheDate", "2026-10-30", "2026-03-01")).toEqual({ kind: "dated", start: "2025-10-30", end: "2026-04-30", phase: "open" });
     expect(stepTiming("saveTheDate", "2026-10-30", "2026-10-21")).toMatchObject({ phase: "late" });
     expect(stepTiming("invitation", "2026-10-30", "2026-05-01")).toEqual({ kind: "dated", start: "2026-06-30", end: "2026-07-30", phase: "before" });
+    // The website has no start: it is due until the invitation window opens.
+    expect(stepTiming("website", "2026-10-30", "2026-03-01")).toEqual({ kind: "dated", start: null, end: "2026-06-30", phase: "open" });
+    expect(stepTiming("website", "2026-10-30", "2026-07-01")).toMatchObject({ phase: "late" });
     expect(stepTiming("thankYou", "2026-10-30", "2026-10-30")).toEqual({ kind: "dated", start: "2026-10-31", end: "2026-12-30", phase: "before" });
   });
 
-  it("has only the rule without a date, and no window for the engagement and the website", () => {
+  it("has only the rule without a date, and no window for the engagement", () => {
     expect(stepTiming("invitation", null, "2026-10-21")).toEqual({ kind: "relative" });
     expect(stepTiming("engagement", "2026-10-30", "2026-10-21")).toEqual({ kind: "anytime" });
-    expect(stepTiming("website", null, "2026-10-21")).toEqual({ kind: "anytime" });
+    expect(stepTiming("website", null, "2026-10-21")).toEqual({ kind: "relative" });
   });
 
   it("clamps to the end of a shorter month", () => {

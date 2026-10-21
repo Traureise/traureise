@@ -31,21 +31,20 @@ async function When({ step, weddingId }: { step: HomeStep; weddingId: string }) 
     );
   } else if (timing.kind === "dated") {
     if (timing.phase === "open") {
-      title = t("timing.now");
-      detail = t("timing.until", { date: day(timing.end) });
+      // Without a start (the website), the deadline itself is the headline: "Bis 30. Juni 2026".
+      title = timing.start ? t("timing.now") : t("timing.by", { date: day(timing.end) });
+      detail = timing.start ? t("timing.until", { date: day(timing.end) }) : rule;
       tone = done ? "quiet" : "open";
     } else if (timing.phase === "before") {
-      title = t("timing.from", { date: day(timing.start) });
+      title = t("timing.from", { date: day(timing.start!) });
       detail = rule;
     } else if (done) {
-      detail = t("timing.range", { start: day(timing.start), end: day(timing.end) });
+      detail = timing.start ? t("timing.range", { start: day(timing.start), end: day(timing.end) }) : t("timing.until", { date: day(timing.end) });
     } else {
       title = t("timing.catchUp");
       detail = t("timing.recommended", { date: day(timing.end) });
       tone = "late";
     }
-  } else if (step.item === "website") {
-    detail = t("timing.websiteHint");
   }
   return (
     <div className="mb-2 sm:mb-0 sm:pt-5 sm:text-right" data-testid="step-when">
@@ -57,8 +56,6 @@ async function When({ step, weddingId }: { step: HomeStep; weddingId: string }) 
   );
 }
 
-/** Every action of a step: the same width, an icon each, one order (open, send, share, view). */
-const ACTION = "sm:w-full sm:justify-start";
 
 /** One step of the timeline: when it is due, preview, status, versions, and its actions. */
 async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) {
@@ -106,7 +103,7 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
             <img
               src={step.preview.website.coverImageKey ? uploadUrl(step.preview.website.coverImageKey) : theme ? themeAssetUrl(theme.id, theme.assets.preview) : ""}
               alt={t("websitePreviewAlt")}
-              className="aspect-[32/22] w-24 rounded-md border border-border object-cover"
+              className="aspect-[3/4] w-16 rounded-md border border-border object-cover"
             />
           )}
         </Link>
@@ -119,15 +116,10 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
             <VersionChips weddingId={weddingId} item={step.item} versions={step.versions} canAdd={step.canAddVersion} />
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 sm:w-40 sm:shrink-0 sm:flex-col">
-          <Button asChild size="sm" variant={now ? "default" : "outline"} className={cn(ACTION, !now && "border-primary/40 text-primary")}>
-            <Link href={versionHref(weddingId, step.item, first.id)}>
-              <PencilLine aria-hidden />
-              {now ? t("continue") : t("openStep")}
-            </Link>
-          </Button>
+        {/* One row: the ways out (send, share, view) in outline, then the way in, last and strongest. */}
+        <div className="flex flex-wrap items-center gap-2 sm:max-w-md sm:shrink-0 sm:justify-end">
           {status.kind === "household" && (
-            <Button asChild size="sm" variant="outline" className={ACTION}>
+            <Button asChild size="sm" variant="outline">
               <Link href={`/hochzeiten/${weddingId}/gaeste?karte=${step.item}`}>
                 <Send aria-hidden />
                 {t("send")}
@@ -136,7 +128,7 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
           )}
           {/* Each household's personal link to its website version: the guest list without a card chosen. */}
           {online.length > 0 && (
-            <Button asChild size="sm" variant="outline" className={ACTION}>
+            <Button asChild size="sm" variant="outline">
               <Link href={`/hochzeiten/${weddingId}/gaeste`} data-testid="website-send">
                 <Send aria-hidden />
                 {t("send")}
@@ -155,20 +147,25 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
                 message={step.messages[v.id] ?? ""}
                 onShared={markEngagementSharedAction.bind(null, weddingId, v.id)}
                 triggerLabel={labelled(t("share"), v.label)}
-                triggerClassName={ACTION}
               />
             ))}
           {online.map((v) => (
-            <ShareDialog key={v.id} url={v.publicUrl!} slug={new URL(v.publicUrl!).pathname.slice(1)} triggerLabel={labelled(t("share"), v.label)} triggerClassName={ACTION} />
+            <ShareDialog key={v.id} url={v.publicUrl!} slug={new URL(v.publicUrl!).pathname.slice(1)} triggerLabel={labelled(t("share"), v.label)} />
           ))}
           {online.map((v) => (
-            <Button key={v.id} asChild size="sm" variant="outline" className={ACTION}>
+            <Button key={v.id} asChild size="sm" variant="outline">
               <a href={v.publicUrl!} target="_blank" rel="noopener">
                 <Eye aria-hidden />
                 {labelled(t("view"), v.label)}
               </a>
             </Button>
           ))}
+          <Button asChild size="sm" variant={now ? "default" : "outline"} className={cn(!now && "border-primary/40 text-primary")}>
+            <Link href={versionHref(weddingId, step.item, first.id)}>
+              <PencilLine aria-hidden />
+              {now ? t("continue") : t("openStep")}
+            </Link>
+          </Button>
         </div>
       </article>
     </li>

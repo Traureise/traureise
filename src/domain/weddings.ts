@@ -132,12 +132,13 @@ export function timelineStates(done: Record<VersionItem, boolean>): Record<Versi
 
 /**
  * When couples usually do each step, in months relative to the wedding day (negative: before). The engagement
- * announcement and the website have no window: as soon as you are engaged, and whenever you like.
+ * announcement has no window (as soon as you are engaged). The website has only an end: it should be online when the
+ * invitation window opens. A Save the Date sent earlier still links it, once it is online.
  */
-export const STEP_WINDOWS: Record<VersionItem, { from: number; to: number } | null> = {
+export const STEP_WINDOWS: Record<VersionItem, { from: number | null; to: number } | null> = {
   engagement: null,
   saveTheDate: { from: -12, to: -6 },
-  website: null,
+  website: { from: null, to: -4 },
   invitation: { from: -4, to: -3 },
   thankYou: { from: 0, to: 2 },
 };
@@ -146,8 +147,8 @@ export type StepTiming =
   | { kind: "anytime" }
   /** Without a wedding date: only the rule ("6–12 Monate vorher"). */
   | { kind: "relative" }
-  /** `before` the window opens, `open` while it is, `late` once it closed. Dates are ISO days. */
-  | { kind: "dated"; start: string; end: string; phase: "before" | "open" | "late" };
+  /** `before` the window opens, `open` while it is, `late` once it closed. Dates are ISO days; no start: open until the end. */
+  | { kind: "dated"; start: string | null; end: string; phase: "before" | "open" | "late" };
 
 /** The ISO day `months` months from `iso`, clamped to the end of a shorter month (31 March − 1 month = 28/29 February). */
 export function addMonths(iso: string, months: number): string {
@@ -166,9 +167,9 @@ export function stepTiming(item: VersionItem, weddingDate: string | null, today:
   if (!window) return { kind: "anytime" };
   if (!weddingDate) return { kind: "relative" };
   // A window that starts on the wedding day (the thank-you card) opens the day after.
-  const start = window.from === 0 ? addDays(weddingDate, 1) : addMonths(weddingDate, window.from);
+  const start = window.from === null ? null : window.from === 0 ? addDays(weddingDate, 1) : addMonths(weddingDate, window.from);
   const end = addMonths(weddingDate, window.to);
-  return { kind: "dated", start, end, phase: today < start ? "before" : today > end ? "late" : "open" };
+  return { kind: "dated", start, end, phase: start && today < start ? "before" : today > end ? "late" : "open" };
 }
 
 /** A household card is done once every household it is meant for got it. */

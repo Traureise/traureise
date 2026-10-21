@@ -41,7 +41,11 @@ the wedding and to the list of weddings.
 switcher at the top of a wedding, or on the list) starts another one.
 
 A wedding's home (`/hochzeiten/<id>`) greets you with your names, shows how many days are left, the date and the
-place, and then the five items as a timeline: finished steps have a tick, the next step is lifted out with
+place, and then the five items as a timeline. Left of the line, each step says when it is due, in dates once the
+wedding has one: "Jetzt" with the last day, "Ab …" before it opens, "Jetzt nachholen" in red once it closed and the
+step is not done. Save the Date 12 to 6 months before, the website by 4 months before (the invitation links it; a
+Save the Date sent earlier shows the link once the website is online), the invitation 4 to 3 months before, the
+thank-you card up to 2 months after. On the line, finished steps have a tick, the next step is lifted out with
 **Weitermachen**, later ones are quieter. Each step shows a small preview, when couples usually do it, its status
 ("28 von 31 Haushalten geöffnet", "Entwurf · noch nicht veröffentlicht") and its versions. **Versenden** opens the
 guest list for that item; for the published website it opens the guest list with each household's personal link.
