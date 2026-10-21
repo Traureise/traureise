@@ -358,11 +358,11 @@ test("the couple enters a household's answer for it, and the household sees and 
     await person(form, "Erna").getByLabel("Allergien und Unverträglichkeiten").fill("Laktose");
     await person(form, "Karl").getByLabel("Ich kann leider nicht").check();
     await form.getByRole("button", { name: "Antwort speichern" }).click();
-    await expect(form.getByTestId("guest-form-saved")).toHaveText("Antwort für Oma und Opa gespeichert.");
   });
 
-  await test.step("the list counts it and says the couple entered it", async () => {
-    await page.getByRole("link", { name: "Zur Gästeliste" }).click();
+  await test.step("saving goes back to the list, which counts it and says the couple entered it", async () => {
+    await expect(page).toHaveURL(new RegExp(`/hochzeiten/[0-9a-f-]{36}/gaeste$`));
+    await expect(page.getByText("Antwort für Oma und Opa gespeichert.")).toBeVisible();
     await expect(household(page, "Oma und Opa").getByTestId("household-status")).toHaveText("Geantwortet · von euch eingetragen");
   });
 

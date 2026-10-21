@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useFormatter, useTranslations } from "next-intl";
+import { toast } from "sonner";
 import type { GuestForm as GuestFormData } from "@/application/guests";
 import { mealApplies, type Poll, type PollAnswer } from "@/domain/guests";
 import type { FieldErrors } from "@/domain/result";
@@ -64,7 +65,18 @@ function PollField({ poll, value, onChange, name, errors }: { poll: Poll; value:
  * someone, and a message. The same component is the couple's preview (`save` null, nothing is sent) and the form
  * the couple fills in for a household (state "couple": no requests to bring someone, they add people instead).
  */
-export function GuestForm({ form, save, belowCards = false }: { form: GuestFormData; save: ((input: unknown) => Promise<ActionResult<void>>) | null; belowCards?: boolean }) {
+export function GuestForm({
+  form,
+  save,
+  belowCards = false,
+  doneHref,
+}: {
+  form: GuestFormData;
+  save: ((input: unknown) => Promise<ActionResult<void>>) | null;
+  belowCards?: boolean;
+  /** Where saving leads (the couple's entry goes back to the guest list); without it the form stays and says it saved. */
+  doneHref?: string;
+}) {
   const t = useTranslations("rsvp");
   const tRequest = useTranslations("rsvp.requestStatus");
   const format = useFormatter();
@@ -101,7 +113,10 @@ export function GuestForm({ form, save, belowCards = false }: { form: GuestFormD
         message,
         requests,
       });
-      if (result.ok) {
+      if (result.ok && doneHref) {
+        toast.success(t("savedByCouple", { household: household.name }));
+        router.push(doneHref);
+      } else if (result.ok) {
         setErrors({});
         setRequests([""]);
         setSaved(true);

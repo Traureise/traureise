@@ -42,7 +42,7 @@ export default async function CoupleAnswerPage({ params }: Props) {
       </Link>
       <h2 className="font-heading text-3xl font-medium">{t("title", { household: form.household.name })}</h2>
       <div className="site overflow-hidden rounded-2xl border border-border" style={siteStyle(form.design)} data-testid="couple-answer">
-        <GuestForm form={form} save={saveCoupleAnswerAction.bind(null, id, householdId)} />
+        <GuestForm form={form} save={saveCoupleAnswerAction.bind(null, id, householdId)} doneHref={`/hochzeiten/${id}/gaeste`} />
       </div>
     </div>
   );
