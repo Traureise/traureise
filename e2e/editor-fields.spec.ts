@@ -37,8 +37,8 @@ test("every editor field reaches the public website, and invalid input explains 
 
   await test.step("wedding details: names are required; the time zone is the wedding's", async () => {
     await openSection(page, editorUrl, "Startseite");
-    await page.getByTestId("home-wedding-details").getByRole("button", { name: "Angaben ändern" }).click();
-    const details = page.getByRole("dialog", { name: "Eure Hochzeit" });
+    await page.getByTestId("home-wedding-details").getByRole("link", { name: "Angaben ändern" }).click();
+    const details = page.getByRole("form", { name: "Eure Hochzeit" });
     await details.getByLabel("Eure Namen").fill(" ");
     await details.getByLabel("Adresse eurer Hochzeit").fill("konto");
     await details.getByRole("button", { name: "Speichern" }).click();
@@ -48,7 +48,7 @@ test("every editor field reaches the public website, and invalid input explains 
     await details.getByLabel("Adresse eurer Hochzeit").fill(slug);
     await details.getByLabel("Zeitzone").selectOption("Europe/London");
     await details.getByRole("button", { name: "Speichern" }).click();
-    await expect(details).toBeHidden();
+    await expect(page).toHaveURL(new RegExp(`/website/[0-9a-f-]{36}/home$`));
   });
 
   await test.step("home: invalid input shows errors next to the fields", async () => {

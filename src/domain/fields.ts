@@ -32,3 +32,9 @@ export const webUrl = z.preprocess(
 );
 
 export const imageKey = z.string().regex(/^[a-zA-Z0-9_-]+\.(webp|jpg|png)$/, "invalid_image");
+
+/** A place picked on the map: both coordinates or neither (the error goes on `latitude`). */
+export const latitude = optional(z.coerce.number("invalid_option").min(-90, "invalid_option").max(90, "invalid_option")).default(null);
+export const longitude = optional(z.coerce.number("invalid_option").min(-180, "invalid_option").max(180, "invalid_option")).default(null);
+export const bothOrNeither = (p: { latitude: number | null; longitude: number | null }) => (p.latitude === null) === (p.longitude === null);
+export const bothOrNeitherError = { path: ["latitude"], message: "invalid_option" };

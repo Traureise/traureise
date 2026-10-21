@@ -168,7 +168,7 @@ export class InMemoryWeddings implements WeddingRepository {
 
   async create(input: NewWedding) {
     const now = new Date();
-    const wedding: Wedding = { id: randomUUID(), location: null, lastOpenedAt: null, createdAt: now, updatedAt: now, ...input };
+    const wedding: Wedding = { id: randomUUID(), location: null, latitude: null, longitude: null, lastOpenedAt: null, createdAt: now, updatedAt: now, ...input };
     this.weddings.push(wedding);
     return copy(wedding);
   }

@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Feature } from "./billing";
 import type { CardKind } from "./card-kinds";
 import { dayNumber, localDay } from "./days";
-import { isoDate, optional, requiredText } from "./fields";
+import { bothOrNeither, bothOrNeitherError, isoDate, latitude, longitude, optional, requiredText } from "./fields";
 import { parseWith, type Parsed } from "./result";
 import { DEFAULT_TIMEZONE, isValidTimeZone } from "./website";
 
@@ -67,13 +67,23 @@ const detailsSchema = z
     hasDate: z.boolean().default(false),
     weddingDate: optional(isoDate).default(null),
     location: optional(z.string().trim().max(LOCATION_MAX, "too_long")).default(null),
+    latitude,
+    longitude,
     timezone: z.string().refine(isValidTimeZone, "invalid_timezone").default(DEFAULT_TIMEZONE),
   })
   .superRefine(withDate)
-  .transform(({ title, hasDate, weddingDate, location, timezone }) => ({ title, weddingDate: hasDate ? weddingDate : null, location, timezone }));
+  .refine(bothOrNeither, bothOrNeitherError)
+  .transform(({ title, hasDate, weddingDate, location, latitude, longitude, timezone }) => ({
+    title,
+    weddingDate: hasDate ? weddingDate : null,
+    location,
+    latitude,
+    longitude,
+    timezone,
+  }));
 export type WeddingDetailsInput = z.infer<typeof detailsSchema>;
 
-/** Names, date, place and time zone: what every card and website version of the wedding shares. */
+/** Names, date, place (with its spot on the map) and time zone: what every card and website version of the wedding shares. */
 export function parseWeddingDetails(input: unknown): Parsed<WeddingDetailsInput> {
   return parseWith(detailsSchema, input);
 }

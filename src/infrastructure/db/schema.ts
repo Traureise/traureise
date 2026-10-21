@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -76,6 +77,9 @@ export const weddings = pgTable(
     title: text("title").notNull(),
     weddingDate: date("wedding_date", { mode: "string" }),
     location: text("location"),
+    // Where the place is on the map, both or neither (picked on the Hochzeit tab).
+    latitude: doublePrecision("latitude"),
+    longitude: doublePrecision("longitude"),
     timezone: text("timezone").notNull().default("Europe/Berlin"),
     lastOpenedAt: timestamp("last_opened_at", { withTimezone: true }),
     createdAt: createdAt(),

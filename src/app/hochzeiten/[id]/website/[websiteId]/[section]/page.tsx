@@ -5,11 +5,11 @@ import { HomeForm } from "@/components/editor/home-form";
 import { Panel } from "@/components/editor/panel";
 import { SectionEditor } from "@/components/editor/section-editor";
 import { ThemePicker } from "@/components/editor/theme-picker";
-import { WeddingDetailsButton } from "@/components/weddings/wedding-details-dialog";
+import { WeddingDetailsLink } from "@/components/weddings/wedding-details-link";
 import { container } from "@/composition/container";
 import { FONT_PAIRINGS } from "@/domain/fonts";
 import { localize } from "@/domain/theme";
-import { themeAssetUrl, timeZoneOptions } from "@/lib/format";
+import { themeAssetUrl } from "@/lib/format";
 import { loadEditorView } from "@/lib/editor";
 
 export default async function EditorSectionPage({ params }: { params: Promise<{ id: string; websiteId: string; section: string }> }) {
@@ -26,7 +26,7 @@ export default async function EditorSectionPage({ params }: { params: Promise<{ 
         <HomeForm
           website={view.website}
           appUrl={c.appUrl}
-          details={<WeddingDetailsButton wedding={view.wedding} appUrl={c.appUrl} timeZones={timeZoneOptions()} variant="link" />}
+          details={<WeddingDetailsLink weddingId={weddingId} back={`/hochzeiten/${weddingId}/website/${id}/home`} />}
         />
       </Panel>
     );

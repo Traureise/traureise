@@ -330,7 +330,7 @@ export default async function GuestsPage({ params, searchParams }: Props) {
                 <p className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="card-waits-for-date">
                   <CalendarClock className="size-4" aria-hidden />
                   {tSending("waitsForDate")}{" "}
-                  <Link href={`/hochzeiten/${id}`} className="text-primary underline-offset-4 hover:underline">
+                  <Link href={`/hochzeiten/${id}/hochzeit`} className="text-primary underline-offset-4 hover:underline">
                     {tSending("setDate")}
                   </Link>
                 </p>

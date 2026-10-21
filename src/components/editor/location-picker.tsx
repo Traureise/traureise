@@ -8,7 +8,8 @@ import type { CircleMarker, Map as LeafletMap } from "leaflet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export type PickedPlace = { latitude: number; longitude: number; name?: string; address?: string };
+export type Coordinates = { latitude: number; longitude: number };
+export type PickedPlace = Coordinates & { name?: string; address?: string };
 
 type Result = { place_id: number; lat: string; lon: string; name: string; display_name: string; address?: Record<string, string> };
 
@@ -32,10 +33,20 @@ function addressOf(r: Result): string {
 
 /**
  * Finds a place on an OpenStreetMap map. Nothing is loaded from OpenStreetMap until the couple agrees, because
- * tiles and search send their IP address to the OpenStreetMap Foundation (ADR 0026). Without the map the venue
- * and address fields work as before.
+ * tiles and search send their IP address to the OpenStreetMap Foundation (ADR 0026). Without the map the
+ * fields beside it work as before. Without a place yet, the map starts `near` (the wedding's place) or on Germany.
  */
-export function LocationPicker({ value, onPick, onClear }: { value: { latitude: number; longitude: number } | null; onPick: (place: PickedPlace) => void; onClear: () => void }) {
+export function LocationPicker({
+  value,
+  near = null,
+  onPick,
+  onClear,
+}: {
+  value: Coordinates | null;
+  near?: Coordinates | null;
+  onPick: (place: PickedPlace) => void;
+  onClear: () => void;
+}) {
   const t = useTranslations("editor.location");
   // The form only appears after a click (never rendered on the server), so reading storage here is safe.
   const [consented, setConsented] = useState(storedConsent);
@@ -68,7 +79,8 @@ export function LocationPicker({ value, onPick, onClear }: { value: { latitude: 
     let cancelled = false;
     void import("leaflet").then((L) => {
       if (cancelled || !mapElement.current) return;
-      const m = L.map(mapElement.current, { scrollWheelZoom: false }).setView(value ? [value.latitude, value.longitude] : GERMANY, value ? 16 : 5);
+      const start = value ?? near;
+      const m = L.map(mapElement.current, { scrollWheelZoom: false }).setView(start ? [start.latitude, start.longitude] : GERMANY, value ? 16 : near ? 13 : 5);
       L.tileLayer(TILES_URL, { maxZoom: 19, attribution: `<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">${t("attribution")}</a>` }).addTo(m);
       const dot = L.circleMarker(value ? [value.latitude, value.longitude] : GERMANY, { radius: 9, color: "#4a2342", weight: 3, fillColor: "#fbf7fa", fillOpacity: 1 });
       if (value) dot.addTo(m);

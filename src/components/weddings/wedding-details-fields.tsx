@@ -7,29 +7,14 @@ import { FieldError } from "@/components/forms/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { FieldErrors } from "@/domain/result";
-import type { TimeZoneOption } from "@/lib/format";
 
-export type WeddingDetailsValue = { title: string; weddingDate: string | null; location?: string | null; timezone?: string };
+export type WeddingDetailsValue = { title: string; weddingDate: string | null };
 
 /**
- * The one component for a wedding's details: names, "Habt ihr schon ein Datum?" with the date on yes, and
- * optionally place and time zone. Form fields: title, hasDate ("yes"/"no"), weddingDate, location, timezone.
+ * The one component for a wedding's names and "Habt ihr schon ein Datum?" with the date on yes. Form fields:
+ * title, hasDate ("yes"/"no"), weddingDate. Place, time zone and address are on the Hochzeit tab only.
  */
-export function WeddingDetailsFields({
-  idPrefix,
-  value,
-  errors,
-  withPlace = false,
-  timeZones,
-}: {
-  idPrefix: string;
-  value?: WeddingDetailsValue;
-  errors: FieldErrors;
-  withPlace?: boolean;
-  /** Shows the time zone select. */
-  /** German labels, built on the server (see timeZoneOptions). */
-  timeZones?: TimeZoneOption[];
-}) {
+export function WeddingDetailsFields({ idPrefix, value, errors }: { idPrefix: string; value?: WeddingDetailsValue; errors: FieldErrors }) {
   const t = useTranslations("weddings.fields");
   const [hasDate, setHasDate] = useState(!!value?.weddingDate);
   return (
@@ -51,26 +36,6 @@ export function WeddingDetailsFields({
         </div>
       </fieldset>
       {hasDate && <DateField id={`${idPrefix}-date`} name="weddingDate" label={t("dateLabel")} value={value?.weddingDate} error={errors.weddingDate} />}
-      {withPlace && (
-        <div className="space-y-2">
-          <Label htmlFor={`${idPrefix}-location`}>{t("locationLabel")}</Label>
-          <Input id={`${idPrefix}-location`} name="location" defaultValue={value?.location ?? undefined} />
-          <FieldError code={errors.location} />
-        </div>
-      )}
-      {timeZones && (
-        <div className="space-y-2">
-          <Label htmlFor={`${idPrefix}-timezone`}>{t("timezoneLabel")}</Label>
-          <select id={`${idPrefix}-timezone`} name="timezone" defaultValue={value?.timezone} className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm">
-            {timeZones.map((tz) => (
-              <option key={tz.id} value={tz.id}>
-                {tz.label}
-              </option>
-            ))}
-          </select>
-          <FieldError code={errors.timezone} />
-        </div>
-      )}
     </div>
   );
 }

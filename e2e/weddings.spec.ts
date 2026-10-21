@@ -53,7 +53,13 @@ test("a couple creates their wedding, gets every item, adds versions, chooses wh
       await expect(steps.first().getByRole("link", { name: "Weitermachen" })).toBeVisible();
       for (const name of ["Save the Date", "Einladung", "Dankeskarte"]) await expect(step(page, name).getByTestId("version-chips")).toContainText("Standard");
       await expect(step(page, "Hochzeitswebsite").getByTestId("step-status")).toHaveText("Entwurf · noch nicht veröffentlicht");
-      await expect(page.getByTestId("guest-summary")).toContainText("Noch keine Haushalte");
+      // The wedding's tabs; a tab stays current on its subpages.
+      await expect(page.getByTestId("wedding-tabs").getByRole("link")).toHaveText(["Vorbereitung", "Hochzeit", "Gästeliste", "Ablauf"]);
+      await expect(page.getByTestId("tab-preparation")).toHaveAttribute("aria-current", "page");
+      await page.getByTestId("tab-guests").click();
+      await page.getByTestId("guest-tabs").getByRole("link", { name: "Einstellungen" }).click();
+      await expect(page.getByTestId("tab-guests")).toHaveAttribute("aria-current", "page");
+      await expect(page.getByTestId("tab-preparation")).not.toHaveAttribute("aria-current", "page");
 
       await setWeddingSlug(page, weddingId, slug);
       expect((await request.get(`/${slug}`)).status()).toBe(404);

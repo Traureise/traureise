@@ -57,6 +57,13 @@
       "when": 1792488842010,
       "tag": "0007_blocks",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792568885555,
+      "tag": "0008_wedding_place",
+      "breakpoints": true
     }
   ]
 }

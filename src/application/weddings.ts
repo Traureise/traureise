@@ -1,6 +1,5 @@
 import { activeTier, type Tier } from "@/domain/billing";
 import { cardCounts, CARD_KINDS, followWeddingDetails, type CardModel, type HouseholdCardKind } from "@/domain/cards";
-import { guestOverview } from "@/domain/guests";
 import { slugify } from "@/domain/slug";
 import { DEFAULT_TIMEZONE } from "@/domain/website";
 import {
@@ -112,10 +111,8 @@ export type WeddingHome = {
   steps: HomeStep[];
   /** Days until the wedding; null without a date. */
   countdown: number | null;
-  guests: { households: number; coming: number; open: number };
   /** Only with billing on. */
   tier: Tier | null;
-  others: { id: string; title: string }[];
 };
 
 export class GetWeddingHome {
@@ -125,11 +122,10 @@ export class GetWeddingHome {
   async execute(userId: string, weddingId: string): Promise<WeddingHome> {
     const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
     const ctx = await loadGuestContext(this.deps, wedding);
-    const [households, records, opens, all] = await Promise.all([
+    const [households, records, opens] = await Promise.all([
       this.deps.guests.listHouseholds(weddingId),
       this.deps.cards.listDeliveries(weddingId),
       this.deps.cards.listOpens(weddingId),
-      this.deps.weddings.listByOwner(userId),
     ]);
     const byHousehold = households.map((h) => deliveriesByKind(ctx, records, opens, h.id));
     const counts = (kind: HouseholdCardKind) => cardCounts(byHousehold.map((d) => d[kind]));
@@ -168,15 +164,23 @@ export class GetWeddingHome {
       };
     });
     const states = timelineStates(Object.fromEntries(steps.map((s) => [s.item, s.done])) as Record<VersionItem, boolean>);
-    const overview = guestOverview({ households, events: ctx.events, meal: ctx.meal, polls: ctx.polls });
     return {
       wedding,
       steps: steps.map(({ item, versions, preview, status, canAddVersion, messages }) => ({ item, versions, preview, status, canAddVersion, messages, state: states[item] })),
       countdown: wedding.weddingDate ? daysUntil(wedding.weddingDate, wedding.timezone, ctx.now) : null,
-      guests: { households: households.length, coming: overview.people.coming, open: overview.people.open },
       tier: this.deps.billing.enabled ? activeTier(ctx.features.entitlements, ctx.now) : null,
-      others: all.filter((w) => w.id !== weddingId).sort(byRecentUse).map(({ id, title }) => ({ id, title })),
     };
+  }
+}
+
+export class GetWeddingFrame {
+  constructor(private deps: Deps) {}
+
+  /** What every tab of a wedding shows above its content: the wedding and, for the switcher, the account's others. */
+  async execute(userId: string, weddingId: string): Promise<{ wedding: Wedding; others: { id: string; title: string }[] }> {
+    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const all = await this.deps.weddings.listByOwner(userId);
+    return { wedding, others: all.filter((w) => w.id !== weddingId).sort(byRecentUse).map(({ id, title }) => ({ id, title })) };
   }
 }
 

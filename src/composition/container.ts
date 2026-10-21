@@ -58,7 +58,7 @@ import { AddEvent, DeleteEvent, ListEvents, UpdateEvent } from "@/application/sc
 import { AddBlock, AddSection, DeleteBlock, DeleteSection, MoveBlock, MoveSection, UpdateBlock, UpdateSection } from "@/application/sections";
 import { GetUpload, UploadImage } from "@/application/uploads";
 import { AddVersion, AssignVersion, DeleteVersion, RenameVersion } from "@/application/versions";
-import { CreateWedding, DeleteWedding, GetRecentWedding, GetWeddingHome, ListWeddings, MarkWeddingUsed, UpdateWeddingDetails, UpdateWeddingSlug } from "@/application/weddings";
+import { CreateWedding, DeleteWedding, GetRecentWedding, GetWeddingFrame, GetWeddingHome, ListWeddings, MarkWeddingUsed, UpdateWeddingDetails, UpdateWeddingSlug } from "@/application/weddings";
 import { GetWebsiteForOwner, SelectTheme, SetCoverImage, SetPublished, UpdateDesign, UpdateHome, UpdateSlug } from "@/application/websites";
 import { createDatabase } from "@/infrastructure/db/client";
 import { SharpImageProcessor } from "@/infrastructure/images/sharp";
@@ -181,6 +181,7 @@ function build() {
     listWeddings: new ListWeddings(deps),
     getRecentWedding: new GetRecentWedding(deps),
     getWeddingHome: new GetWeddingHome(deps),
+    getWeddingFrame: new GetWeddingFrame(deps),
     markWeddingUsed: new MarkWeddingUsed(deps),
     updateWeddingDetails: new UpdateWeddingDetails(deps),
     updateWeddingSlug: new UpdateWeddingSlug(deps),

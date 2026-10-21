@@ -43,17 +43,18 @@ export async function openCard(page: Page, weddingId: string, name: "Verlobungsa
   return new URL(page.url()).pathname;
 }
 
-/** The wedding's address (details dialog), for /<slug>/verlobung and the calendar file. */
+/** The wedding's address (Hochzeit tab), for /<slug>/verlobung and the calendar file. */
 export async function setWeddingSlug(page: Page, weddingId: string, slug: string) {
   await page.goto(homeUrl(weddingId));
-  await page.getByRole("button", { name: "Angaben ändern" }).click();
-  const dialog = page.getByRole("dialog", { name: "Eure Hochzeit" });
-  // A new address breaks links already shared: the dialog says so before saving.
-  await expect(dialog.getByTestId("slug-change-hint")).toHaveCount(0);
-  await dialog.getByLabel("Adresse eurer Hochzeit").fill(slug);
-  await expect(dialog.getByTestId("slug-change-hint")).toContainText("keine Weiterleitung");
-  await dialog.getByRole("button", { name: "Speichern" }).click();
-  await expect(dialog).toBeHidden();
+  await page.getByRole("link", { name: "Angaben ändern" }).click();
+  await expect(page).toHaveURL(`${homeUrl(weddingId)}/hochzeit`);
+  const form = page.getByRole("form", { name: "Eure Hochzeit" });
+  // A new address breaks links already shared: the form says so before saving.
+  await expect(form.getByTestId("slug-change-hint")).toHaveCount(0);
+  await form.getByLabel("Adresse eurer Hochzeit").fill(slug);
+  await expect(form.getByTestId("slug-change-hint")).toContainText("keine Weiterleitung");
+  await form.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByText("Gespeichert")).toBeVisible();
 }
 
 /** A website version's own address, from its home section. */

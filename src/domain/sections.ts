@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { imageKey, isoDate, optional, requiredText, text, time24, webUrl } from "./fields";
+import { bothOrNeither, bothOrNeitherError, imageKey, isoDate, latitude, longitude, optional, requiredText, text, time24, webUrl } from "./fields";
 import { parseWith, type FieldErrors, type Parsed } from "./result";
 
 /** The standard template: today's eight sections in their default order. */
@@ -100,10 +100,10 @@ const eventSchema = z
     description: text(2000),
     website: optional(webUrl).default(null),
     // Where the place was picked on the map; both or neither.
-    latitude: optional(z.coerce.number("invalid_option").min(-90, "invalid_option").max(90, "invalid_option")).default(null),
-    longitude: optional(z.coerce.number("invalid_option").min(-180, "invalid_option").max(180, "invalid_option")).default(null),
+    latitude,
+    longitude,
   })
-  .refine((e) => (e.latitude === null) === (e.longitude === null), { path: ["latitude"], message: "invalid_option" })
+  .refine(bothOrNeither, bothOrNeitherError)
   .transform((e) => ({ ...e, endDate: e.endTime && !e.endDate ? e.startDate : e.endDate }));
 
 export type EventData = z.infer<typeof eventSchema>;

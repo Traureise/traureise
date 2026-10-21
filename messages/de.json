@@ -378,8 +378,6 @@
     "deleteConfirm": "Termin löschen? Er verschwindet auch von allen Websites.",
     "deleted": "Termin gelöscht",
     "empty": "Noch keine Termine.",
-    "summary": "{count, plural, =0 {Noch keine Termine} one {# Termin} other {# Termine}}",
-    "editSchedule": "Ablauf bearbeiten",
     "until": "bis {time} Uhr"
   },
   "site": {
@@ -984,6 +982,13 @@
     "open": "Öffnen",
     "all": "Alle Hochzeiten",
     "switcher": "Hochzeit wechseln",
+    "tabs": {
+      "label": "Bereiche der Hochzeit",
+      "preparation": "Vorbereitung",
+      "wedding": "Hochzeit",
+      "guests": "Gästeliste",
+      "schedule": "Ablauf"
+    },
     "breadcrumb": "Navigation",
     "dateOpen": "Datum noch offen",
     "form": {
@@ -1008,8 +1013,27 @@
       "open": "Angaben ändern",
       "title": "Eure Hochzeit",
       "lead": "Namen, Datum und Ort gelten für alle Karten und Website-Versionen. Was ihr in einer Karte selbst umgeschrieben habt, bleibt.",
+      "sections": {
+        "names": {
+          "title": "Namen und Datum",
+          "lead": "So steht ihr auf jeder Karte und jeder Website-Version."
+        },
+        "place": {
+          "title": "Ort",
+          "lead": "Steht auf dem Save the Date und der Website. Auf der Karte gefunden, beginnt auch die Ortssuche im Ablauf dort."
+        },
+        "address": {
+          "title": "Zeitzone und Adresse",
+          "lead": "Die Zeitzone gilt für alle Uhrzeiten und Kalendereinträge, die Adresse für den Link der Verlobungsanzeige."
+        },
+        "delete": {
+          "title": "Hochzeit löschen",
+          "lead": "Löscht die Hochzeit mit allen Karten, Website-Versionen, der Gästeliste und Bildern. Das lässt sich nicht rückgängig machen."
+        }
+      },
+      "contents": "Inhalt",
       "submit": "Speichern",
-      "cancel": "Abbrechen",
+      "saving": "Wird gespeichert …",
       "saved": "Gespeichert"
     },
     "home": {
@@ -1041,9 +1065,6 @@
       "share": "Teilen",
       "send": "Versenden",
       "view": "Ansehen",
-      "guests": "Gäste",
-      "guestSummary": "{households, plural, =0 {Noch keine Haushalte} one {# Haushalt} other {# Haushalte}} · {coming} Zusagen · {open} offen",
-      "guestList": "Gästeliste",
       "plan": "Paket: {tier}",
       "upgrade": "Paket wählen",
       "purchaseThanks": "Danke für deinen Kauf! Sobald die Zahlung bestätigt ist, ist dein Paket für diese Hochzeit freigeschaltet.",

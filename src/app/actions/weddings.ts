@@ -16,6 +16,8 @@ const details = (form: FormData) => ({
   hasDate: form.get("hasDate") === "yes",
   weddingDate: field(form, "weddingDate"),
   location: field(form, "location"),
+  latitude: field(form, "latitude"),
+  longitude: field(form, "longitude"),
   timezone: form.get("timezone") === null ? undefined : field(form, "timezone"),
 });
 

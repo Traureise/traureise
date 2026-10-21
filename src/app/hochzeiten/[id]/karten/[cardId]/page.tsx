@@ -10,10 +10,10 @@ import { ExportMenu } from "@/components/cards/export-menu";
 import { ShareDialog } from "@/components/share/share-dialog";
 import { Button } from "@/components/ui/button";
 import { VersionMenu } from "@/components/weddings/versions";
-import { WeddingDetailsButton } from "@/components/weddings/wedding-details-dialog";
+import { WeddingDetailsLink } from "@/components/weddings/wedding-details-link";
 import { WeddingNav } from "@/components/weddings/wedding-nav";
 import { container } from "@/composition/container";
-import { dateFromIso, timeZoneOptions } from "@/lib/format";
+import { dateFromIso } from "@/lib/format";
 import { requireProfile } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -47,8 +47,6 @@ export default async function CardEditorPage({ params }: Props) {
   const tHome = await getTranslations("weddings.home");
   const format = await getFormatter();
   const { wedding, card } = data;
-  const c = container();
-  const timeZones = timeZoneOptions();
   const base = `/hochzeiten/${id}/karten/${card.id}`;
   const kindName = tKinds(card.kind);
   const header = (
@@ -61,7 +59,7 @@ export default async function CardEditorPage({ params }: Props) {
           <span>
             {wedding.title} · {wedding.weddingDate ? format.dateTime(dateFromIso(wedding.weddingDate), { dateStyle: "long", timeZone: "UTC" }) : t("dateOpen")}
           </span>
-          <WeddingDetailsButton wedding={wedding} appUrl={c.appUrl} timeZones={timeZones} variant="link" />
+          <WeddingDetailsLink weddingId={id} back={base} />
         </p>
       </div>
       {/* One even toolbar: which version, its preview, export and sharing. */}
@@ -97,7 +95,7 @@ export default async function CardEditorPage({ params }: Props) {
         <p className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-secondary/40 p-3 text-sm" data-testid="card-waits-for-date">
           <CalendarClock className="size-4 text-primary" aria-hidden />
           {t("waitsForDate")}
-          <WeddingDetailsButton wedding={wedding} appUrl={c.appUrl} timeZones={timeZones} variant="link" label={t("setDate")} />
+          <WeddingDetailsLink weddingId={id} back={base} label={t("setDate")} />
         </p>
       )}
       {data.offlineWebsites && (

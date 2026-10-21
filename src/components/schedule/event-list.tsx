@@ -10,10 +10,11 @@ import { deleteEventAction, saveEventAction } from "@/app/actions/schedule";
 import type { WeddingEvent } from "@/application/ports";
 import { EVENT_FIELDS } from "@/components/editor/block-fields";
 import { FieldForm } from "@/components/editor/field-form";
+import type { Coordinates } from "@/components/editor/location-picker";
 import { Button } from "@/components/ui/button";
 
 /** The Ablauf: the wedding's events, chronological; add, edit and delete. */
-export function EventList({ weddingId, events }: { weddingId: string; events: WeddingEvent[] }) {
+export function EventList({ weddingId, events, near }: { weddingId: string; events: WeddingEvent[]; near: Coordinates | null }) {
   const t = useTranslations("schedule");
   const tErrors = useTranslations("errors");
   const tTypes = useTranslations("sections.eventTypes");
@@ -52,6 +53,7 @@ export function EventList({ weddingId, events }: { weddingId: string; events: We
                       label={t("editEvent")}
                       onSubmit={(data) => saveEventAction(weddingId, event.id, data)}
                       onDone={() => setEditing(null)}
+                      near={near}
                     />
                   </li>
                 ) : (
@@ -90,6 +92,7 @@ export function EventList({ weddingId, events }: { weddingId: string; events: We
           label={t("newEvent")}
           onSubmit={(data) => saveEventAction(weddingId, null, data)}
           onDone={() => setEditing(null)}
+          near={near}
         />
       ) : (
         <Button variant="outline" className="w-full" onClick={() => setEditing("new")}>

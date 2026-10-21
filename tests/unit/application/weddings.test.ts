@@ -134,7 +134,6 @@ describe("the home timeline", () => {
     expect(view.steps[1]!.status).toMatchObject({ kind: "household", counts: { households: 1, sent: 1, opened: 0 } });
     await new SetPublished(f.deps).execute(anna.id, view.steps[2]!.versions[0]!.id, true);
     expect((await home(wedding.id)).steps[2]).toMatchObject({ state: "done", status: { kind: "website", online: 1 } });
-    expect((await home(wedding.id)).guests).toEqual({ households: 1, coming: 0, open: 1 });
   });
 
   it("the engagement step is done once every household got it, or once its public link was shared", async () => {

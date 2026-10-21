@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageField } from "./image-field";
 import { normalizeTime } from "@/domain/days";
-import { LocationPicker, type PickedPlace } from "./location-picker";
+import { LocationPicker, type Coordinates, type PickedPlace } from "./location-picker";
 import type { FieldGroup, FieldSpec } from "./block-fields";
 import { useSave } from "./use-save";
 
@@ -26,6 +26,8 @@ type Props = {
   label: string;
   onSubmit: (data: Record<string, unknown>) => Promise<{ ok: true } | { ok: false; fieldErrors?: Record<string, string>; error?: string }>;
   onDone: () => void;
+  /** Where a map starts when the block has no place yet: the wedding's place. */
+  near?: Coordinates | null;
 };
 
 /** Consecutive fields of one group, in order; fields without a group form one unnamed group. */
@@ -40,7 +42,7 @@ function groupsOf(fields: FieldSpec[]): { group: FieldGroup | undefined; fields:
 }
 
 /** A form for one block or event, laid out from field specs (in named groups, two columns on wide screens). */
-export function FieldForm({ weddingId, fields, initial, idPrefix, label, onSubmit, onDone }: Props) {
+export function FieldForm({ weddingId, fields, initial, idPrefix, label, onSubmit, onDone, near }: Props) {
   const t = useTranslations();
   const { pending, errors, save, dismiss } = useSave();
   const [images, setImages] = useState<Record<string, string | null>>(
@@ -103,7 +105,7 @@ export function FieldForm({ weddingId, fields, initial, idPrefix, label, onSubmi
       return (
         <div className="space-y-2">
           <p className="text-sm font-medium">{label}</p>
-          <LocationPicker value={place} onPick={pick} onClear={() => setPlace(null)} />
+          <LocationPicker value={place} near={near} onPick={pick} onClear={() => setPlace(null)} />
           <FieldError code={errors.latitude} />
         </div>
       );

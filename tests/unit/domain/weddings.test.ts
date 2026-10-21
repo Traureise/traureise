@@ -30,15 +30,19 @@ describe("parseNewWedding", () => {
 });
 
 describe("parseWeddingDetails", () => {
-  it("takes names, date, place and time zone; no date means not planned yet", () => {
-    expect(parseWeddingDetails({ title: "Anna & Ben", hasDate: true, weddingDate: "2027-06-12", location: " Kempten ", timezone: "Europe/Vienna" })).toEqual({
+  it("takes names, date, place with its spot on the map and time zone; no date means not planned yet", () => {
+    expect(
+      parseWeddingDetails({ title: "Anna & Ben", hasDate: true, weddingDate: "2027-06-12", location: " Kempten ", latitude: "47.72674", longitude: "10.31389", timezone: "Europe/Vienna" }),
+    ).toEqual({
       ok: true,
-      value: { title: "Anna & Ben", weddingDate: "2027-06-12", location: "Kempten", timezone: "Europe/Vienna" },
+      value: { title: "Anna & Ben", weddingDate: "2027-06-12", location: "Kempten", latitude: 47.72674, longitude: 10.31389, timezone: "Europe/Vienna" },
     });
-    expect(parseWeddingDetails({ title: "Anna & Ben", hasDate: false, weddingDate: "2027-06-12", location: "" })).toEqual({
+    expect(parseWeddingDetails({ title: "Anna & Ben", hasDate: false, weddingDate: "2027-06-12", location: "", latitude: "", longitude: "" })).toEqual({
       ok: true,
-      value: { title: "Anna & Ben", weddingDate: null, location: null, timezone: "Europe/Berlin" },
+      value: { title: "Anna & Ben", weddingDate: null, location: null, latitude: null, longitude: null, timezone: "Europe/Berlin" },
     });
+    expect(parseWeddingDetails({ title: "Anna & Ben", hasDate: false, latitude: "47.7" })).toMatchObject({ ok: false, fieldErrors: { latitude: "invalid_option" } });
+    expect(parseWeddingDetails({ title: "Anna & Ben", hasDate: false, latitude: "95", longitude: "10" })).toMatchObject({ ok: false, fieldErrors: { latitude: "invalid_option" } });
     expect(parseWeddingDetails({ title: "Anna & Ben", hasDate: false, timezone: "Mars/Olympus" })).toMatchObject({ ok: false, fieldErrors: { timezone: "invalid_timezone" } });
   });
 });
@@ -85,7 +89,7 @@ describe("versions", () => {
     const now = new Date("2026-10-19T10:00:00Z");
     const allowed = (tier: Parameters<typeof billing>[0]) => VERSION_ITEMS.filter((item) => canUse(VERSION_FEATURES[item], billing(tier), now));
     expect(allowed(null)).toEqual([]);
-    expect(allowed("rsvp")).toEqual(["website"]);
+    expect(allowed("rsvp")).toEqual(["saveTheDate", "website"]);
     expect(allowed("invitations")).toEqual(["saveTheDate", "website", "invitation"]);
     expect(allowed("complete")).toEqual(["engagement", "saveTheDate", "website", "invitation", "thankYou"]);
     expect(VERSION_ITEMS.every((item) => canUse(VERSION_FEATURES[item], { billingEnabled: false, entitlements: [] }, now))).toBe(true);
