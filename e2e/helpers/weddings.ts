@@ -27,7 +27,7 @@ export const step = (page: Page, name: string) => page.getByTestId("timeline-ste
 /** Opens the first version of an item from the wedding's home. */
 async function openStep(page: Page, weddingId: string, name: string) {
   await page.goto(homeUrl(weddingId));
-  await step(page, name).getByRole("link", { name: /^(Öffnen|Weitermachen)$/ }).click();
+  await step(page, name).getByRole("link", { name: /^(Bearbeiten|Weitermachen)$/ }).click();
 }
 
 export async function openWebsiteEditor(page: Page, weddingId: string): Promise<string> {

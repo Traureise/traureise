@@ -31,6 +31,6 @@ test("every public wedding website links the legal pages in a discreet footer", 
   await page.goto(`/${slug}`);
   const footer = page.getByTestId("site-footer");
   await expect(footer).toContainText("Erstellt mit Traureise");
-  await expect(footer.getByRole("link")).toHaveText(Object.keys(LINKS));
+  await expect(footer.getByRole("link")).toHaveText(["Erstellt mit Traureise", ...Object.keys(LINKS)]);
   for (const [name, href] of Object.entries(LINKS)) await expect(footer.getByRole("link", { name })).toHaveAttribute("href", href);
 });

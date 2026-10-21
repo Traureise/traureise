@@ -95,7 +95,7 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
         {step.state === "done" && <Check className="size-4" />}
       </span>
       <article className={cn("flex flex-col gap-4 rounded-2xl border bg-card p-4 sm:flex-row sm:items-center", now ? "border-primary shadow-lg shadow-primary/10" : "border-border", step.state === "later" && "opacity-80")}>
-        <Link href={versionHref(weddingId, step.item, first.id)} className="shrink-0 self-start" tabIndex={-1} aria-hidden>
+        <Link href={versionHref(weddingId, step.item, first.id)} className="shrink-0 self-start max-sm:hidden" tabIndex={-1} aria-hidden>
           {"card" in step.preview ? (
             <CardFrame model={step.preview.card} className="w-16" label={t("cardPreviewAlt", { item: name })} />
           ) : (
@@ -116,25 +116,36 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
             <VersionChips weddingId={weddingId} item={step.item} versions={step.versions} canAdd={step.canAddVersion} />
           </div>
         </div>
-        {/* One row: the ways out (send, share, view) in outline, then the way in, last and strongest. */}
-        <div className="flex flex-wrap items-center gap-2 sm:max-w-md sm:shrink-0 sm:justify-end">
-          {status.kind === "household" && (
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/hochzeiten/${weddingId}/gaeste?karte=${step.item}`}>
-                <Send aria-hidden />
-                {t("send")}
+        {/*
+          Two rows in two even columns: above, what the couple does with the item (Ansehen, Bearbeiten); below, what
+          goes to the guests (Teilen, Versenden). Each kind has its own style; Bearbeiten is filled for the next step.
+        */}
+        <div className="grid grid-cols-2 gap-2 sm:w-72 sm:shrink-0 [&>*]:w-full">
+          {"card" in step.preview ? (
+            <Button asChild size="sm" variant="secondary">
+              <Link href={`${versionHref(weddingId, step.item, first.id)}/vorschau`}>
+                <Eye aria-hidden />
+                {t("view")}
               </Link>
             </Button>
+          ) : online.length > 0 ? (
+            online.map((v) => (
+              <Button key={v.id} asChild size="sm" variant="secondary">
+                <a href={v.publicUrl!} target="_blank" rel="noopener">
+                  <Eye aria-hidden />
+                  {labelled(t("view"), v.label)}
+                </a>
+              </Button>
+            ))
+          ) : (
+            <span aria-hidden />
           )}
-          {/* Each household's personal link to its website version: the guest list without a card chosen. */}
-          {online.length > 0 && (
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/hochzeiten/${weddingId}/gaeste`} data-testid="website-send">
-                <Send aria-hidden />
-                {t("send")}
-              </Link>
-            </Button>
-          )}
+          <Button asChild size="sm" variant={now ? "default" : "outline"} className={cn("col-start-2", !now && "border-primary/40 text-primary")}>
+            <Link href={versionHref(weddingId, step.item, first.id)}>
+              <PencilLine aria-hidden />
+              {now ? t("continue") : t("openStep")}
+            </Link>
+          </Button>
           {step.item === "engagement" &&
             status.kind === "household" &&
             status.active &&
@@ -152,20 +163,15 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
           {online.map((v) => (
             <ShareDialog key={v.id} url={v.publicUrl!} slug={new URL(v.publicUrl!).pathname.slice(1)} triggerLabel={labelled(t("share"), v.label)} />
           ))}
-          {online.map((v) => (
-            <Button key={v.id} asChild size="sm" variant="outline">
-              <a href={v.publicUrl!} target="_blank" rel="noopener">
-                <Eye aria-hidden />
-                {labelled(t("view"), v.label)}
-              </a>
+          {(status.kind === "household" || online.length > 0) && (
+            <Button asChild size="sm" className="col-start-2 bg-accent text-accent-foreground hover:bg-accent/70">
+              {/* A card: the guest list with that card chosen; the website: each household's personal link. */}
+              <Link href={status.kind === "household" ? `/hochzeiten/${weddingId}/gaeste?karte=${step.item}` : `/hochzeiten/${weddingId}/gaeste`} data-testid={step.item === "website" ? "website-send" : undefined}>
+                <Send aria-hidden />
+                {t("send")}
+              </Link>
             </Button>
-          ))}
-          <Button asChild size="sm" variant={now ? "default" : "outline"} className={cn(!now && "border-primary/40 text-primary")}>
-            <Link href={versionHref(weddingId, step.item, first.id)}>
-              <PencilLine aria-hidden />
-              {now ? t("continue") : t("openStep")}
-            </Link>
-          </Button>
+          )}
         </div>
       </article>
     </li>

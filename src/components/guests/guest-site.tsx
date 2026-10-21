@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { siteStyle } from "@/components/site/site-style";
 import { container } from "@/composition/container";
@@ -10,7 +11,9 @@ export async function GuestSite({ design, children }: { design: ResolvedDesign; 
     <div className="site flex min-h-dvh flex-col" style={siteStyle(design)} data-theme={design.theme.id} data-testid="guest-site">
       <main className="flex-1">{children}</main>
       <footer className="site-muted flex flex-wrap justify-center gap-x-4 gap-y-1 px-6 py-12 text-center text-xs" data-testid="site-footer">
-        <span>{t("madeWith")}</span>
+        <Link href="/" className="underline-offset-4 hover:underline">
+          {t("madeWith")}
+        </Link>
         {container().legalLinks.map(({ page, href }) => (
           <a key={page} href={href} className="underline-offset-4 hover:underline">
             {t(page)}

@@ -16,8 +16,9 @@ test("without the operator's links there are no legal pages and nothing links to
   await createWebsite(page, slug);
   await page.goto(`/${slug}`);
   const siteFooter = page.getByTestId("site-footer");
-  await expect(siteFooter).toContainText("Erstellt mit Traureise");
-  await expect(siteFooter.getByRole("link")).toHaveCount(0);
+  // Only the credit, which leads to this instance's start page.
+  await expect(siteFooter.getByRole("link")).toHaveText(["Erstellt mit Traureise"]);
+  await expect(siteFooter.getByRole("link", { name: "Erstellt mit Traureise" })).toHaveAttribute("href", "/");
 });
 
 test("without billing there are no prices, plans or purchases anywhere", async ({ page, request }) => {

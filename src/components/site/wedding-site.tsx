@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 import type { WebsiteView } from "@/application/views";
 import { renderableSections } from "@/application/views";
@@ -66,7 +67,9 @@ export async function WeddingSite({ view, now, mode }: Props) {
       ))}
 
       <footer className="site-muted flex flex-wrap justify-center gap-x-4 gap-y-1 px-6 py-12 text-center text-xs" data-testid="site-footer">
-        <span>{t("madeWith")}</span>
+        <Link href="/" target={mode === "preview" ? "_blank" : undefined} className="underline-offset-4 hover:underline">
+          {t("madeWith")}
+        </Link>
         {container().legalLinks.map(({ page, href }) => (
           <a key={page} href={href} target={mode === "preview" ? "_blank" : undefined} rel={mode === "preview" ? "noopener" : undefined} className="underline-offset-4 hover:underline">
             {t(page)}
