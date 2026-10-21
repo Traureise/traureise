@@ -2,25 +2,26 @@
 
 ## Impressum, privacy policy and terms
 
-Traureise ships no legal texts: who runs an instance and what it does with data differs for each one. A
-public instance in Germany needs an Impressum (§ 5 DDG) and a privacy policy (Art. 13 DSGVO); with billing on,
-terms as well. Write them as Markdown files and point Traureise at them:
+Traureise ships no legal texts and shows none itself: who runs an instance and what it does with data differs for
+each one ([ADR 0027](adr/0027-legal-pages-are-links.md)). A public instance in Germany needs an Impressum
+(§ 5 DDG) and a privacy policy (Art. 13 DSGVO); with billing on, terms as well. Publish them wherever you publish
+pages (your homepage, your own docs) and link them:
 
 ```yaml
 services:
   app:
     environment:
-      IMPRINT_FILE: /legal/impressum.md     # /impressum
-      PRIVACY_FILE: /legal/datenschutz.md   # /datenschutz
-      TERMS_FILE: /legal/agb.md             # /agb
-    volumes:
-      - ./legal:/legal:ro
+      IMPRINT_URL: https://example.org/impressum/
+      PRIVACY_URL: https://example.org/datenschutz/
+      TERMS_URL: https://example.org/agb/
 ```
 
-- Each is optional; without a file the page is a 404 and nothing links to it.
-- Each existing page is linked from the app footer and from a discreet footer on every wedding website.
-- The file is read on every request, so a change shows at once. Keep the files in version control.
-- Raw HTML is shown as text; only web, mail and phone links are kept.
+- Each is optional; unset, there is no link. Only `http(s)` links are accepted.
+- Each one that is set is linked from the app footer ("Impressum", "Datenschutz", "AGB") and from a discreet
+  footer on every wedding website and guest page.
+- The app logs a warning at startup when `IMPRINT_URL` or `PRIVACY_URL` is missing.
+- An instance only you use, on your own network, needs none of them.
+- Keep the texts in version control: for a privacy policy it matters what it said on which day.
 
 ### What to write
 

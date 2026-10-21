@@ -20,12 +20,22 @@ The website is a **draft**: it is not online until you publish it in the website
 **Offline nehmen** to take it down again). A draft's address is a 404 for everyone else; you see it in the
 editor's preview.
 
-**Angaben ändern** (on the home, in every card editor and on the website's Startseite) changes names, date, place,
-time zone and the wedding's address for everything at once. Cards follow, except where you rewrote the text. Without
-a date, the Save the Date and the invitation show "Datum folgt"; you can design them, but sending and exporting wait
-until the wedding has a date.
+The **Hochzeit** tab (`/hochzeiten/<id>/hochzeit`) holds names, date, place, time zone and the wedding's address for
+everything at once, and deleting the wedding. The place can be found on an OpenStreetMap map, after the couple agrees to
+load it ([ADR 0026](adr/0026-openstreetmap-location-picker-after-consent.md)); its spot is kept, and the maps in the
+Ablauf start there. **Angaben ändern** and **Datum eintragen** (on the timeline, in every card editor, on the website's
+Startseite and on the guest list) lead to this tab and, from an editor, back after saving. Cards follow, except where
+you rewrote the text. Without a date, the Save the Date and the invitation show "Datum folgt"; you can design them,
+but sending and exporting wait until the wedding has a date.
 
-## The home: a timeline
+## Four tabs
+
+Every wedding has four tabs under its name: **Vorbereitung** (the timeline below), **Hochzeit** (the details above),
+**Gästeliste** ([Guests and RSVP](guests.md)) and **Ablauf** (the events). A tab stays current on its own subpages,
+such as the guest list's settings. Card and website editors are full pages of their own, with a breadcrumb back to
+the wedding and to the list of weddings.
+
+## Vorbereitung: a timeline
 
 `/dashboard` opens the wedding you used last; `/hochzeiten` lists all of them, and **Neue Hochzeit** (in the
 switcher at the top of a wedding, or on the list) starts another one.
@@ -33,14 +43,12 @@ switcher at the top of a wedding, or on the list) starts another one.
 A wedding's home (`/hochzeiten/<id>`) greets you with your names, shows how many days are left, the date and the
 place, and then the five items as a timeline: finished steps have a tick, the next step is lifted out with
 **Weitermachen**, later ones are quieter. Each step shows a small preview, when couples usually do it, its status
-("28 von 31 Haushalten geöffnet", "Entwurf · noch nicht veröffentlicht") and its versions. Below, a row
-summarises the guests and leads to the guest list.
+("28 von 31 Haushalten geöffnet", "Entwurf · noch nicht veröffentlicht") and its versions. **Versenden** opens the
+guest list for that item; for the published website it opens the guest list with each household's personal link.
 
 What counts as finished: a card once every household it is meant for got it (the engagement announcement also
 once you shared its public link), the website once a version is online. **Speichern und schließen** (in the arrow
 next to **Speichern** in the card editor) saves and goes back to this page.
-
-Every page of a wedding has a breadcrumb back to the wedding and to the list of weddings.
 
 ## Versions for different audiences
 
@@ -64,8 +72,8 @@ named after the version) switches between versions and holds these actions.
   version shows all events unless you switch some off for that version ("Auf dieser Website zeigen").
 
 Extra versions are paid when billing is on (see [Legal pages, account rights and billing](legal-and-billing.md)):
-an extra Save the Date or invitation needs **Einladungen**, an extra engagement announcement or thank-you card
-**Komplett**, an extra website any paid package. Versions you added stay when a package ends; an extra website
+an extra Save the Date or website needs **RSVP**, an extra invitation **Einladungen**, an extra engagement
+announcement or thank-you card **Komplett**. Versions you added stay when a package ends; an extra website
 version then goes offline. Self-hosted without billing, everything is unlimited.
 
 ## Addresses

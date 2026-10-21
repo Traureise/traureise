@@ -58,6 +58,7 @@ nav:
           - Versions for audiences: adr/0024-versions-for-audiences.md
           - Sections built from typed blocks: adr/0025-sections-built-from-typed-blocks.md
           - OpenStreetMap location picker after consent: adr/0026-openstreetmap-location-picker-after-consent.md
+          - Legal pages are links: adr/0027-legal-pages-are-links.md
 
 theme:
   name: material
