@@ -54,7 +54,7 @@ export async function setWeddingSlug(page: Page, weddingId: string, slug: string
   await form.getByLabel("Adresse eurer Hochzeit").fill(slug);
   await expect(form.getByTestId("slug-change-hint")).toContainText("keine Weiterleitung");
   await form.getByRole("button", { name: "Speichern" }).click();
-  await expect(page.getByText("Gespeichert")).toBeVisible();
+  await expect(page.getByText("Gespeichert").first()).toBeVisible();
 }
 
 /** A website version's own address, from its home section. */

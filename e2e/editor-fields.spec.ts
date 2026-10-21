@@ -46,7 +46,7 @@ test("every editor field reaches the public website, and invalid input explains 
     await expect(details.getByText("Diese Adresse ist für Traureise reserviert.")).toBeVisible();
     await details.getByLabel("Eure Namen").fill("Clara & Dev");
     await details.getByLabel("Adresse eurer Hochzeit").fill(slug);
-    await details.getByLabel("Zeitzone").selectOption("Europe/London");
+    await details.getByLabel("Zeitzone", { exact: true }).selectOption("Europe/London");
     await details.getByRole("button", { name: "Speichern" }).click();
     await expect(page).toHaveURL(new RegExp(`/website/[0-9a-f-]{36}/home$`));
   });

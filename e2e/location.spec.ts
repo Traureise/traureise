@@ -86,7 +86,7 @@ test("a couple finds the venue on an OpenStreetMap map, after agreeing to load i
     await form.getByRole("button", { name: /Gut Sonnenhof/ }).click();
     await expect(form.getByLabel("Ort (optional)")).toHaveValue("Gut Sonnenhof");
     await form.getByRole("button", { name: "Speichern" }).click();
-    await expect(page.getByText("Gespeichert")).toBeVisible();
+    await expect(page.getByText("Gespeichert").first()).toBeVisible();
     await page.reload();
     await expect(form.getByLabel("Ort (optional)")).toHaveValue("Gut Sonnenhof");
     await expect(form.getByRole("button", { name: "Punkt entfernen" })).toBeVisible();
