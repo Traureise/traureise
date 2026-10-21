@@ -109,6 +109,15 @@ async function Step({ step, weddingId }: { step: HomeStep; weddingId: string }) 
                   <ShareDialog url={v.publicUrl!} slug={new URL(v.publicUrl!).pathname.slice(1)} triggerLabel={step.versions.length > 1 ? `${t("share")}: ${v.label}` : t("share")} />
                 </span>
               ))}
+          {/* Each household's personal link to its website version: the guest list without a card chosen. */}
+          {step.item === "website" && step.versions.some((v) => v.online) && (
+            <Button asChild size="sm" variant="ghost">
+              <Link href={`/hochzeiten/${weddingId}/gaeste`} data-testid="website-send">
+                <Send aria-hidden />
+                {t("send")}
+              </Link>
+            </Button>
+          )}
         </div>
       </article>
     </li>

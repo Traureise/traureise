@@ -281,6 +281,8 @@ test("a couple builds, shares, restyles and deletes their wedding website", asyn
     const card = step(page, "Hochzeitswebsite");
     await expect(card).toHaveAttribute("data-state", "done");
     await expect(card.getByTestId("step-status")).toHaveText("Veröffentlicht");
+    // "Versenden" leads to the guest list, where each household's personal link is sent.
+    await expect(card.getByRole("link", { name: "Versenden" })).toHaveAttribute("href", `/hochzeiten/${weddingId}/gaeste`);
 
     await card.getByRole("button", { name: "Teilen" }).click();
     const dialog = page.getByRole("dialog", { name: "Website teilen" });
