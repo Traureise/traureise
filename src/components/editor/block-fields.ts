@@ -3,7 +3,9 @@ import { germanDate } from "@/domain/days";
 import { EVENT_TYPES, PARTY_ROLES, PLACE_TYPES, type BlockData, type BlockType } from "@/domain/sections";
 
 export type FieldType = "text" | "textarea" | "date" | "time" | "url" | "select" | "image";
-export type FieldSpec = { name: string; type: FieldType; options?: readonly string[]; optionLabels?: string; required?: boolean };
+export type FieldGroup = "what" | "when" | "where" | "more";
+/** `half`: shares a row with its neighbour on wide screens. `group`: the fieldset it belongs to (editor.fieldGroups). */
+export type FieldSpec = { name: string; type: FieldType; options?: readonly string[]; optionLabels?: string; required?: boolean; half?: boolean; group?: FieldGroup };
 
 /** Form layout per block type; labels come from editor.fields.<name>. Event blocks have their own form. */
 export const BLOCK_FIELDS: Record<Exclude<BlockType, "event">, FieldSpec[]> = {
@@ -39,17 +41,17 @@ export const BLOCK_FIELDS: Record<Exclude<BlockType, "event">, FieldSpec[]> = {
 
 /** An event of the Ablauf. */
 export const EVENT_FIELDS: FieldSpec[] = [
-  { name: "imageKey", type: "image" },
-  { name: "eventType", type: "select", options: EVENT_TYPES, optionLabels: "sections.eventTypes", required: true },
-  { name: "name", type: "text", required: true },
-  { name: "startDate", type: "date", required: true },
-  { name: "startTime", type: "time", required: true },
-  { name: "endDate", type: "date" },
-  { name: "endTime", type: "time" },
-  { name: "venueName", type: "text" },
-  { name: "address", type: "textarea" },
-  { name: "description", type: "textarea" },
-  { name: "website", type: "url" },
+  { name: "eventType", type: "select", options: EVENT_TYPES, optionLabels: "sections.eventTypes", required: true, half: true, group: "what" },
+  { name: "name", type: "text", required: true, half: true, group: "what" },
+  { name: "startDate", type: "date", required: true, half: true, group: "when" },
+  { name: "startTime", type: "time", required: true, half: true, group: "when" },
+  { name: "endDate", type: "date", half: true, group: "when" },
+  { name: "endTime", type: "time", half: true, group: "when" },
+  { name: "venueName", type: "text", half: true, group: "where" },
+  { name: "website", type: "url", half: true, group: "where" },
+  { name: "address", type: "textarea", group: "where" },
+  { name: "description", type: "textarea", group: "more" },
+  { name: "imageKey", type: "image", group: "more" },
 ];
 
 

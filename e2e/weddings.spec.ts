@@ -193,17 +193,20 @@ test("a couple creates their wedding, gets every item, adds versions, chooses wh
 
     await test.step("one person in one go; the engagement goes through the guest list; cards sent elsewhere are marked by hand", async () => {
       await page.goto(guestsUrl(weddingId));
-      const quick = page.getByRole("form", { name: "Einzelne Person schnell hinzufügen" });
-      await quick.getByPlaceholder("Name, z. B. Tante Erika").fill("Tante Erika");
+      const quick = page.getByRole("form", { name: "Gäste hinzufügen" });
+      await quick.getByLabel("Name").fill("Tante Erika");
       await quick.getByRole("button", { name: "Person hinzufügen" }).click();
       await expect(household(page, "Tante Erika")).toContainText("1 Person: Tante Erika");
 
       await chooseCard(page, "Verlobungsanzeige");
       await expect(page.getByTestId("card-sending-counts")).toHaveText("0 von 3 Haushalten geöffnet · 0 gesendet");
       const erika = household(page, "Tante Erika");
-      await erika.getByRole("button", { name: "Als gesendet markieren" }).click();
+      // Marking by hand is in the household's menu.
+      await erika.getByRole("button", { name: "Weitere Aktionen für Tante Erika" }).click();
+      await page.getByRole("menuitem", { name: "Als gesendet markieren" }).click();
       await expect(erika.getByTestId("delivery-status")).toHaveText(/^Als gesendet markiert am/);
-      await erika.getByRole("button", { name: "Doch nicht gesendet" }).click();
+      await erika.getByRole("button", { name: "Weitere Aktionen für Tante Erika" }).click();
+      await page.getByRole("menuitem", { name: "Doch nicht gesendet" }).click();
       await expect(erika.getByTestId("delivery-status")).toHaveText("Nicht gesendet");
       await page.getByRole("button", { name: "Alle als gesendet markieren (3)" }).click();
       await page.getByRole("alertdialog").getByRole("button", { name: "Als gesendet markieren" }).click();

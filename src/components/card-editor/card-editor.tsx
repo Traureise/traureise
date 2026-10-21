@@ -171,7 +171,7 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
           </fieldset>
           <div className="space-y-2">
             <Label htmlFor="card-fonts">{t("fonts")}</Label>
-            <select id="card-fonts" value={fontPairingId ?? ""} onChange={(e) => setFontPairingId(e.target.value || null)} className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm">
+            <select id="card-fonts" value={fontPairingId ?? ""} onChange={(e) => setFontPairingId(e.target.value || null)} className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm">
               <option value="">{t("fontsDefault")}</option>
               {FONT_PAIRINGS.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -191,7 +191,7 @@ export function CardEditor({ data, locale, header }: { data: CardEditorData; loc
           {fields.includes("eventId") && (
             <div className="space-y-2">
               <Label htmlFor="card-event">{t("fields.eventId")}</Label>
-              <select id="card-event" value={content.eventId ?? ""} onChange={(e) => set("eventId", e.target.value || null)} className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm">
+              <select id="card-event" value={content.eventId ?? ""} onChange={(e) => set("eventId", e.target.value || null)} className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm">
                 <option value="">{t("noEvent")}</option>
                 {data.events.map((e) => (
                   <option key={e.id} value={e.id}>

@@ -31,8 +31,9 @@ export const openedUrls = (page: Page) => page.evaluate(() => (window as unknown
 
 /** Picks the card on the Gäste page (Versand: Antwortlink / Save the Date / Einladung / Dankeskarte). */
 export async function chooseCard(page: Page, name: CardName | "Antwortlink") {
-  await page.getByTestId("card-picker").getByRole("link", { name, exact: true }).click();
-  await expect(page.getByTestId("card-picker").getByRole("link", { name, exact: true })).toHaveAttribute("aria-current", "page");
+  await page.getByTestId("card-picker").getByRole("button").click();
+  await page.getByRole("menuitem", { name, exact: true }).click();
+  await expect(page.getByTestId("card-picker").getByRole("button")).toHaveAccessibleName(`Versand: ${name}`);
 }
 
 /** Opens a household's envelope (or sees the card directly) and waits until the page reported it. */

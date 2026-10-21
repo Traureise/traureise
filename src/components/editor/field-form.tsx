@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageField } from "./image-field";
 import { normalizeTime } from "@/domain/days";
-import type { FieldSpec } from "./block-fields";
+import type { FieldGroup, FieldSpec } from "./block-fields";
 import { useSave } from "./use-save";
 
 type Props = {
@@ -27,7 +27,18 @@ type Props = {
   onDone: () => void;
 };
 
-/** A form for one block or event, laid out from field specs. */
+/** Consecutive fields of one group, in order; fields without a group form one unnamed group. */
+function groupsOf(fields: FieldSpec[]): { group: FieldGroup | undefined; fields: FieldSpec[] }[] {
+  const groups: { group: FieldGroup | undefined; fields: FieldSpec[] }[] = [];
+  for (const field of fields) {
+    const last = groups.at(-1);
+    if (last && last.group === field.group) last.fields.push(field);
+    else groups.push({ group: field.group, fields: [field] });
+  }
+  return groups;
+}
+
+/** A form for one block or event, laid out from field specs (in named groups, two columns on wide screens). */
 export function FieldForm({ weddingId, fields, initial, idPrefix, label, onSubmit, onDone }: Props) {
   const t = useTranslations();
   const { pending, errors, save, dismiss } = useSave();
@@ -70,7 +81,7 @@ export function FieldForm({ weddingId, fields, initial, idPrefix, label, onSubmi
         {field.type === "textarea" ? (
           <Textarea {...common} rows={3} defaultValue={(value as string) ?? ""} />
         ) : field.type === "select" ? (
-          <select {...common} defaultValue={(value as string) ?? ""} className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm">
+          <select {...common} defaultValue={(value as string) ?? ""} className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm">
             <option value="" disabled>
               {t("editor.fields.chooseOption")}
             </option>
@@ -96,10 +107,31 @@ export function FieldForm({ weddingId, fields, initial, idPrefix, label, onSubmi
       onChange={(e) => {
         const target = e.target as EventTarget as HTMLInputElement;
         dismiss(target.name || target.dataset.field || "");
-      }} className="space-y-4 rounded-xl border border-primary/30 bg-background p-4" aria-label={label}>
-      {fields.map((field) => (
-        <div key={field.name}>{input(field)}</div>
-      ))}
+      }} className="@container space-y-4 rounded-xl border border-primary/30 bg-background p-4" aria-label={label}>
+      {groupsOf(fields).map(({ group, fields: groupFields }) => {
+        const grid = (
+          <div className="grid gap-4 @lg:grid-cols-2">
+            {groupFields.map((field) => (
+              <div key={field.name} className={field.half ? undefined : "@lg:col-span-2"}>
+                {input(field)}
+              </div>
+            ))}
+          </div>
+        );
+        return group ? (
+          <div key={group} className="gap-x-6 border-t border-border pt-4 first:border-t-0 first:pt-0 @2xl:grid @2xl:grid-cols-[5rem_minmax(0,1fr)]">
+            <p className="mb-3 font-heading text-base font-medium @2xl:mb-0 @2xl:pt-0.5" aria-hidden>
+              {t(`editor.fieldGroups.${group}`)}
+            </p>
+            <fieldset className="m-0 min-w-0 border-0 p-0">
+              <legend className="sr-only">{t(`editor.fieldGroups.${group}`)}</legend>
+              {grid}
+            </fieldset>
+          </div>
+        ) : (
+          <div key="fields">{grid}</div>
+        );
+      })}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" onClick={onDone}>
           {t("editor.cancel")}

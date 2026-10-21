@@ -304,3 +304,36 @@ test("12 months after the wedding the guest data is deleted, after a warning 30 
     await setClockOffset(page.request, baseURL!, 0);
   }
 });
+
+test("a household is added from the name field, edited and deleted from its menu", async ({ page }) => {
+  await login(page, uniqueEmail("menu"), "Mira");
+  const editorUrl = await createWebsite(page, `mira-und-jan-${Date.now()}`);
+  await page.goto(guestsUrl(editorUrl));
+  // One field adds a person, or opens a household with the typed name.
+  const add = page.getByRole("form", { name: "Gäste hinzufügen" });
+  await add.getByLabel("Name").fill("Familie Roth");
+  await add.getByRole("button", { name: "Weitere Möglichkeiten" }).click();
+  await page.getByRole("menuitem", { name: "Haushalt hinzufügen" }).click();
+  const draft = page.getByRole("form", { name: "Neuer Haushalt" });
+  await expect(draft.getByLabel("Name des Haushalts")).toHaveValue("Familie Roth");
+  await draft.getByLabel("Person 1", { exact: true }).fill("Ida");
+  await draft.getByRole("button", { name: "Speichern" }).click();
+  await expect(draft).toBeHidden();
+  await expect(add.getByLabel("Name")).toHaveValue("");
+  const roth = household(page, "Familie Roth");
+
+  await roth.getByRole("button", { name: "Weitere Aktionen für Familie Roth" }).click();
+  await page.getByRole("menuitem", { name: "Bearbeiten" }).click();
+  const form = page.getByRole("form", { name: "Haushalt bearbeiten" });
+  await form.getByLabel("Name des Haushalts").fill("Familie Roth-Berg");
+  await form.getByRole("button", { name: "Speichern" }).click();
+  await expect(form).toBeHidden();
+  const renamed = household(page, "Familie Roth-Berg");
+  await expect(renamed).toContainText("1 Person: Ida");
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await renamed.getByRole("button", { name: "Weitere Aktionen für Familie Roth-Berg" }).click();
+  await page.getByRole("menuitem", { name: "Löschen" }).click();
+  await expect(page.getByTestId("household")).toHaveCount(0);
+  await expect(page.getByTestId("guests-empty")).toBeVisible();
+});

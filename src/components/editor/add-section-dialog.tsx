@@ -47,7 +47,7 @@ export function AddSectionDialog({ websiteId, base, open, onOpenChange }: { webs
               id="add-section-choice"
               value={choice}
               onChange={(e) => setChoice(e.target.value as SectionTemplate | "")}
-              className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+              className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm"
             >
               <option value="">{t("empty")}</option>
               {SECTION_TEMPLATES.map((template) => (

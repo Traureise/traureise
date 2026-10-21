@@ -3,8 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { BellRing, CheckCheck, Mail, Send, Undo2 } from "lucide-react";
+import { BellRing, CheckCheck, CircleSlash, Mail, MoreHorizontal, PencilLine, Send, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
+import { deleteHouseholdAction } from "@/app/actions/guests";
 import { markCardsSentAction, sendCardEmailsAction, sendRemindersAction, setCardExcludedAction, shareCardAction } from "@/app/actions/cards";
 import {
   AlertDialog,
@@ -19,9 +20,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CopyLinkButton } from "@/components/share/copy-link-button";
 import { WhatsAppButton } from "@/components/share/whatsapp-button";
 import type { HouseholdCardKind } from "@/domain/cards";
+import { whatsappUrl } from "@/domain/guests";
+import { HouseholdDialog, type HouseholdDraft } from "./household-dialog";
 
 type Household = { id: string; name: string; email: string | null; link: string };
 
@@ -40,18 +44,17 @@ function useRun() {
 }
 
 /**
- * Sending one card to one household: WhatsApp (a wa.me link the couple opens), Link kopieren, E-Mail, and
- * leaving the household out. WhatsApp and copied links are recorded as sent.
+ * Sending one card to one household: WhatsApp (a wa.me link the couple opens), Link kopieren and E-Mail. Both
+ * WhatsApp and copied links count as sent. A household left out gets "Doch senden" instead. Marking by hand and
+ * leaving out are in the household's menu.
  */
-export function CardSendButtons({
+export function CardShareButtons({
   weddingId,
   kind,
   household,
   message,
   emailSending,
   excluded,
-  sent,
-  markedByHand,
 }: {
   weddingId: string;
   kind: HouseholdCardKind;
@@ -59,13 +62,8 @@ export function CardSendButtons({
   message: string;
   emailSending: boolean;
   excluded: boolean;
-  /** The household has this card (any version, any channel). */
-  sent: boolean;
-  /** …because the couple marked it by hand, which can be undone. */
-  markedByHand: boolean;
 }) {
   const t = useTranslations("guests.sending");
-  const tKinds = useTranslations("cardKinds");
   const tList = useTranslations("guests.list");
   const { pending, run } = useRun();
   const share = (via: "whatsapp" | "link") => run(() => shareCardAction(weddingId, kind, household.id, via));
@@ -86,29 +84,92 @@ export function CardSendButtons({
           {t("email")}
         </Button>
       )}
-      {!sent && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={pending}
-          onClick={() => run(() => markCardsSentAction(weddingId, kind, { householdId: household.id }, true), () => toast.success(t("markedSent", { kind: tKinds(kind), household: household.name })))}
-        >
-          <CheckCheck aria-hidden />
-          {t("markSent")}
-        </Button>
-      )}
-      {markedByHand && (
-        <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => run(() => markCardsSentAction(weddingId, kind, { householdId: household.id }, false))}>
-          <Undo2 aria-hidden />
-          {t("unmarkSent")}
-        </Button>
-      )}
-      {!sent && (
-        <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => run(() => setCardExcludedAction(weddingId, kind, household.id, true))}>
-          {t("exclude")}
-        </Button>
-      )}
+    </>
+  );
+}
+
+/**
+ * Everything else for one household, behind "⋯": a reminder (email where there is an address, otherwise
+ * WhatsApp), marking the chosen card as sent by hand or leaving the household out, editing and deleting.
+ */
+export function HouseholdMenu({
+  weddingId,
+  household,
+  events,
+  card,
+  reminder,
+}: {
+  weddingId: string;
+  household: HouseholdDraft & { link: string | null };
+  events: { id: string; name: string }[];
+  card: { kind: HouseholdCardKind; sent: boolean; markedByHand: boolean; excluded: boolean } | null;
+  reminder: { byEmail: boolean; message: string } | null;
+}) {
+  const t = useTranslations("guests.sending");
+  const tHousehold = useTranslations("guests.household");
+  const tList = useTranslations("guests.list");
+  const tKinds = useTranslations("cardKinds");
+  const { pending, run } = useRun();
+  const [editing, setEditing] = useState(false);
+  const id = household.id;
+
+  function remind() {
+    if (!reminder) return;
+    if (reminder.byEmail && household.email) run(() => sendRemindersAction(weddingId, { householdId: id }), () => toast.success(t("reminderQueued", { household: household.name })));
+    else if (household.link) window.open(whatsappUrl(reminder.message, household.name, household.link), "_blank", "noopener,noreferrer");
+  }
+
+  function remove() {
+    if (!window.confirm(tHousehold("confirmDelete", { name: household.name }))) return;
+    run(() => deleteHouseholdAction(weddingId, id), () => toast.success(tHousehold("deleted")));
+  }
+
+  const cardItems = card && !card.excluded && (!card.sent || card.markedByHand);
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="ghost" size="icon-sm" disabled={pending} aria-label={tList("more", { name: household.name })}>
+            <MoreHorizontal aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-52">
+          {reminder && household.link && (
+            <DropdownMenuItem onSelect={remind}>
+              <BellRing aria-hidden />
+              {t("remind")}
+            </DropdownMenuItem>
+          )}
+          {cardItems && !card.sent && (
+            <>
+              <DropdownMenuItem onSelect={() => run(() => markCardsSentAction(weddingId, card.kind, { householdId: id }, true), () => toast.success(t("markedSent", { kind: tKinds(card.kind), household: household.name })))}>
+                <CheckCheck aria-hidden />
+                {t("markSent")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => run(() => setCardExcludedAction(weddingId, card.kind, id, true))}>
+                <CircleSlash aria-hidden />
+                {t("exclude")}
+              </DropdownMenuItem>
+            </>
+          )}
+          {cardItems && card.markedByHand && (
+            <DropdownMenuItem onSelect={() => run(() => markCardsSentAction(weddingId, card.kind, { householdId: id }, false))}>
+              <Undo2 aria-hidden />
+              {t("unmarkSent")}
+            </DropdownMenuItem>
+          )}
+          {(reminder || cardItems) && <DropdownMenuSeparator />}
+          <DropdownMenuItem onSelect={() => setEditing(true)}>
+            <PencilLine aria-hidden />
+            {tHousehold("edit")}
+          </DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onSelect={remove}>
+            <Trash2 aria-hidden />
+            {tHousehold("delete")}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <HouseholdDialog weddingId={weddingId} events={events} household={household} open={editing} onOpenChange={setEditing} />
     </>
   );
 }
@@ -168,25 +229,6 @@ export function SendAllButton({ weddingId, kind, count }: { weddingId: string; k
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  );
-}
-
-/** Erinnerung senden for one open household: an email where there is an address, otherwise WhatsApp. */
-export function ReminderButton({ weddingId, household, byEmail, message }: { weddingId: string; household: Household; byEmail: boolean; message: string }) {
-  const t = useTranslations("guests.sending");
-  const { pending, run } = useRun();
-  if (!byEmail || !household.email) return <WhatsAppButton message={message} name={household.name} link={household.link} label={t("remind")} variant="outline" />;
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      disabled={pending}
-      onClick={() => run(() => sendRemindersAction(weddingId, { householdId: household.id }), () => toast.success(t("reminderQueued", { household: household.name })))}
-    >
-      <BellRing aria-hidden />
-      {t("remind")}
-    </Button>
   );
 }
 

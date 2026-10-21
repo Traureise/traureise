@@ -87,6 +87,7 @@ export function PollList({ weddingId, polls }: { weddingId: string; polls: Poll[
   const [deleting, start] = useTransition();
   return (
     <div className="space-y-3">
+      {polls.length === 0 && editing !== "new" && <p className="rounded-xl border border-dashed border-input px-4 py-3 text-sm text-muted-foreground">{t("empty")}</p>}
       <ul className="space-y-3">
         {polls.map((poll) => (
           <li key={poll.id} data-testid="poll">

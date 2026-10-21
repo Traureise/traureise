@@ -35,7 +35,7 @@ export default async function SchedulePage({ params }: Props) {
   const t = await getTranslations("schedule");
   return (
     <PageShell header={<AppHeader email={user.email} />}>
-      <div className="mx-auto max-w-2xl space-y-6">
+      <div className="mx-auto max-w-3xl space-y-6">
         <WeddingNav wedding={wedding} current={t("title")} />
         <header className="space-y-2">
           <h1 className="font-heading text-4xl font-medium tracking-tight">{t("title")}</h1>

@@ -61,7 +61,7 @@ export function WeddingDetailsFields({
       {timeZones && (
         <div className="space-y-2">
           <Label htmlFor={`${idPrefix}-timezone`}>{t("timezoneLabel")}</Label>
-          <select id={`${idPrefix}-timezone`} name="timezone" defaultValue={value?.timezone} className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm">
+          <select id={`${idPrefix}-timezone`} name="timezone" defaultValue={value?.timezone} className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm">
             {timeZones.map((tz) => (
               <option key={tz.id} value={tz.id}>
                 {tz.label}
