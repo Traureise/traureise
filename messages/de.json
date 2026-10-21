@@ -1040,13 +1040,22 @@
       "dateOpen": "Datum noch offen",
       "timeline": "Eure Schritte",
       "when": {
-        "engagement": "Verlobung",
+        "engagement": "Sobald ihr verlobt seid",
         "saveTheDate": "6–12 Monate vorher",
         "website": "Wann ihr mögt",
         "invitation": "3–4 Monate vorher",
         "thankYou": "Nach der Hochzeit"
       },
-      "next": "Als Nächstes",
+      "timing": {
+        "now": "Jetzt",
+        "until": "bis {date}",
+        "from": "Ab {date}",
+        "range": "{start} – {end}",
+        "catchUp": "Jetzt nachholen",
+        "recommended": "empfohlen bis {date}",
+        "setDate": "Datum eintragen",
+        "websiteHint": "am besten vor dem Save the Date"
+      },
       "continue": "Weitermachen",
       "openStep": "Öffnen",
       "done": "Erledigt",

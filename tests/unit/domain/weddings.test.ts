@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  addMonths,
   ASSIGNABLE_ITEMS,
   assignedVersion,
   daysUntil,
@@ -8,6 +9,7 @@ import {
   needsDate,
   parseNewWedding,
   parseVersionLabel,
+  stepTiming,
   parseWeddingDetails,
   timelineStates,
   VERSION_FEATURES,
@@ -131,5 +133,25 @@ describe("timeline", () => {
 
   it("Save the Date and invitation wait for a date; the engagement and thank-you card do not", () => {
     expect(["engagement", "saveTheDate", "invitation", "thankYou"].filter((k) => needsDate(k as never))).toEqual(["saveTheDate", "invitation"]);
+  });
+});
+
+describe("stepTiming", () => {
+  it("dates each step's window from the wedding day and says where today is", () => {
+    expect(stepTiming("saveTheDate", "2026-10-30", "2026-03-01")).toEqual({ kind: "dated", start: "2025-10-30", end: "2026-04-30", phase: "open" });
+    expect(stepTiming("saveTheDate", "2026-10-30", "2026-10-21")).toMatchObject({ phase: "late" });
+    expect(stepTiming("invitation", "2026-10-30", "2026-05-01")).toEqual({ kind: "dated", start: "2026-06-30", end: "2026-07-30", phase: "before" });
+    expect(stepTiming("thankYou", "2026-10-30", "2026-10-30")).toEqual({ kind: "dated", start: "2026-10-31", end: "2026-12-30", phase: "before" });
+  });
+
+  it("has only the rule without a date, and no window for the engagement and the website", () => {
+    expect(stepTiming("invitation", null, "2026-10-21")).toEqual({ kind: "relative" });
+    expect(stepTiming("engagement", "2026-10-30", "2026-10-21")).toEqual({ kind: "anytime" });
+    expect(stepTiming("website", null, "2026-10-21")).toEqual({ kind: "anytime" });
+  });
+
+  it("clamps to the end of a shorter month", () => {
+    expect(addMonths("2027-08-31", -6)).toBe("2027-02-28");
+    expect(addMonths("2028-05-31", -3)).toBe("2028-02-29");
   });
 });

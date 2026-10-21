@@ -23,6 +23,7 @@ export function ShareDialog({
   message,
   onShared,
   triggerLabel,
+  triggerClassName,
 }: {
   url: string;
   slug: string;
@@ -30,6 +31,7 @@ export function ShareDialog({
   message?: string;
   onShared?: () => void;
   triggerLabel?: string;
+  triggerClassName?: string;
 }) {
   const t = useTranslations("share");
   const [open, setOpen] = useState(false);
@@ -55,7 +57,7 @@ export function ShareDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" className={triggerClassName}>
           <Share2 aria-hidden />
           {triggerLabel ?? t("button")}
         </Button>

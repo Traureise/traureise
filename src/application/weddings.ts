@@ -1,6 +1,7 @@
 import { activeTier, type Tier } from "@/domain/billing";
 import { cardCounts, CARD_KINDS, followWeddingDetails, type CardModel, type HouseholdCardKind } from "@/domain/cards";
 import { slugify } from "@/domain/slug";
+import { localDay } from "@/domain/days";
 import { DEFAULT_TIMEZONE } from "@/domain/website";
 import {
   daysUntil,
@@ -8,10 +9,12 @@ import {
   needsDate,
   parseNewWedding,
   parseWeddingDetails,
+  stepTiming,
   timelineStates,
   VERSION_FEATURES,
   VERSION_ITEMS,
   type StepState,
+  type StepTiming,
   type VersionItem,
 } from "@/domain/weddings";
 import { cardPreview, engagementUrl, newCardVersion, siteUrl } from "./cards";
@@ -95,6 +98,8 @@ export type StepStatus =
 export type HomeStep = {
   item: VersionItem;
   state: StepState;
+  /** When couples usually do it: dated from the wedding day once there is one. */
+  timing: StepTiming;
   /** First first; `href` targets are built by the app (card or website editor). */
   versions: { id: string; label: string; online?: boolean; publicUrl: string | null }[];
   /** A small preview of the first version: the card, or the website's cover and theme. */
@@ -130,7 +135,7 @@ export class GetWeddingHome {
     const byHousehold = households.map((h) => deliveriesByKind(ctx, records, opens, h.id));
     const counts = (kind: HouseholdCardKind) => cardCounts(byHousehold.map((d) => d[kind]));
 
-    const steps = VERSION_ITEMS.map((item): Omit<HomeStep, "state"> & { done: boolean } => {
+    const steps = VERSION_ITEMS.map((item): Omit<HomeStep, "state" | "timing"> & { done: boolean } => {
       const canAddVersion = ctx.can(VERSION_FEATURES[item]);
       if (item === "website") {
         const online = ctx.websites.filter((w) => ctx.online(w)).length;
@@ -166,7 +171,16 @@ export class GetWeddingHome {
     const states = timelineStates(Object.fromEntries(steps.map((s) => [s.item, s.done])) as Record<VersionItem, boolean>);
     return {
       wedding,
-      steps: steps.map(({ item, versions, preview, status, canAddVersion, messages }) => ({ item, versions, preview, status, canAddVersion, messages, state: states[item] })),
+      steps: steps.map(({ item, versions, preview, status, canAddVersion, messages }) => ({
+        item,
+        versions,
+        preview,
+        status,
+        canAddVersion,
+        messages,
+        state: states[item],
+        timing: stepTiming(item, wedding.weddingDate, localDay(ctx.now, wedding.timezone)),
+      })),
       countdown: wedding.weddingDate ? daysUntil(wedding.weddingDate, wedding.timezone, ctx.now) : null,
       tier: this.deps.billing.enabled ? activeTier(ctx.features.entitlements, ctx.now) : null,
     };

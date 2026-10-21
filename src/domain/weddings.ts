@@ -130,6 +130,47 @@ export function timelineStates(done: Record<VersionItem, boolean>): Record<Versi
   return Object.fromEntries(VERSION_ITEMS.map((item) => [item, done[item] ? "done" : item === next ? "now" : "later"])) as Record<VersionItem, StepState>;
 }
 
+/**
+ * When couples usually do each step, in months relative to the wedding day (negative: before). The engagement
+ * announcement and the website have no window: as soon as you are engaged, and whenever you like.
+ */
+export const STEP_WINDOWS: Record<VersionItem, { from: number; to: number } | null> = {
+  engagement: null,
+  saveTheDate: { from: -12, to: -6 },
+  website: null,
+  invitation: { from: -4, to: -3 },
+  thankYou: { from: 0, to: 2 },
+};
+
+export type StepTiming =
+  | { kind: "anytime" }
+  /** Without a wedding date: only the rule ("6–12 Monate vorher"). */
+  | { kind: "relative" }
+  /** `before` the window opens, `open` while it is, `late` once it closed. Dates are ISO days. */
+  | { kind: "dated"; start: string; end: string; phase: "before" | "open" | "late" };
+
+/** The ISO day `months` months from `iso`, clamped to the end of a shorter month (31 March − 1 month = 28/29 February). */
+export function addMonths(iso: string, months: number): string {
+  const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
+  const target = new Date(Date.UTC(y, m - 1 + months, 1));
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(d, lastDay));
+  return target.toISOString().slice(0, 10);
+}
+
+const addDays = (iso: string, days: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
+/** When a step is due for a wedding on `weddingDate`, seen from `today` (both ISO days in the wedding's time zone). */
+export function stepTiming(item: VersionItem, weddingDate: string | null, today: string): StepTiming {
+  const window = STEP_WINDOWS[item];
+  if (!window) return { kind: "anytime" };
+  if (!weddingDate) return { kind: "relative" };
+  // A window that starts on the wedding day (the thank-you card) opens the day after.
+  const start = window.from === 0 ? addDays(weddingDate, 1) : addMonths(weddingDate, window.from);
+  const end = addMonths(weddingDate, window.to);
+  return { kind: "dated", start, end, phase: today < start ? "before" : today > end ? "late" : "open" };
+}
+
 /** A household card is done once every household it is meant for got it. */
 export function householdCardDone(counts: { households: number; sent: number }): boolean {
   return counts.households > 0 && counts.sent >= counts.households;
