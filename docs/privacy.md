@@ -44,9 +44,16 @@ consent banner is needed for them.
 - Fonts and scripts are bundled and served by the instance. Nothing is loaded from CDNs or Google Fonts.
 - QR codes are generated in the browser.
 - Map links point to OpenStreetMap and are only followed when a guest clicks them.
+- The one exception, and only for the couple, never for guests: the place of an event can be found on an
+  OpenStreetMap map in the Ablauf. Nothing is loaded until the couple clicks **Karte laden** after a notice
+  that their IP address goes to the OpenStreetMap Foundation (tiles from `tile.openstreetmap.org`, search via
+  `nominatim.openstreetmap.org`). **Immer laden** remembers that choice in the browser (`localStorage`, no
+  cookie). Without it, the venue and address fields work as before. Mention it in your privacy policy if your
+  couples use it ([ADR 0026](adr/0026-openstreetmap-location-picker-after-consent.md)).
 - Public wedding websites send `noindex`, so search engines don't list them.
 
-Every end-to-end test fails if the browser contacts any host other than the instance. The decision
+Every end-to-end test fails if the browser contacts any host other than the instance (the location test
+answers OpenStreetMap's requests itself). The decision
 and its reasons are in [ADR 0005](adr/0005-gdpr-no-runtime-third-party-requests.md).
 
 ## Your processors

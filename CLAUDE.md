@@ -45,7 +45,8 @@ from Mailpit (`e2e/helpers/`). Billing E2E uses the Creem stub in `e2e/creem-stu
 - Never write the reference app's name or domain anywhere committed or published (`.secrets/reference.env`;
   `npm run check:names`). Never commit `.secrets/` or `docs/superpowers/`.
 - No hardcoded UI strings in `.tsx` (lint rule): copy goes in `messages/de.json`.
-- No runtime third-party requests (fonts via `@fontsource`, no CDNs, no analytics).
+- No runtime third-party requests (fonts via `@fontsource`, no CDNs, no analytics). Only exception: the couple's
+  OpenStreetMap location picker, loaded after consent (ADR 0026).
 - Legal texts are not in the app: operators supply Markdown via `IMPRINT_FILE`/`PRIVACY_FILE`/`TERMS_FILE`.
 - No skipped tests, Playwright `retries: 0`.
 - No instance holds real data yet (development only): schema changes still get a Drizzle migration, but

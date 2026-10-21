@@ -156,6 +156,14 @@ describe("parseEvent", () => {
     });
   });
 
+  it("keeps the coordinates of a place picked on the map, both or none", () => {
+    const picked = parseEvent({ ...event, latitude: "47.7216", longitude: "10.3132" });
+    expect(picked.ok && picked.value).toMatchObject({ latitude: 47.7216, longitude: 10.3132 });
+    expect(parseEvent(event).ok && parseEvent(event)).toMatchObject({ value: { latitude: null, longitude: null } });
+    expect(parseEvent({ ...event, latitude: "95", longitude: "10" }).ok).toBe(false);
+    expect(parseEvent({ ...event, latitude: "47.7", longitude: "" }).ok).toBe(false);
+  });
+
   it("accepts an end after midnight and rejects malformed times and unknown types", () => {
     expect(parseEvent({ ...event, endDate: "2027-06-13", endTime: "02:00" }).ok).toBe(true);
     expect(parseEvent({ ...event, startTime: "25:00" }).ok).toBe(false);

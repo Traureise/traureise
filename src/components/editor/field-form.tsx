@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { DateField } from "@/components/forms/date-field";
 import { TimeField } from "@/components/forms/time-field";
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageField } from "./image-field";
 import { normalizeTime } from "@/domain/days";
+import { LocationPicker, type PickedPlace } from "./location-picker";
 import type { FieldGroup, FieldSpec } from "./block-fields";
 import { useSave } from "./use-save";
 
@@ -46,9 +47,33 @@ export function FieldForm({ weddingId, fields, initial, idPrefix, label, onSubmi
     Object.fromEntries(fields.filter((f) => f.type === "image").map((f) => [f.name, (initial[f.name] as string | null) ?? null])),
   );
 
+  const formRef = useRef<HTMLFormElement>(null);
+  const [place, setPlace] = useState<{ latitude: number; longitude: number } | null>(
+    typeof initial.latitude === "number" && typeof initial.longitude === "number" ? { latitude: initial.latitude, longitude: initial.longitude } : null,
+  );
+
+  /** A place picked on the map fills the venue and address fields (still editable) and keeps its coordinates. */
+  function pick(picked: PickedPlace) {
+    setPlace({ latitude: picked.latitude, longitude: picked.longitude });
+    const form = formRef.current;
+    for (const [name, value] of [
+      ["venueName", picked.name],
+      ["address", picked.address],
+    ] as const) {
+      const input = form?.elements.namedItem(name);
+      if (value && (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) input.value = value;
+    }
+    dismiss("latitude");
+  }
+
   function submit(form: FormData) {
     const data: Record<string, unknown> = {};
     for (const field of fields) {
+      if (field.type === "location") {
+        data.latitude = place?.latitude ?? null;
+        data.longitude = place?.longitude ?? null;
+        continue;
+      }
       const raw = field.type === "image" ? images[field.name] : String(form.get(field.name) ?? "");
       data[field.name] = field.type === "time" ? normalizeTime(raw as string) : raw;
     }
@@ -72,6 +97,15 @@ export function FieldForm({ weddingId, fields, initial, idPrefix, label, onSubmi
           }}
           error={errors[field.name]}
         />
+      );
+    }
+    if (field.type === "location") {
+      return (
+        <div className="space-y-2">
+          <p className="text-sm font-medium">{label}</p>
+          <LocationPicker value={place} onPick={pick} onClear={() => setPlace(null)} />
+          <FieldError code={errors.latitude} />
+        </div>
       );
     }
     if (field.type === "date") return <DateField id={id} name={field.name} label={label} value={(value as string) ?? ""} error={errors[field.name]} />;
@@ -103,6 +137,7 @@ export function FieldForm({ weddingId, fields, initial, idPrefix, label, onSubmi
 
   return (
     <form
+      ref={formRef}
       onSubmit={(e) => (e.preventDefault(), submit(new FormData(e.currentTarget)))}
       onChange={(e) => {
         const target = e.target as EventTarget as HTMLInputElement;

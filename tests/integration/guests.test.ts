@@ -35,7 +35,7 @@ let party: string;
 beforeEach(async () => {
   ownerId = (await users.create("anna@example.org")).id;
   weddingId = (await newWedding("anna", "Anna & Ben", "2027-06-12")).id;
-  party = (await weddings.addEvent(weddingId, { imageKey: null, eventType: "reception", name: "Feier", startDate: "2027-06-12", startTime: "18:00", endDate: null, endTime: null, venueName: "", address: "", description: "", website: null })).id;
+  party = (await weddings.addEvent(weddingId, { imageKey: null, eventType: "reception", name: "Feier", startDate: "2027-06-12", startTime: "18:00", endDate: null, endTime: null, venueName: "", address: "", description: "", website: null, latitude: null, longitude: null })).id;
 });
 
 /** Real repositories and templates; only the clock, mailer, storage and themes are fakes. */

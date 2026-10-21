@@ -32,11 +32,11 @@ async function WebsiteLink({ url }: { url: string | null }) {
   );
 }
 
-async function MapButton({ address }: { address: string }) {
+async function MapButton({ address, at }: { address: string; at?: { latitude: number | null; longitude: number | null } }) {
   const t = await getTranslations("site");
-  if (!address) return null;
+  if (!address && typeof at?.latitude !== "number") return null;
   return (
-    <a href={mapLink(address)} className="site-button" target="_blank" rel="noopener noreferrer">
+    <a href={mapLink(address, at)} className="site-button" target="_blank" rel="noopener noreferrer">
       <MapPinned className="size-4" aria-hidden />
       {t("showMap")}
     </a>
@@ -77,7 +77,7 @@ async function Events({ events, website }: { events: WeddingEvent[]; website: We
             {e.description && <p className="whitespace-pre-line">{e.description}</p>}
             <Img imageKey={e.imageKey} className="max-h-72 w-full rounded-xl object-cover" />
             <div className="flex flex-wrap gap-2 pt-1">
-              <MapButton address={[e.venueName, e.address].filter(Boolean).join(", ")} />
+              <MapButton address={[e.venueName, e.address].filter(Boolean).join(", ")} at={e} />
               <a href={`/${website.slug}/kalender/${id}`} className="site-button" download>
                 <CalendarPlus className="size-4" aria-hidden />
                 {t("addToCalendar")}

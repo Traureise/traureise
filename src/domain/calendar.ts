@@ -86,6 +86,10 @@ export function buildAllDayIcs(event: { uid: string; title: string; location?: s
 }
 
 /** Map links go to OpenStreetMap; nothing is loaded until the guest clicks. */
-export function mapLink(address: string): string {
+export function mapLink(address: string, at?: { latitude: number | null; longitude: number | null }): string {
+  // Events saved before coordinates existed have neither field.
+  if (typeof at?.latitude === "number" && typeof at.longitude === "number") {
+    return `https://www.openstreetmap.org/?mlat=${at.latitude}&mlon=${at.longitude}#map=17/${at.latitude}/${at.longitude}`;
+  }
   return `https://www.openstreetmap.org/search?query=${encodeURIComponent(address)}`;
 }

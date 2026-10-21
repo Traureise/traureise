@@ -57,6 +57,7 @@ nav:
           - Everything belongs to the wedding: adr/0023-everything-belongs-to-the-wedding.md
           - Versions for audiences: adr/0024-versions-for-audiences.md
           - Sections built from typed blocks: adr/0025-sections-built-from-typed-blocks.md
+          - OpenStreetMap location picker after consent: adr/0026-openstreetmap-location-picker-after-consent.md
 
 theme:
   name: material
