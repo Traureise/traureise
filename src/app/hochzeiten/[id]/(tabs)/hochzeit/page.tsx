@@ -23,20 +23,39 @@ export default async function WeddingDetailsPage({ params, searchParams }: Props
   const t = await getTranslations("weddings.details");
   // Only back into this wedding (a card or the website editor), never elsewhere.
   const back = zurueck?.startsWith(`/hochzeiten/${id}/`) && !zurueck.includes("//") ? zurueck : null;
+  const contents = [
+    { id: "wedding-names", label: t("sections.names.title") },
+    { id: "wedding-place", label: t("sections.place.title") },
+    { id: "wedding-address", label: t("sections.address.title") },
+    { id: "wedding-delete", label: t("sections.delete.title") },
+  ];
   return (
     <div className="space-y-8">
-      <header className="space-y-2">
+      <header className="max-w-3xl space-y-2">
         <h1 className="font-heading text-4xl font-medium tracking-tight">{t("title")}</h1>
         <p className="text-muted-foreground">{t("lead")}</p>
       </header>
-      <div className="space-y-8">
-        <div className="rounded-3xl border border-border bg-card px-6 sm:px-10" data-testid="wedding-details">
-          <WeddingDetailsForm wedding={wedding} appUrl={container().appUrl} timeZones={timeZoneOptions()} back={back} />
-        </div>
-        <div className="rounded-3xl border border-border bg-card px-6 sm:px-10">
-          <SettingsSection id="wedding-delete" icon={<Trash2 />} tone="danger" title={t("sections.delete.title")} description={t("sections.delete.lead")}>
-            <DeleteWeddingButton weddingId={wedding.id} title={wedding.title} />
-          </SettingsSection>
+      <div className="grid items-start gap-10 lg:grid-cols-[11rem_minmax(0,1fr)]">
+        <nav aria-label={t("contents")} className="sticky top-6 hidden lg:block">
+          <ul className="space-y-1 border-l border-border text-sm">
+            {contents.map((c) => (
+              <li key={c.id}>
+                <a href={`#${c.id}`} className="-ml-px block border-l-2 border-transparent py-1.5 pl-4 text-muted-foreground hover:border-primary hover:text-foreground">
+                  {c.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <div className="space-y-8">
+          <div className="rounded-3xl border border-border bg-card px-6 sm:px-10" data-testid="wedding-details">
+            <WeddingDetailsForm wedding={wedding} appUrl={container().appUrl} timeZones={timeZoneOptions()} back={back} />
+          </div>
+          <div className="rounded-3xl border border-border bg-card px-6 sm:px-10">
+            <SettingsSection id="wedding-delete" icon={<Trash2 />} tone="danger" title={t("sections.delete.title")} description={t("sections.delete.lead")}>
+              <DeleteWeddingButton weddingId={wedding.id} title={wedding.title} />
+            </SettingsSection>
+          </div>
         </div>
       </div>
     </div>

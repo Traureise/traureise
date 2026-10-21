@@ -1027,6 +1027,7 @@
           "lead": "Löscht die Hochzeit mit allen Karten, Website-Versionen, der Gästeliste und Bildern. Das lässt sich nicht rückgängig machen."
         }
       },
+      "contents": "Inhalt",
       "submit": "Speichern",
       "saving": "Wird gespeichert …",
       "saved": "Gespeichert"
