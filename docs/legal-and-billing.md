@@ -18,8 +18,8 @@ services:
 
 - Each is optional; unset, there is no link. Only `http(s)` links are accepted.
 - Each one that is set is linked from the app footer ("Impressum", "Datenschutz", "AGB") and from a discreet
-  footer on every wedding website and guest page. With billing on, `/preise` names the terms and the privacy
-  policy above the buy buttons' fine print.
+  footer on every wedding website and guest page. With billing on, `/preise` also names the terms and the
+  privacy policy below the prices.
 - The app logs a warning at startup when `IMPRINT_URL` or `PRIVACY_URL` is missing.
 - An instance only you use, on your own network, needs none of them.
 - Keep the texts in version control: for a privacy policy it matters what it said on which day.
