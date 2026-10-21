@@ -16,6 +16,12 @@ test("the app footer links the operator's legal pages; Traureise shows none itse
   const footer = page.getByTestId("app-footer");
   for (const [name, href] of Object.entries(LINKS)) await expect(footer.getByRole("link", { name })).toHaveAttribute("href", href);
   await expect(footer.getByRole("link", { name: "Preise" })).toHaveAttribute("href", "/preise");
+
+  // Where people buy, the terms are named too.
+  await page.goto("/preise");
+  const terms = page.getByTestId("pricing-terms");
+  await expect(terms.getByRole("link", { name: "AGB" })).toHaveAttribute("href", LINKS.AGB);
+  await expect(terms.getByRole("link", { name: "Datenschutzerklärung" })).toHaveAttribute("href", LINKS.Datenschutz);
 });
 
 test("every public wedding website links the legal pages in a discreet footer", async ({ page }) => {

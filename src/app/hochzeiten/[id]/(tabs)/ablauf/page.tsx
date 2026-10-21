@@ -31,7 +31,7 @@ export default async function SchedulePage({ params }: Props) {
   const { wedding, events } = await load((await params).id);
   const t = await getTranslations("schedule");
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-6">
       <header className="space-y-2">
         <h1 className="font-heading text-4xl font-medium tracking-tight">{t("title")}</h1>
         <p className="text-muted-foreground">{t("lead")}</p>

@@ -42,7 +42,7 @@ export default async function WeddingHomePage({ params, searchParams }: Props) {
   const date = wedding.weddingDate ? format.dateTime(dateFromIso(wedding.weddingDate), { dateStyle: "long", timeZone: "UTC" }) : null;
   const badge = [home.countdown !== null && home.countdown >= 0 ? t("countdown", { days: home.countdown }) : null, date ?? t("dateOpen"), wedding.location].filter(Boolean).join(" · ");
   return (
-    <div className="max-w-3xl space-y-8">
+    <div className="space-y-8">
       {kauf === "danke" && (
         <p role="status" className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm" data-testid="purchase-thanks">
           {t("purchaseThanks")}
