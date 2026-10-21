@@ -3,6 +3,7 @@ import type { GuestRepository, HouseholdData, NewPoll, PollRecord } from "@/appl
 import type { AssignableItem, Assignment } from "@/domain/weddings";
 import {
   DEFAULT_RSVP_SETTINGS,
+  type AnswerSource,
   type Guest,
   type GuestRequest,
   type Household,
@@ -98,6 +99,7 @@ export class DrizzleGuestRepository implements GuestRepository {
       message: r.message,
       pollAnswers: r.pollAnswers,
       respondedAt: r.respondedAt,
+      answeredBy: r.answeredBy ?? null,
       createdAt: r.createdAt,
       email: r.email,
       personalLine: r.personalLine,
@@ -168,12 +170,12 @@ export class DrizzleGuestRepository implements GuestRepository {
     await this.db.delete(households).where(and(eq(households.id, householdId), eq(households.weddingId, weddingId)));
   }
 
-  async saveResponse(householdId: string, response: HouseholdResponse, at: Date): Promise<void> {
+  async saveResponse(householdId: string, response: HouseholdResponse, at: Date, by: AnswerSource): Promise<void> {
     await this.db.transaction(async (tx) => {
       for (const { guestId, ...answer } of response.people) {
         await tx.update(guests).set(answer).where(and(eq(guests.id, guestId), eq(guests.householdId, householdId)));
       }
-      await tx.update(households).set({ pollAnswers: response.pollAnswers, message: response.message, respondedAt: at }).where(eq(households.id, householdId));
+      await tx.update(households).set({ pollAnswers: response.pollAnswers, message: response.message, respondedAt: at, answeredBy: by }).where(eq(households.id, householdId));
       if (response.requests.length > 0) {
         await tx.insert(guestRequests).values(response.requests.map((name) => ({ householdId, name, createdAt: at })));
       }

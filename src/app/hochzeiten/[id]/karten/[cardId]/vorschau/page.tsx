@@ -51,7 +51,7 @@ export default async function CardPreviewPage({ params }: Props) {
         <CardList cards={view.cards} formAnchor={view.form ? "antwort" : null} />
         {view.form && (
           <div id="antwort">
-            <GuestForm form={view.form} token={null} belowCards={view.cards.length > 0} />
+            <GuestForm form={view.form} save={null} belowCards={view.cards.length > 0} />
           </div>
         )}
       </Letter>

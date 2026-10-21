@@ -1,0 +1,1 @@
+ALTER TABLE "households" ADD COLUMN "answered_by" text;

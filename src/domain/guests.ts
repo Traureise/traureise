@@ -43,6 +43,8 @@ export type Guest = {
   fromRequest: boolean;
 };
 export type GuestRequest = { id: string; name: string; status: RequestStatus; createdAt: Date; decidedAt: Date | null };
+/** Who entered a household's answer. */
+export type AnswerSource = "guest" | "couple";
 export type Household = {
   id: string;
   name: string;
@@ -52,6 +54,8 @@ export type Household = {
   pollAnswers: PollAnswers;
   /** When the household last answered; null while open. */
   respondedAt: Date | null;
+  /** Who entered that answer: the household through its link, or the couple for it (grandparents without a phone). */
+  answeredBy: AnswerSource | null;
   createdAt: Date;
   /** Optional: cards and reminders by email (v4). */
   email: string | null;

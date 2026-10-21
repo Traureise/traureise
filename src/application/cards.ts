@@ -312,6 +312,7 @@ export class GetCardPreview {
       message: "",
       pollAnswers: {},
       respondedAt: null,
+      answeredBy: null,
       createdAt: ctx.now,
       email: null,
       personalLine: "",

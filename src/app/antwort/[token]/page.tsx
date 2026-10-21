@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { cache } from "react";
+import { submitGuestResponseAction } from "@/app/actions/guests";
 import { CardList } from "@/components/cards/household-letters";
 import { Letter } from "@/components/cards/letter";
 import { GuestForm } from "@/components/guests/guest-form";
@@ -38,7 +39,7 @@ export default async function HouseholdPage({ params }: Props) {
       </GuestSite>
     );
   }
-  const form = view.form && <GuestForm form={view.form} token={token} belowCards={view.cards.length > 0} />;
+  const form = view.form && <GuestForm form={view.form} save={submitGuestResponseAction.bind(null, token)} belowCards={view.cards.length > 0} />;
   if (view.cards.length === 0) return <GuestSite design={view.design}>{form}</GuestSite>;
   return (
     <GuestSite design={view.design}>

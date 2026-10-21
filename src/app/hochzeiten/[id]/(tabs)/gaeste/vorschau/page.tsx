@@ -22,7 +22,7 @@ export default async function GuestFormPreviewPage({ params }: Props) {
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">{t("lead")}</p>
       <div className="site overflow-hidden rounded-2xl border border-border" style={siteStyle(form.design)} data-testid="guest-form-preview">
-        <GuestForm form={form} token={null} />
+        <GuestForm form={form} save={null} />
       </div>
     </div>
   );

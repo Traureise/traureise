@@ -337,3 +337,45 @@ test("a household is added from the name field, edited and deleted from its menu
   await expect(page.getByTestId("household")).toHaveCount(0);
   await expect(page.getByTestId("guests-empty")).toBeVisible();
 });
+
+test("the couple enters a household's answer for it, and the household sees and can change it", async ({ page, browser, baseURL }) => {
+  await login(page, uniqueEmail("omas"), "Rosa");
+  const editorUrl = await createWebsite(page, `rosa-und-tim-${Date.now()}`);
+  await addEvent(page, editorUrl, "Feier", "2027-06-12", "18:00");
+  await page.goto(guestsUrl(editorUrl));
+  await addHousehold(page, "Oma und Opa", [{ name: "Erna" }, { name: "Karl" }]);
+
+  await test.step("from the household's menu, in the form the household would see", async () => {
+    await household(page, "Oma und Opa").getByRole("button", { name: "Weitere Aktionen für Oma und Opa" }).click();
+    await page.getByRole("menuitem", { name: "Antwort eintragen" }).click();
+    await expect(page.getByRole("heading", { name: "Antwort für Oma und Opa eintragen" })).toBeVisible();
+    const form = page.getByTestId("couple-answer");
+    await expect(form.getByTestId("couple-note")).toBeVisible();
+    // Asking to bring someone is the guests' way; the couple adds people on the list instead.
+    await expect(form.getByLabel("Name der Begleitung 1")).toHaveCount(0);
+    await expect(form.getByLabel("Nachricht an Anna & Ben")).toHaveCount(0);
+    await person(form, "Erna").getByLabel("Ich komme").check();
+    await person(form, "Erna").getByLabel("Allergien und Unverträglichkeiten").fill("Laktose");
+    await person(form, "Karl").getByLabel("Ich kann leider nicht").check();
+    await form.getByRole("button", { name: "Antwort speichern" }).click();
+    await expect(form.getByTestId("guest-form-saved")).toHaveText("Antwort für Oma und Opa gespeichert.");
+  });
+
+  await test.step("the list counts it and says the couple entered it", async () => {
+    await page.getByRole("link", { name: "Zur Gästeliste" }).click();
+    await expect(household(page, "Oma und Opa").getByTestId("household-status")).toHaveText("Geantwortet · von euch eingetragen");
+  });
+
+  await test.step("the household's own link shows what was entered and takes its change", async () => {
+    const link = await guestLink(page, "Oma und Opa");
+    await asGuest(browser, baseURL!, link, async (guest) => {
+      await expect(guest.getByTestId("answered-note")).toContainText("haben eure Antwort schon für euch eingetragen");
+      await expect(person(guest, "Erna").getByLabel("Allergien und Unverträglichkeiten")).toHaveValue("Laktose");
+      await person(guest, "Karl").getByLabel("Ich komme").check();
+      await guest.getByRole("button", { name: "Antwort ändern" }).click();
+      await expect(guest.getByTestId("guest-form-saved")).toBeVisible();
+    });
+    await page.reload();
+    await expect(household(page, "Oma und Opa").getByTestId("household-status")).toHaveText("Geantwortet");
+  });
+});
