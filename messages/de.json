@@ -279,7 +279,7 @@
       "results": "Gefundene Orte",
       "noResults": "Nichts gefunden. Versucht es mit Name und Stadt.",
       "failed": "Die Suche hat gerade nicht geklappt. Versucht es gleich noch einmal.",
-      "hint": "Klickt in die Karte, um den Punkt zu setzen oder zu verschieben.",
+      "hint": "Klickt auf einen Ort in der Karte, etwa ein Gebäude: Er wird mit Name und Adresse übernommen.",
       "clear": "Punkt entfernen",
       "attribution": "© OpenStreetMap-Mitwirkende"
     },

@@ -16,6 +16,7 @@ type Result = { place_id: number; lat: string; lon: string; name: string; displa
 /** Remembers in this browser that the couple wants the map loaded without asking (no cookie, nothing sent). */
 const CONSENT_KEY = "traureise:osm-map";
 const SEARCH_URL = "https://nominatim.openstreetmap.org/search";
+const REVERSE_URL = "https://nominatim.openstreetmap.org/reverse";
 const TILES_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 /** Nominatim's usage policy: at most one request per second, no search-as-you-type. */
 const MIN_SEARCH_INTERVAL_MS = 1000;
@@ -58,8 +59,36 @@ export function LocationPicker({
   const map = useRef<LeafletMap | null>(null);
   const marker = useRef<CircleMarker | null>(null);
   const onPickRef = useRef(onPick);
+  const nameAtRef = useRef<(latitude: number, longitude: number) => Promise<void>>(async () => {});
+  const lookup = useRef(0);
   useEffect(() => {
     onPickRef.current = onPick;
+  });
+
+  /**
+   * A click on the map, say on "Rathaus Kempten": what is there (Nominatim's reverse search) fills name and address
+   * like a search result. Within the one-request-a-second limit, only the last click is looked up.
+   */
+  async function nameAt(latitude: number, longitude: number) {
+    const id = ++lookup.current;
+    const wait = lastSearch.current + MIN_SEARCH_INTERVAL_MS - Date.now();
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    if (id !== lookup.current) return;
+    lastSearch.current = Date.now();
+    try {
+      const params = new URLSearchParams({ lat: String(latitude), lon: String(longitude), format: "jsonv2", addressdetails: "1", zoom: "18", "accept-language": "de" });
+      const response = await fetch(`${REVERSE_URL}?${params}`, { headers: { Accept: "application/json" } });
+      if (!response.ok) return;
+      const r = (await response.json()) as Partial<Result> & { error?: string };
+      if (id !== lookup.current || r.error || !r.display_name) return;
+      // The spot stays where the couple clicked; only the name and address come from the lookup.
+      onPickRef.current({ latitude, longitude, name: r.name || undefined, address: addressOf(r as Result) });
+    } catch {
+      // Offline or refused: the spot is set, the fields stay as they are.
+    }
+  }
+  useEffect(() => {
+    nameAtRef.current = nameAt;
   });
 
   function consent(always: boolean) {
@@ -86,7 +115,10 @@ export function LocationPicker({
       if (value) dot.addTo(m);
       m.on("click", (e) => {
         dot.setLatLng(e.latlng).addTo(m);
-        onPickRef.current({ latitude: round(e.latlng.lat), longitude: round(e.latlng.lng) });
+        const latitude = round(e.latlng.lat);
+        const longitude = round(e.latlng.lng);
+        onPickRef.current({ latitude, longitude });
+        void nameAtRef.current(latitude, longitude);
       });
       map.current = m;
       marker.current = dot;

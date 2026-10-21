@@ -93,4 +93,17 @@ test("a couple finds the venue on an OpenStreetMap map, after agreeing to load i
     await page.getByTestId("tab-preparation").click();
     await expect(page.getByTestId("wedding-badge")).toContainText("Gut Sonnenhof");
   });
+
+  await test.step("a click on the map takes the place there, with its name", async () => {
+    await page.route(`https://${NOMINATIM}/reverse**`, (route) =>
+      route.fulfill({ json: { place_id: 2, lat: "47.72674", lon: "10.31389", name: "Rathaus Kempten", display_name: "Rathaus Kempten, Rathausplatz 29, 87435 Kempten", address: { road: "Rathausplatz", house_number: "29", postcode: "87435", city: "Kempten" } } }),
+    );
+    await page.goto(scheduleUrl(weddingId));
+    await page.getByRole("button", { name: "Termin hinzufügen" }).click();
+    const form = page.getByRole("form", { name: "Neuer Termin" });
+    await form.getByTestId("location-map").click();
+    await expect(form.getByLabel("Veranstaltungsort")).toHaveValue("Rathaus Kempten");
+    await expect(form.getByLabel("Adresse")).toHaveValue("Rathausplatz 29, 87435 Kempten");
+    expect(osm.some((u) => u.includes("/reverse?") && u.includes("zoom=18"))).toBe(true);
+  });
 });
