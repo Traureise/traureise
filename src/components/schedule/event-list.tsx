@@ -79,7 +79,7 @@ export function EventList({ weddingId, events, near }: { weddingId: string; even
                         </p>
                       )}
                     </div>
-                    <div className="col-span-2 flex gap-2 sm:col-span-1">
+                    <div className="col-span-2 flex justify-end gap-2 sm:col-span-1">
                       <Button size="sm" variant="outline" className="border-primary/40 text-primary" aria-label={`${t("edit")}: ${event.data.name}`} onClick={() => setEditing(event.id)}>
                         <PencilLine aria-hidden />
                         {t("edit")}
