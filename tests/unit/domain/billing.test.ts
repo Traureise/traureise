@@ -53,10 +53,14 @@ describe("canUse", () => {
     expect(canUse("rsvp", { billingEnabled: true, entitlements: [] }, now)).toBe(false);
   });
 
-  it("gates v4: Save the Dates, invitations, email sending and reminders need Einladungen; cards need Komplett", () => {
+  it("gates v4: Save the Dates need RSVP; invitations, email sending and reminders Einladungen; cards Komplett", () => {
     const rsvp = { billingEnabled: true, entitlements: [entitlement({ tier: "rsvp" })] };
     const invitations = { billingEnabled: true, entitlements: [entitlement({ tier: "invitations" })] };
-    for (const feature of ["saveTheDates", "invitations", "emailSending", "emailReminders"] as const) {
+    for (const feature of ["saveTheDates", "saveTheDateVersions"] as const) {
+      expect(canUse(feature, { billingEnabled: true, entitlements: [] }, now)).toBe(false);
+      expect(canUse(feature, rsvp, now)).toBe(true);
+    }
+    for (const feature of ["invitations", "emailSending", "emailReminders"] as const) {
       expect(canUse(feature, rsvp, now)).toBe(false);
       expect(canUse(feature, invitations, now)).toBe(true);
     }

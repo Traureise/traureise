@@ -65,7 +65,7 @@ prices, plans or locks appear anywhere.
 
 A purchase attaches to one wedding and lasts until 12 months after the wedding date (or after the
 purchase if no date is set). Refunds and chargebacks revoke it. The RSVP tier unlocks sending guest links
-([Guests and RSVP](guests.md)); Einladungen unlocks Save the Dates, invitations, email sending and
+([Guests and RSVP](guests.md)) and Save the Dates; Einladungen unlocks invitations, email sending and
 reminders, and Komplett the thank-you card and the engagement announcement ([cards](cards.md)). A tier
 without a product id is shown as "bald verfügbar" and cannot be bought.
 
