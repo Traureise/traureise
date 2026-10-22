@@ -1,5 +1,7 @@
 import { z } from "zod";
 import {
+  IMPORT_CELL_MAX,
+  IMPORT_IGNORED_COLUMNS_MAX,
   IMPORT_MAX_BYTES,
   IMPORT_MAX_ROWS,
   planImport,
@@ -17,7 +19,8 @@ import { loadOwnedWedding } from "./owned";
 
 export type ImportReview = { rows: ImportRow[]; ignoredColumns: string[]; plan: ImportPlan };
 
-const text = z.string().max(2000);
+/** readImportTable cuts cells to this length, so every row it returns passes. */
+const text = z.string().max(IMPORT_CELL_MAX);
 const rowsSchema = z
   .array(
     z.object({
@@ -38,7 +41,7 @@ const decisionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("overwrite"), guestId: text }),
 ]);
 const decisionsSchema = z.record(z.string().regex(/^[1-9][0-9]{0,8}$/), decisionSchema);
-const ignoredSchema = z.array(text).max(200);
+const ignoredSchema = z.array(text).max(IMPORT_IGNORED_COLUMNS_MAX);
 
 function parseReview(input: { rows: unknown; decisions: unknown; ignoredColumns?: unknown }) {
   const rows = rowsSchema.safeParse(input.rows);
@@ -74,7 +77,7 @@ export class DownloadGuestTemplate {
 export class PreviewGuestImport {
   constructor(private deps: Deps) {}
 
-  async execute(userId: string, weddingId: string, file: { bytes: Uint8Array; size: number }, headers: ImportHeaders): Promise<ImportReview> {
+  async execute(userId: string, weddingId: string, file: { bytes: Uint8Array }, headers: ImportHeaders): Promise<ImportReview> {
     const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
     if (file.bytes.byteLength === 0) throw new ValidationError({ file: "empty" });
     if (file.bytes.byteLength > IMPORT_MAX_BYTES) throw new ValidationError({ file: "too_large" });

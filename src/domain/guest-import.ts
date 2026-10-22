@@ -6,6 +6,10 @@ import { ALLERGIES_MAX, NAME_MAX, PERSONAL_LINE_MAX, type Household, type RsvpEv
 export const IMPORT_MAX_BYTES = 1_000_000;
 export const IMPORT_MAX_ROWS = 1000;
 export const HOUSEHOLD_MAX_PEOPLE = 30;
+/** Longer cells are cut: still longer than any field allows, so the row shows "too long" and can be skipped. */
+export const IMPORT_CELL_MAX = 2000;
+/** At most this many ignored column names are reported. */
+export const IMPORT_IGNORED_COLUMNS_MAX = 200;
 
 /** Header labels in the couple's language; the template uses them and the reader matches them. */
 export type ImportHeaders = { name: string; household: string; child: string; email: string; allergies: string; personalLine: string };
@@ -17,12 +21,17 @@ export type RowProblem = {
   field: keyof Omit<ImportRow, "line" | "events"> | "events" | "household";
   code: "required" | "too_long" | "invalid_email" | "invalid_yes_no" | "household_full";
 };
-export type DuplicateMatch = { kind: "existing"; guestId: string; householdName: string; name: string; email: string | null } | { kind: "row"; line: number };
+export type DuplicateMatch =
+  /** `claimedBy`: the line of another row that already overwrites this person. */
+  | { kind: "existing"; guestId: string; householdName: string; name: string; email: string | null; claimedBy?: number }
+  | { kind: "row"; line: number };
 export type Duplicate = { line: number; by: "name" | "email"; matches: DuplicateMatch[] };
 export type ImportWarning =
   | { code: "ignored_columns"; columns: string[] }
   | { code: "conflicting_values"; household: string; field: "personalLine" | "events" }
-  | { code: "ambiguous_household"; household: string };
+  | { code: "ambiguous_household"; household: string }
+  /** The household asked for no more emails, so the file's addresses for it are left out. */
+  | { code: "unsubscribed_household"; household: string };
 export type PlannedPerson = { name: string; isChild: boolean; email: string | null; allergies: string };
 export type ImportPlan = {
   problems: RowProblem[];
@@ -33,6 +42,8 @@ export type ImportPlan = {
   /** Overwrites keep the person's household and answers; empty cells keep the old value. */
   overwrite: { guestId: string; name: string; isChild: boolean; email: string | null; allergies: string }[];
   warnings: ImportWarning[];
+  /** Duplicate lines still waiting for a (valid) decision. */
+  undecided: number[];
   /** True when every problem row is skipped and every duplicate decided. */
   ready: boolean;
 };
@@ -49,6 +60,8 @@ function yesNo(value: string): boolean | null {
   if (NO.has(k)) return false;
   return null;
 }
+
+const cut = (s: string) => (s.length > IMPORT_CELL_MAX ? s.slice(0, IMPORT_CELL_MAX) : s);
 
 type Column = "name" | "household" | "child" | "email" | "allergies" | "personalLine";
 const COLUMNS: Column[] = ["name", "household", "child", "email", "allergies", "personalLine"];
@@ -71,7 +84,7 @@ export function readImportTable(
     if (field) return void fields.set(index, field);
     const event = events.find((e) => key(e.name) === k && ![...eventColumns.values()].includes(e.id));
     if (event) return void eventColumns.set(index, event.id);
-    ignoredColumns.push(cell.trim());
+    if (ignoredColumns.length < IMPORT_IGNORED_COLUMNS_MAX) ignoredColumns.push(cut(cell.trim()));
   });
   if (![...fields.values()].includes("name")) return { ok: false, error: "no_name_column" };
 
@@ -79,8 +92,8 @@ export function readImportTable(
   body.forEach((cells, index) => {
     if (cells.every((c) => c.trim() === "")) return;
     const row: ImportRow = { line: index + 2, name: "", household: "", child: "", email: "", allergies: "", personalLine: "", events: {} };
-    for (const [column, field] of fields) row[field] = (cells[column] ?? "").trim();
-    for (const [column, eventId] of eventColumns) row.events[eventId] = (cells[column] ?? "").trim();
+    for (const [column, field] of fields) row[field] = cut((cells[column] ?? "").trim());
+    for (const [column, eventId] of eventColumns) row.events[eventId] = cut((cells[column] ?? "").trim());
     rows.push(row);
   });
   if (rows.length === 0) return { ok: false, error: "empty" };
@@ -175,8 +188,9 @@ export function planImport(input: {
 
   const toAdd: Candidate[] = [];
   const toOverwrite: { candidate: Candidate; guestId: string }[] = [];
-  const claimed = new Set<string>();
-  let undecided = false;
+  const claimed = new Map<string, number>();
+  const undecided: number[] = [];
+  const existingMatches: { line: number; matches: Extract<DuplicateMatch, { kind: "existing" }>[] }[] = [];
   candidates.forEach((c, order) => {
     const name = key(c.row.name);
     const sameName = byName.get(name) ?? [];
@@ -190,21 +204,27 @@ export function planImport(input: {
     if (c.email !== "") push(rowsByEmail, c.email, { order, candidate: c });
 
     if (known.length === 0 && earlier.length === 0) return void toAdd.push(c);
-    const matches: DuplicateMatch[] = [
-      ...known.map((k): DuplicateMatch => ({ kind: "existing", guestId: k.guest.id, householdName: k.household.name, name: k.guest.name, email: k.guest.email })),
-      ...earlier.map((e): DuplicateMatch => ({ kind: "row", line: e.candidate.row.line })),
-    ];
+    const mine = known.map((k) => ({ kind: "existing" as const, guestId: k.guest.id, householdName: k.household.name, name: k.guest.name, email: k.guest.email }));
+    existingMatches.push({ line: c.row.line, matches: mine });
+    const matches: DuplicateMatch[] = [...mine, ...earlier.map((e): DuplicateMatch => ({ kind: "row", line: e.candidate.row.line }))];
     const matchedByName = sameName.length > 0 || earlierName.length > 0;
     duplicates.push({ line: c.row.line, by: matchedByName ? "name" : "email", matches });
     const decision = decisions[c.row.line];
     if (decision?.action === "add") return void toAdd.push(c);
     // A person can be overwritten by one row only; a second claim counts as undecided.
     if (decision?.action === "overwrite" && !claimed.has(decision.guestId) && known.some((k) => k.guest.id === decision.guestId)) {
-      claimed.add(decision.guestId);
+      claimed.set(decision.guestId, c.row.line);
       return void toOverwrite.push({ candidate: c, guestId: decision.guestId });
     }
-    undecided = true;
+    undecided.push(c.row.line);
   });
+  // Every other row sees who already overwrites a person, wherever that row is in the file.
+  for (const { line, matches } of existingMatches) {
+    for (const m of matches) {
+      const by = claimed.get(m.guestId);
+      if (by !== undefined && by !== line) Object.assign(m, { claimedBy: by });
+    }
+  }
 
   // 5: the household cap, counting the people already in a household being joined.
   const added = new Map<string, number>();
@@ -235,7 +255,9 @@ export function planImport(input: {
   for (const group of groups.values()) {
     const first = group[0]!;
     if (first.target.kind === "existing") {
-      join.push({ householdId: first.target.household.id, householdName: first.target.household.name, people: group.map((c) => person(c.row)) });
+      const target = first.target.household;
+      const people = group.map((c) => person(c.row));
+      join.push({ householdId: target.id, householdName: target.name, people: target.unsubscribedAt ? people.map((p) => withoutEmail(p, target)) : people });
       continue;
     }
     const name = first.row.household.trim() || first.row.name.trim();
@@ -258,17 +280,52 @@ export function planImport(input: {
   }
 
   const overwrite: ImportPlan["overwrite"] = toOverwrite.map(({ candidate, guestId }) => {
-    const old = guests.find((g) => g.guest.id === guestId)!.guest;
-    const p = person(candidate.row);
+    const { guest: old, household } = guests.find((g) => g.guest.id === guestId)!;
+    const fromFile = person(candidate.row);
+    const p = household.unsubscribedAt && fromFile.email !== old.email ? withoutEmail(fromFile, household) : fromFile;
     return {
       guestId,
-      name: p.name,
+      // A difference only in case or spaces keeps the name as the couple wrote it before.
+      name: key(old.name) === key(p.name) ? old.name : p.name,
       isChild: candidate.row.child.trim() === "" ? old.isChild : p.isChild,
       email: p.email ?? old.email,
       allergies: p.allergies || old.allergies,
     };
   });
 
-  return { problems, duplicates, create, join, overwrite, warnings, ready: !openProblems && !undecided && (create.length > 0 || join.length > 0 || overwrite.length > 0) };
+  return {
+    problems,
+    duplicates,
+    create,
+    join,
+    overwrite,
+    warnings,
+    undecided,
+    ready: !openProblems && undecided.length === 0 && (create.length > 0 || join.length > 0 || overwrite.length > 0),
+  };
+
+  /** A household that unsubscribed gets no address from a file; the couple can add one in the household dialog. */
+  function withoutEmail(p: PlannedPerson, household: Household): PlannedPerson {
+    if (p.email === null) return p;
+    if (!warnings.some((w) => w.code === "unsubscribed_household" && w.household === household.name)) warnings.push({ code: "unsubscribed_household", household: household.name });
+    return { ...p, email: null };
+  }
+}
+
+/**
+ * Drops decisions a new plan no longer offers: overwriting a person the row no longer matches,
+ * and "add" or "overwrite" for a row that is no longer a duplicate. Skips stay. Planning ignores
+ * these decisions anyway, so the plan stays the same; without them the import is not refused.
+ */
+export function pruneDecisions(decisions: Readonly<Record<number, ImportDecision>>, plan: ImportPlan): Record<number, ImportDecision> {
+  const duplicates = new Map(plan.duplicates.map((d) => [d.line, d]));
+  const out: Record<number, ImportDecision> = {};
+  for (const [line, decision] of Object.entries(decisions)) {
+    const dup = duplicates.get(Number(line));
+    if (decision.action === "skip") out[Number(line)] = decision;
+    else if (!dup) continue;
+    else if (decision.action === "add" || dup.matches.some((m) => m.kind === "existing" && m.guestId === decision.guestId)) out[Number(line)] = decision;
+  }
+  return out;
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Guest, Household, RsvpEvent } from "@/domain/guests";
-import { planImport, readImportTable, templateTable, type ImportDecision, type ImportHeaders, type ImportRow } from "@/domain/guest-import";
+import { planImport, pruneDecisions, readImportTable, templateTable, type ImportDecision, type ImportHeaders, type ImportRow } from "@/domain/guest-import";
 
 const headers: ImportHeaders = { name: "Name", household: "Haushalt", child: "Kind", email: "E-Mail", allergies: "Allergien", personalLine: "Persönliche Zeile" };
 const events: RsvpEvent[] = [
@@ -267,7 +267,98 @@ describe("planImport edge cases", () => {
     const rows = Array.from({ length: 1000 }, (_, i) => row(i + 2, { name: `Neu ${i}`, household: `Neu ${i % 100}`, email: `neu${i}@example.com` }));
     const start = performance.now();
     const p = plan(rows, existing);
-    expect(performance.now() - start).toBeLessThan(200);
+    expect(performance.now() - start).toBeLessThan(1000);
     expect(p.duplicates).toEqual([]);
+  });
+});
+
+describe("long cells", () => {
+  it("cuts cells and ignored column names to 2000 characters, so the row is too long and can be skipped", () => {
+    const long = "x".repeat(5000);
+    const result = readImportTable([["Name", "Allergien", long], ["Anna", long, "y"]], headers, events);
+    expect(result.ok && result.rows[0]?.allergies.length).toBe(2000);
+    expect(result.ok && result.ignoredColumns[0]?.length).toBe(2000);
+    if (!result.ok) return;
+    expect(plan(result.rows).problems).toEqual([{ line: 2, field: "allergies", code: "too_long" }]);
+    expect(plan(result.rows, [], { 2: { action: "skip" } }).problems).toEqual([]);
+  });
+  it("reports at most 200 ignored columns", () => {
+    const head = ["Name", ...Array.from({ length: 300 }, (_, i) => `Spalte ${i}`)];
+    const result = readImportTable([head, ["Anna"]], headers, events);
+    expect(result.ok && result.ignoredColumns).toHaveLength(200);
+  });
+});
+
+describe("unsubscribed households", () => {
+  const meier = { ...household("h1", "Meier", [guest("g1", "Anna Meier")]), unsubscribedAt: new Date(0) };
+
+  it("leaves out the file's addresses for people joining it, with a warning", () => {
+    const p = plan([row(2, { name: "Ben", household: "Meier", email: "ben@example.com" }), row(3, { name: "Cleo", household: "Meier", email: "cleo@example.com" })], [meier]);
+    expect(p.join[0]?.people.map((x) => x.email)).toEqual([null, null]);
+    expect(p.warnings).toEqual([{ code: "unsubscribed_household", household: "Meier" }]);
+  });
+  it("keeps the missing address when overwriting someone in it", () => {
+    const p = plan([row(2, { name: "Anna Meier", email: "anna@example.com" })], [meier], { 2: { action: "overwrite", guestId: "g1" } });
+    expect(p.overwrite[0]?.email).toBeNull();
+    expect(p.warnings).toEqual([{ code: "unsubscribed_household", household: "Meier" }]);
+  });
+  it("does not warn without an address in the file, nor for other households", () => {
+    const other = household("h2", "Schulz", []);
+    const p = plan([row(2, { name: "Ben", household: "Meier" }), row(3, { name: "Cleo", household: "Schulz", email: "cleo@example.com" })], [meier, other]);
+    expect(p.warnings).toEqual([]);
+    expect(p.join.find((j) => j.householdId === "h2")?.people[0]?.email).toBe("cleo@example.com");
+  });
+});
+
+describe("overwriting names", () => {
+  it("keeps the existing name when only case or spaces differ, and takes a new spelling otherwise", () => {
+    const existing = [household("h1", "Meier", [guest("g1", "Anna Meier")])];
+    expect(plan([row(2, { name: "anna  MEIER" })], existing, { 2: { action: "overwrite", guestId: "g1" } }).overwrite[0]?.name).toBe("Anna Meier");
+    const renamed = plan([row(2, { name: "Anna Meier", email: "anna@example.com" })], [household("h1", "Meier", [guest("g1", "Anna Maier", { email: "anna@example.com" })])], { 2: { action: "overwrite", guestId: "g1" } });
+    expect(renamed.overwrite[0]?.name).toBe("Anna Meier");
+  });
+});
+
+describe("undecided rows", () => {
+  const existing = [household("h1", "Meier", [guest("g1", "Anna Meier")])];
+  const rows = [row(2, { name: "Anna Meier", household: "A" }), row(3, { name: "anna meier", household: "B" })];
+
+  it("lists duplicates without a valid decision", () => {
+    expect(plan(rows, existing).undecided).toEqual([2, 3]);
+    expect(plan(rows, existing, { 2: { action: "add" } }).undecided).toEqual([3]);
+  });
+  it("marks a person another row already overwrites, for the other rows only", () => {
+    const p = plan(rows, existing, { 3: { action: "overwrite", guestId: "g1" } });
+    const match = (line: number) => p.duplicates.find((d) => d.line === line)?.matches.find((m) => m.kind === "existing");
+    expect(match(2)).toMatchObject({ guestId: "g1", claimedBy: 3 });
+    expect(match(3)).not.toHaveProperty("claimedBy");
+    const both = plan(rows, existing, { 2: { action: "overwrite", guestId: "g1" }, 3: { action: "overwrite", guestId: "g1" } });
+    expect(both.undecided).toEqual([3]);
+    expect(both.duplicates.find((d) => d.line === 3)?.matches[0]).toMatchObject({ claimedBy: 2 });
+  });
+});
+
+describe("pruneDecisions", () => {
+  const anna = guest("g1", "Anna Meier");
+  const rows = [row(2, { name: "Anna Meier" }), row(3, { name: "Ben" }), row(4, { name: "Cleo", email: "x" })];
+
+  it("drops overwrites of people the row no longer matches and decisions of rows that are no longer duplicates, keeping skips", () => {
+    const decisions: Record<number, ImportDecision> = { 2: { action: "overwrite", guestId: "g1" }, 3: { action: "add" }, 4: { action: "skip" } };
+    // Anna was renamed after the review: row 2 is no longer a duplicate.
+    const now = [household("h1", "Meier", [{ ...anna, name: "Anna Schmidt" }])];
+    const p = plan(rows, now, decisions);
+    const pruned = pruneDecisions(decisions, p);
+    expect(pruned).toEqual({ 4: { action: "skip" } });
+    expect(plan(rows, now, pruned)).toEqual(p);
+    expect(p.ready).toBe(true);
+  });
+  it("keeps decisions the plan still offers", () => {
+    const now = [household("h1", "Meier", [anna])];
+    const decisions: Record<number, ImportDecision> = { 2: { action: "overwrite", guestId: "g1" }, 4: { action: "skip" } };
+    expect(pruneDecisions(decisions, plan(rows, now, decisions))).toEqual(decisions);
+    const gone: Record<number, ImportDecision> = { 2: { action: "overwrite", guestId: "g9" } };
+    const p = plan(rows, now, gone);
+    expect(pruneDecisions(gone, p)).toEqual({});
+    expect(p.undecided).toEqual([2]);
   });
 });

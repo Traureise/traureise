@@ -15,7 +15,7 @@ let weddingId: string;
 let sheet: FakeSpreadsheets;
 
 const row = (line: number, name: string, extra: Partial<ImportRow> = {}): ImportRow => ({ line, name, household: "", child: "", email: "", allergies: "", personalLine: "", events: {}, ...extra });
-const file = (size = 10) => ({ bytes: new Uint8Array(size), size });
+const file = (size = 10) => ({ bytes: new Uint8Array(size) });
 
 beforeEach(async () => {
   f = createFakes();
@@ -43,7 +43,7 @@ describe("someone else's wedding", () => {
 });
 
 describe("PreviewGuestImport", () => {
-  const preview = (size?: { bytes: Uint8Array; size: number }, userId = anna.id) => new PreviewGuestImport(f.deps).execute(userId, weddingId, size ?? file(), headers);
+  const preview = (size?: { bytes: Uint8Array }, userId = anna.id) => new PreviewGuestImport(f.deps).execute(userId, weddingId, size ?? file(), headers);
   const fileError = async (p: Promise<unknown>) => (await p.then(() => null, (e) => e)) as ValidationError;
 
   it("refuses an empty or too large file without reading it", async () => {
@@ -71,6 +71,20 @@ describe("PreviewGuestImport", () => {
     expect(review.rows).toHaveLength(1);
     expect(review.ignoredColumns).toEqual(["Farbe"]);
     expect(review.plan.create).toHaveLength(1);
+  });
+
+  it("returns rows that planning accepts, however long the cells and however many columns", async () => {
+    const long = "x".repeat(5000);
+    sheet.result = { ok: true, rows: [["Name", ...Array.from({ length: 300 }, (_, i) => `Spalte ${i}`)], ["Clara", long], ["Dora"]] };
+    const review = await preview();
+    expect(review.plan.problems).toEqual([]);
+    sheet.result = { ok: true, rows: [["Name", "Allergien"], ["Clara", long], ["Dora"]] };
+    const longRow = await preview();
+    expect(longRow.plan.problems).toEqual([{ line: 2, field: "allergies", code: "too_long" }]);
+    const planned = await new PlanGuestImport(f.deps).execute(anna.id, weddingId, { rows: longRow.rows, decisions: { 2: { action: "skip" } }, ignoredColumns: review.ignoredColumns });
+    expect(planned.ready).toBe(true);
+    await new ImportGuests(f.deps).execute(anna.id, weddingId, { rows: longRow.rows, decisions: { 2: { action: "skip" } } });
+    expect((await f.deps.guests.listHouseholds(weddingId)).map((h) => h.name)).toEqual(["Dora"]);
   });
 
   it("does not show someone else's wedding", async () => {
