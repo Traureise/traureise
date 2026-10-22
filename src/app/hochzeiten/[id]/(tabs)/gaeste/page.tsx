@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { CalendarClock, ChevronRight, ClipboardPen, Download, Lock, Mail, MessageCircle } from "lucide-react";
+import { CalendarClock, ChevronRight, ClipboardPen, Download, FileSpreadsheet, Lock, Mail, MessageCircle, Upload } from "lucide-react";
 import type { GuestListEntry, GuestPage } from "@/application/guests";
 import { CardShareButtons, HouseholdMenu, MarkAllSentButton, RemindAllButton, SendAllButton } from "@/components/guests/card-sending";
 import { RequestActions } from "@/components/guests/guest-actions";
@@ -284,6 +284,18 @@ export default async function GuestsPage({ params, searchParams }: Props) {
                 <Download aria-hidden />
                 {t("list.csv")}
               </a>
+            </Button>
+            <Button asChild variant="outline">
+              <a href={`${base}/vorlage`} download>
+                <FileSpreadsheet aria-hidden />
+                {t("list.template")}
+              </a>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={`${base}/import`}>
+                <Upload aria-hidden />
+                {t("list.import")}
+              </Link>
             </Button>
           </div>
         </div>

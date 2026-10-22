@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { ValidationError } from "@/application/errors";
 import { container } from "@/composition/container";
+import { importHeaders } from "@/lib/import-headers";
 import { runAction, type ActionResult } from "@/lib/action-result";
 import { clientIp } from "@/lib/client-ip";
 import { requireUser } from "@/lib/session";
@@ -54,4 +56,24 @@ export async function submitGuestResponseAction(token: string, input: unknown): 
   const result = await runAction(() => container().submitGuestResponse.execute({ token, input, ip }));
   if (result.ok) revalidatePath(`/antwort/${token}`);
   return result;
+}
+
+/** Reading the file changes nothing, so no revalidation. */
+export async function previewGuestImportAction(weddingId: string, form: FormData) {
+  const user = await requireUser();
+  const file = form.get("file");
+  const headers = await importHeaders();
+  return runAction(async () => {
+    if (!(file instanceof File)) throw new ValidationError({ file: "empty" });
+    return container().previewGuestImport.execute(user.id, weddingId, { bytes: new Uint8Array(await file.arrayBuffer()), size: file.size }, headers);
+  });
+}
+
+export async function planGuestImportAction(weddingId: string, input: { rows: unknown; decisions: unknown; ignoredColumns: unknown }) {
+  const user = await requireUser();
+  return runAction(() => container().planGuestImport.execute(user.id, weddingId, input));
+}
+
+export async function importGuestsAction(weddingId: string, input: { rows: unknown; decisions: unknown }) {
+  return guests(weddingId, (userId) => container().importGuests.execute(userId, weddingId, input));
 }

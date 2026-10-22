@@ -49,6 +49,28 @@ nothing to WhatsApp or anyone else. **Erinnerung senden** sends a reminder to a 
 answered (an email where there is an address and the Einladungen package, otherwise WhatsApp), and the
 invitation can send reminders automatically ([Reminders](cards.md#reminders)).
 
+## Importing a guest list
+
+Instead of typing every household, **Gästeliste importieren** (on the Gäste page) reads an Excel (`.xlsx`) or
+CSV file of up to 1 MB and 1000 rows. **Vorlage herunterladen** gives a spreadsheet with the columns *Name*,
+*Haushalt*, *Kind*, *E-Mail*, *Allergien* and *Persönliche Zeile*, plus one column per event of the Ablauf
+(*ja* or *nein*: invited or not). Only *Name* is required; one row is one person, and rows with the same
+household name form one household. A row without a household becomes a household of its own. Columns the app
+does not know are ignored and listed as a note.
+
+Nothing is saved before the review is done:
+
+1. **Rows with problems** (no name, an invalid email address, a value that is neither ja nor nein, text that is
+   too long, a household over 30 people) can be fixed in place or skipped.
+2. **Possible duplicates** (the same name, or the same email address in another household, as an existing
+   guest or as an earlier row) need a decision: skip, add anyway, edit, or overwrite the existing person.
+   Overwriting keeps the person's household and answers and takes over only the filled cells.
+3. **Will be imported** lists the new households, the people joining existing households (a household name
+   that matches exactly one existing household), and notes such as conflicting values within a household.
+
+**Importieren** is enabled once every problem is skipped or fixed and every duplicate decided. If the guest
+list changed in the meantime, nothing is written and the review is shown again.
+
 ## For guests
 
 Guests need no account and get no cookies. The link `/antwort/<token>` is personal to the household; it
