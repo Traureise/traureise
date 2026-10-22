@@ -1,4 +1,4 @@
-import { strToU8, unzipSync, zipSync } from "fflate";
+import { deflateSync, strToU8, unzipSync, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { FflateSpreadsheets } from "@/infrastructure/spreadsheets";
 
@@ -104,5 +104,89 @@ describe("XLSX", () => {
     const xml = new TextDecoder().decode(unzipSync(bytes)["xl/worksheets/sheet1.xml"]);
     expect(xml).not.toContain("<f>");
     expect(xml).toContain('t="inlineStr"');
+  });
+
+  it("reads prefixed element names (x:row, x:c)", () => {
+    const bytes = workbook({ sheet: '<x:row r="1"><x:c r="A1" t="inlineStr"><x:is><x:t>p</x:t></x:is></x:c></x:row>' });
+    expect(codec.read(bytes)).toEqual({ ok: true, rows: [["p"]] });
+  });
+});
+
+/** Builds a zip by hand so the headers can lie. */
+function rawZip(entries: { name: string; data: Uint8Array; declared?: number }[]): Uint8Array {
+  const parts: Uint8Array[] = [];
+  const central: Uint8Array[] = [];
+  let offset = 0;
+  const u16 = (n: number) => [n & 255, (n >> 8) & 255];
+  const u32 = (n: number) => [n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255];
+  for (const e of entries) {
+    const comp = deflateSync(e.data);
+    const name = strToU8(e.name);
+    const size = e.declared ?? e.data.length;
+    const local = Uint8Array.from([0x50, 0x4b, 3, 4, ...u16(20), ...u16(0), ...u16(8), ...u16(0), ...u16(0), ...u32(0), ...u32(comp.length), ...u32(size), ...u16(name.length), ...u16(0), ...name]);
+    central.push(Uint8Array.from([0x50, 0x4b, 1, 2, ...u16(20), ...u16(20), ...u16(0), ...u16(8), ...u16(0), ...u16(0), ...u32(0), ...u32(comp.length), ...u32(size), ...u16(name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(offset), ...name]));
+    parts.push(local, comp);
+    offset += local.length + comp.length;
+  }
+  const cdSize = central.reduce((n, c) => n + c.length, 0);
+  const end = Uint8Array.from([0x50, 0x4b, 5, 6, ...u16(0), ...u16(0), ...u16(entries.length), ...u16(entries.length), ...u32(cdSize), ...u32(offset), ...u16(0)]);
+  return Uint8Array.from([...parts, ...central, end].flatMap((p) => [...p]));
+}
+
+describe("XLSX, hostile input", () => {
+  const parts = (sheet: string) => ({
+    wb: strToU8(`<workbook ${NS} xmlns:r="x"><sheets><sheet name="a" r:id="rId1"/></sheets></workbook>`),
+    rels: strToU8('<Relationships><Relationship Id="rId1" Target="worksheets/s.xml"/></Relationships>'),
+    sheet: strToU8(`<worksheet ${NS}><sheetData>${sheet}</sheetData></worksheet>`),
+  });
+
+  it("finishes quickly on a megabyte of unclosed tags", () => {
+    for (const tag of ["<row>", "<c>", "<c r=\"A1\"><is><t>", "<si>"]) {
+      const bytes = workbook({ sheet: tag.repeat(Math.ceil(1_000_000 / tag.length)), shared: tag.repeat(200_000) });
+      const t0 = performance.now();
+      const r = codec.read(bytes);
+      expect(performance.now() - t0).toBeLessThan(1000);
+      expect(r.ok === false || r.rows.length <= 100_000).toBe(true);
+    }
+  });
+  it("finishes quickly on one enormous tag without a closing bracket", () => {
+    const bytes = workbook({ sheet: "<c " + "a".repeat(1_000_000) });
+    const t0 = performance.now();
+    codec.read(bytes);
+    expect(performance.now() - t0).toBeLessThan(1000);
+  });
+  it("rejects duplicate entries of a wanted part", () => {
+    const p = parts("");
+    const bytes = rawZip([
+      { name: "xl/workbook.xml", data: p.wb },
+      ...Array.from({ length: 50 }, () => ({ name: "xl/workbook.xml", data: p.wb })),
+      { name: "xl/_rels/workbook.xml.rels", data: p.rels },
+      { name: "xl/worksheets/s.xml", data: p.sheet },
+    ]);
+    expect(codec.read(bytes)).toEqual({ ok: false, error: "unreadable" });
+  });
+  it("rejects a zip with absurdly many entries", () => {
+    const bytes = zipSync(Object.fromEntries(Array.from({ length: 1500 }, (_, i) => [`f${i}.txt`, strToU8("x")])));
+    expect(codec.read(bytes)).toEqual({ ok: false, error: "unreadable" });
+  });
+  it("does not trust a declared size that is smaller than the real one", () => {
+    const p = parts("");
+    const big = strToU8(`<worksheet ${NS}><sheetData><row r="1"><c r="A1"><v>${"1".repeat(25_000_000)}</v></c></row></sheetData></worksheet>`);
+    const bytes = rawZip([
+      { name: "xl/workbook.xml", data: p.wb },
+      { name: "xl/_rels/workbook.xml.rels", data: p.rels },
+      { name: "xl/worksheets/s.xml", data: big, declared: 200 },
+    ]);
+    const r = codec.read(bytes);
+    expect(r.ok).toBe(false);
+  });
+  it("accepts an honest sheet through the same hand-built path", () => {
+    const p = parts('<row r="1"><c r="A1" t="inlineStr"><is><t>ok</t></is></c></row>');
+    const bytes = rawZip([
+      { name: "xl/workbook.xml", data: p.wb },
+      { name: "xl/_rels/workbook.xml.rels", data: p.rels },
+      { name: "xl/worksheets/s.xml", data: p.sheet },
+    ]);
+    expect(codec.read(bytes)).toEqual({ ok: true, rows: [["ok"]] });
   });
 });

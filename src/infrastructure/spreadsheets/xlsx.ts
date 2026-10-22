@@ -1,4 +1,4 @@
-import { strToU8, unzipSync, zipSync } from "fflate";
+import { strToU8, Unzip, UnzipInflate, UnzipPassThrough, zipSync } from "fflate";
 
 /** Total size of everything we inflate from one upload. */
 export const MAX_INFLATED_BYTES = 20_000_000;
@@ -21,18 +21,60 @@ function decodeEntities(s: string): string {
   });
 }
 
+/** Linear attribute parser (no backtracking regexes: the input is hostile). */
 function attributes(tag: string): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const m of tag.matchAll(/([\w:.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) out[m[1]!] = decodeEntities(m[2] ?? m[3] ?? "");
+  let i = 0;
+  const n = tag.length;
+  const space = (c: number) => c <= 32;
+  while (i < n) {
+    while (i < n && (space(tag.charCodeAt(i)) || tag[i] === "/")) i++;
+    const start = i;
+    while (i < n && !space(tag.charCodeAt(i)) && tag[i] !== "=" && tag[i] !== "/") i++;
+    const name = tag.slice(start, i);
+    while (i < n && space(tag.charCodeAt(i))) i++;
+    if (tag[i] !== "=") continue;
+    i++;
+    while (i < n && space(tag.charCodeAt(i))) i++;
+    const quote = tag[i];
+    if (quote !== '"' && quote !== "'") continue;
+    const close = tag.indexOf(quote, i + 1);
+    if (close === -1) break;
+    if (name) out[name] = decodeEntities(tag.slice(i + 1, close));
+    i = close + 1;
+  }
   return out;
 }
 
-/** Text of all <t> elements, ignoring phonetic runs (<rPh>), which are not part of the value. */
-function textOf(xml: string): string {
-  const withoutPhonetic = xml.replace(/<rPh\b[\s\S]*?<\/rPh>/g, "");
-  let out = "";
-  for (const m of withoutPhonetic.matchAll(/<t\b[^>]*?(?:\/>|>([\s\S]*?)<\/t>)/g)) out += decodeEntities(m[1] ?? "");
-  return out;
+type Tag = { closing: boolean; selfClosing: boolean; name: string; attrs: string };
+
+/**
+ * Single linear pass over the tags (indexOf only, never a lazy regex over the rest of the
+ * document), so unclosed tags cannot make parsing quadratic. Namespace prefixes are dropped
+ * from element names ("x:row" is "row"). `textAfter` is the text up to the next tag.
+ */
+function scan(xml: string, visit: (tag: Tag, textAfter: () => string) => void): void {
+  let i = 0;
+  for (;;) {
+    const lt = xml.indexOf("<", i);
+    if (lt === -1) return;
+    const gt = xml.indexOf(">", lt);
+    if (gt === -1) return;
+    i = gt + 1;
+    const first = xml[lt + 1];
+    if (first === "?" || first === "!") continue;
+    const closing = first === "/";
+    const from = closing ? lt + 2 : lt + 1;
+    let to = from;
+    while (to < gt && xml.charCodeAt(to) > 32 && xml[to] !== "/") to++;
+    const raw = xml.slice(from, to);
+    if (!raw) continue;
+    const textAfter = () => {
+      const next = xml.indexOf("<", gt + 1);
+      return xml.slice(gt + 1, next === -1 ? xml.length : next);
+    };
+    visit({ closing, selfClosing: xml[gt - 1] === "/", name: raw.slice(raw.lastIndexOf(":") + 1), attrs: xml.slice(to, gt) }, textAfter);
+  }
 }
 
 /** "A" = 0, "Z" = 25, "AA" = 26. */
@@ -58,35 +100,72 @@ function resolveTarget(target: string): string {
   return parts.join("/");
 }
 
-/** Inflates only the named entries; checks the declared sizes against the budget first. */
+const MAX_ENTRIES = 1_000;
+
+/**
+ * Inflates only the named entries, streaming, with one byte budget for the whole upload.
+ * Counts the bytes actually produced (the sizes in zip headers are attacker-controlled) and
+ * stops at the first byte over budget. Duplicate entries, lying sizes and zips with absurdly
+ * many entries are unreadable.
+ */
 function inflate(bytes: Uint8Array, names: string[], budget: { left: number }): Record<string, string> {
   const wanted = new Set(names);
-  const sizes = new Map<string, number>();
-  unzipSync(bytes, {
-    filter: (file) => {
-      if (wanted.has(file.name)) {
-        if (file.originalSize > budget.left) throw new TooLargeError();
-        sizes.set(file.name, file.originalSize);
-      }
-      return false;
-    },
+  const seen = new Set<string>();
+  const chunks = new Map<string, Uint8Array[]>();
+  let entries = 0;
+  const unzip = new Unzip((file) => {
+    if (++entries > MAX_ENTRIES) throw new UnreadableError();
+    if (!wanted.has(file.name)) return;
+    if (seen.has(file.name)) throw new UnreadableError();
+    seen.add(file.name);
+    if (file.originalSize !== undefined && file.originalSize > budget.left) throw new TooLargeError();
+    const parts: Uint8Array[] = [];
+    chunks.set(file.name, parts);
+    let produced = 0;
+    file.ondata = (error, data, final) => {
+      if (error) throw new UnreadableError();
+      produced += data.length;
+      budget.left -= data.length;
+      if (budget.left < 0) throw new TooLargeError();
+      parts.push(data);
+      if (final && file.originalSize !== undefined && file.originalSize !== produced) throw new UnreadableError();
+    };
+    file.start();
   });
-  let total = 0;
-  for (const size of sizes.values()) total += size;
-  if (total > budget.left) throw new TooLargeError();
-  const files = unzipSync(bytes, { filter: (file) => wanted.has(file.name) });
+  unzip.register(UnzipInflate);
+  unzip.register(UnzipPassThrough);
+  unzip.push(bytes, true);
   const out: Record<string, string> = {};
-  for (const [name, data] of Object.entries(files)) {
-    budget.left -= data.length;
-    if (budget.left < 0) throw new TooLargeError();
-    out[name] = new TextDecoder().decode(data);
+  for (const [name, parts] of chunks) {
+    const all = new Uint8Array(parts.reduce((n, c) => n + c.length, 0));
+    let at = 0;
+    for (const c of parts) {
+      all.set(c, at);
+      at += c.length;
+    }
+    out[name] = new TextDecoder().decode(all);
   }
   return out;
 }
 
 function sharedStrings(xml: string | undefined): string[] {
   if (!xml) return [];
-  return [...xml.matchAll(/<si\b[^>]*?(?:\/>|>([\s\S]*?)<\/si>)/g)].map((m) => textOf(m[1] ?? ""));
+  const out: string[] = [];
+  let current: string | null = null;
+  let phonetic = false;
+  scan(xml, (tag, textAfter) => {
+    if (tag.name === "si") {
+      if (current !== null) out.push(current);
+      current = null;
+      if (!tag.closing) {
+        if (tag.selfClosing) out.push("");
+        else current = "";
+      }
+    } else if (tag.name === "rPh") phonetic = !tag.closing && !tag.selfClosing;
+    else if (tag.name === "t" && !tag.closing && !tag.selfClosing && !phonetic && current !== null) current += decodeEntities(textAfter());
+  });
+  if (current !== null) out.push(current);
+  return out;
 }
 
 export function readXlsx(bytes: Uint8Array): string[][] {
@@ -96,14 +175,18 @@ export function readXlsx(bytes: Uint8Array): string[][] {
   const rels = meta["xl/_rels/workbook.xml.rels"];
   if (workbook === undefined || rels === undefined) throw new UnreadableError();
 
-  const firstSheet = /<sheet\b[^>]*>/.exec(workbook);
-  const relationId = firstSheet && Object.entries(attributes(firstSheet[0])).find(([key]) => key === "r:id" || key.endsWith(":id"))?.[1];
+  let relationId: string | undefined;
+  scan(workbook, (tag) => {
+    if (relationId !== undefined || tag.closing || tag.name !== "sheet") return;
+    relationId = Object.entries(attributes(tag.attrs)).find(([key]) => key.endsWith(":id"))?.[1] ?? "";
+  });
   if (!relationId) throw new UnreadableError();
   let sheetPath: string | null = null;
-  for (const m of rels.matchAll(/<Relationship\b[^>]*>/g)) {
-    const a = attributes(m[0]);
+  scan(rels, (tag) => {
+    if (tag.closing || tag.name !== "Relationship") return;
+    const a = attributes(tag.attrs);
     if (a.Id === relationId && a.Target) sheetPath = resolveTarget(a.Target);
-  }
+  });
   if (!sheetPath) throw new UnreadableError();
 
   const parts = inflate(bytes, [sheetPath, "xl/sharedStrings.xml"], budget);
@@ -113,30 +196,71 @@ export function readXlsx(bytes: Uint8Array): string[][] {
 
   const rows: string[][] = [];
   let rowNumber = 0;
-  for (const rowMatch of sheet.matchAll(/<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)) {
-    const given = Number(attributes(rowMatch[1]!).r);
-    rowNumber = Number.isInteger(given) && given > 0 ? given : rowNumber + 1;
-    if (rowNumber > MAX_ROWS) throw new TooLargeError();
-    const row: string[] = (rows[rowNumber - 1] ??= []);
-    let nextColumn = 0;
-    for (const cellMatch of (rowMatch[2] ?? "").matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
-      const a = attributes(cellMatch[1]!);
-      const ref = /^([A-Za-z]+)\d*$/.exec(a.r ?? "");
-      const column = ref ? columnIndex(ref[1]!) : nextColumn;
-      nextColumn = column + 1;
-      if (column >= MAX_COLUMNS) throw new TooLargeError();
-      const inner = cellMatch[2] ?? "";
-      let value: string;
-      if (a.t === "inlineStr") value = textOf(/<is\b[^>]*>([\s\S]*?)<\/is>/.exec(inner)?.[1] ?? "");
-      else {
-        const v = /<v\b[^>]*>([\s\S]*?)<\/v>/.exec(inner)?.[1];
-        value = v === undefined ? "" : decodeEntities(v);
-        if (a.t === "s") value = shared[Number(value)] ?? "";
+  let row: string[] | null = null;
+  let nextColumn = 0;
+  let cell: { attrs: Record<string, string>; v: string | undefined; inline: string } | null = null;
+  let inInline = false;
+  let phonetic = false;
+
+  const flush = () => {
+    if (!cell || !row) return void (cell = null);
+    const a = cell.attrs;
+    const ref = /^([A-Za-z]{1,4})\d*$/.exec(a.r ?? "");
+    const column = ref ? columnIndex(ref[1]!) : nextColumn;
+    nextColumn = column + 1;
+    if (column >= MAX_COLUMNS) throw new TooLargeError();
+    let value: string;
+    if (a.t === "inlineStr") value = cell.inline;
+    else if (a.t === "s") value = shared[Number(cell.v ?? "")] ?? "";
+    else value = cell.v ?? "";
+    for (let i = row.length; i < column; i++) row[i] = "";
+    row[column] = value;
+    cell = null;
+  };
+
+  scan(sheet, (tag, textAfter) => {
+    switch (tag.name) {
+      case "row": {
+        flush();
+        inInline = false;
+        if (tag.closing) {
+          row = null;
+          break;
+        }
+        const given = Number(attributes(tag.attrs).r);
+        rowNumber = Number.isInteger(given) && given > 0 ? given : rowNumber + 1;
+        if (rowNumber > MAX_ROWS) throw new TooLargeError();
+        row = rows[rowNumber - 1] ??= [];
+        nextColumn = 0;
+        if (tag.selfClosing) row = null;
+        break;
       }
-      for (let i = row.length; i < column; i++) row[i] = "";
-      row[column] = value;
+      case "c":
+        flush();
+        inInline = false;
+        if (!tag.closing && row) {
+          cell = { attrs: attributes(tag.attrs), v: undefined, inline: "" };
+          if (tag.selfClosing) flush();
+        }
+        break;
+      case "v":
+        if (cell && !tag.closing && !tag.selfClosing) cell.v = decodeEntities(textAfter());
+        break;
+      case "is":
+        inInline = !tag.closing && !tag.selfClosing;
+        break;
+      case "rPh":
+        phonetic = !tag.closing && !tag.selfClosing;
+        break;
+      case "t":
+        if (cell && inInline && !phonetic && !tag.closing && !tag.selfClosing) cell.inline += decodeEntities(textAfter());
+        break;
+      case "sheetData":
+        flush();
+        break;
     }
-  }
+  });
+  flush();
   for (let i = 0; i < rows.length; i++) rows[i] ??= [];
   return rows;
 }
