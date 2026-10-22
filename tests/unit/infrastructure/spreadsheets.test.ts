@@ -177,8 +177,16 @@ describe("XLSX, hostile input", () => {
       { name: "xl/_rels/workbook.xml.rels", data: p.rels },
       { name: "xl/worksheets/s.xml", data: big, declared: 200 },
     ]);
-    const r = codec.read(bytes);
-    expect(r.ok).toBe(false);
+    expect(codec.read(bytes)).toEqual({ ok: false, error: "too_large" });
+  });
+  it("is unreadable when the declared size is wrong but the real size is within budget", () => {
+    const p = parts('<row r="1"><c r="A1" t="inlineStr"><is><t>ok</t></is></c></row>');
+    const bytes = rawZip([
+      { name: "xl/workbook.xml", data: p.wb },
+      { name: "xl/_rels/workbook.xml.rels", data: p.rels },
+      { name: "xl/worksheets/s.xml", data: p.sheet, declared: p.sheet.length + 5 },
+    ]);
+    expect(codec.read(bytes)).toEqual({ ok: false, error: "unreadable" });
   });
   it("accepts an honest sheet through the same hand-built path", () => {
     const p = parts('<row r="1"><c r="A1" t="inlineStr"><is><t>ok</t></is></c></row>');
@@ -188,5 +196,58 @@ describe("XLSX, hostile input", () => {
       { name: "xl/worksheets/s.xml", data: p.sheet },
     ]);
     expect(codec.read(bytes)).toEqual({ ok: true, rows: [["ok"]] });
+  });
+});
+
+function crc32(d: Uint8Array) {
+  let c = ~0;
+  for (const b of d) {
+    c ^= b;
+    for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
+  }
+  return ~c >>> 0;
+}
+
+/** Data-descriptor zip (bit 3, zeroed local header sizes), signed or unsigned descriptor. */
+function ddZip(entries: Record<string, Uint8Array>, opts: { sig: boolean; method: 0 | 8 }): Uint8Array {
+  const u16 = (n: number) => [n & 255, (n >> 8) & 255];
+  const u32 = (n: number) => [n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255];
+  const body: number[] = [];
+  const central: number[] = [];
+  let n = 0;
+  for (const [nm, data] of Object.entries(entries)) {
+    const comp = opts.method === 8 ? deflateSync(data) : data;
+    const name = strToU8(nm);
+    const crc = crc32(data);
+    const off = body.length;
+    body.push(0x50, 0x4b, 3, 4, ...u16(20), ...u16(8), ...u16(opts.method), ...u16(0), ...u16(0), ...u32(0), ...u32(0), ...u32(0), ...u16(name.length), ...u16(0), ...name);
+    for (const b of comp) body.push(b);
+    if (opts.sig) body.push(0x50, 0x4b, 7, 8);
+    body.push(...u32(crc), ...u32(comp.length), ...u32(data.length));
+    central.push(0x50, 0x4b, 1, 2, ...u16(20), ...u16(20), ...u16(8), ...u16(opts.method), ...u16(0), ...u16(0), ...u32(crc), ...u32(comp.length), ...u32(data.length), ...u16(name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(off), ...name);
+    n++;
+  }
+  return Uint8Array.from([...body, ...central, 0x50, 0x4b, 5, 6, ...u16(0), ...u16(0), ...u16(n), ...u16(n), ...u32(central.length), ...u32(body.length), ...u16(0)]);
+}
+
+describe("XLSX, data-descriptor zips", () => {
+  const files = (sheet: string): Record<string, Uint8Array> => ({
+    "[Content_Types].xml": strToU8("<Types/>"),
+    "xl/workbook.xml": strToU8(`<workbook ${NS} xmlns:r="x"><sheets><sheet name="a" r:id="rId1"/></sheets></workbook>`),
+    "xl/_rels/workbook.xml.rels": strToU8('<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>'),
+    "xl/sharedStrings.xml": strToU8("<sst><si><t>Name</t></si><si><t>Anna</t></si></sst>"),
+    "xl/worksheets/sheet1.xml": strToU8(`<worksheet ${NS}><sheetData>${sheet}</sheetData></worksheet>`),
+  });
+  const ok = '<row r="1"><c r="A1" t="s"><v>0</v></c></row><row r="2"><c r="A2" t="s"><v>1</v></c></row>';
+  for (const sig of [true, false]) {
+    for (const method of [8, 0] as const) {
+      it(`reads sig=${sig} method=${method}`, () => {
+        expect(codec.read(ddZip(files(ok), { sig, method }))).toEqual({ ok: true, rows: [["Name"], ["Anna"]] });
+      });
+    }
+  }
+  it("reports too_large for an honest over-budget deflated entry", () => {
+    const bytes = ddZip(files("<row/>".repeat(4_000_000)), { sig: true, method: 8 });
+    expect(codec.read(bytes)).toEqual({ ok: false, error: "too_large" });
   });
 });

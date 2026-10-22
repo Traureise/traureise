@@ -1,4 +1,4 @@
-import { strToU8, Unzip, UnzipInflate, UnzipPassThrough, zipSync } from "fflate";
+import { Inflate, strToU8, zipSync } from "fflate";
 
 /** Total size of everything we inflate from one upload. */
 export const MAX_INFLATED_BYTES = 20_000_000;
@@ -101,43 +101,83 @@ function resolveTarget(target: string): string {
 }
 
 const MAX_ENTRIES = 1_000;
+const CHUNK = 4_096;
+
+type Entry = { method: number; compressed: number; size: number; offset: number };
+
+/** Entries from the central directory (the authority every zip reader uses), by name. */
+function centralDirectory(bytes: Uint8Array, wanted: Set<string>): Map<string, Entry> {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 22 - 65_535); i--) {
+    if (view.getUint32(i, true) === 0x06054b50) {
+      eocd = i;
+      break;
+    }
+  }
+  if (eocd === -1) throw new UnreadableError();
+  const count = view.getUint16(eocd + 10, true);
+  const start = view.getUint32(eocd + 16, true);
+  if (count > MAX_ENTRIES || count === 0xffff || start === 0xffffffff || start >= bytes.length) throw new UnreadableError();
+  const found = new Map<string, Entry>();
+  let at = start;
+  for (let n = 0; n < count; n++) {
+    if (at + 46 > bytes.length || view.getUint32(at, true) !== 0x02014b50) throw new UnreadableError();
+    const nameLength = view.getUint16(at + 28, true);
+    const end = at + 46 + nameLength;
+    if (end > bytes.length) throw new UnreadableError();
+    const name = new TextDecoder().decode(bytes.subarray(at + 46, end));
+    if (wanted.has(name)) {
+      if (found.has(name)) throw new UnreadableError();
+      const compressed = view.getUint32(at + 20, true);
+      const size = view.getUint32(at + 24, true);
+      const offset = view.getUint32(at + 42, true);
+      if (compressed === 0xffffffff || size === 0xffffffff || offset === 0xffffffff) throw new UnreadableError();
+      found.set(name, { method: view.getUint16(at + 10, true), compressed, size, offset });
+    }
+    at = end + view.getUint16(at + 30, true) + view.getUint16(at + 32, true);
+  }
+  return found;
+}
 
 /**
- * Inflates only the named entries, streaming, with one byte budget for the whole upload.
- * Counts the bytes actually produced (the sizes in zip headers are attacker-controlled) and
- * stops at the first byte over budget. Duplicate entries, lying sizes and zips with absurdly
- * many entries are unreadable.
+ * Inflates only the named entries, with one byte budget for the whole upload. Names and sizes
+ * come from the central directory; the bytes actually produced are counted (the sizes are
+ * attacker-controlled) and inflating stops at the first byte over budget. Duplicate entries,
+ * too many entries, unsupported methods and size mismatches are unreadable.
  */
 function inflate(bytes: Uint8Array, names: string[], budget: { left: number }): Record<string, string> {
-  const wanted = new Set(names);
-  const seen = new Set<string>();
-  const chunks = new Map<string, Uint8Array[]>();
-  let entries = 0;
-  const unzip = new Unzip((file) => {
-    if (++entries > MAX_ENTRIES) throw new UnreadableError();
-    if (!wanted.has(file.name)) return;
-    if (seen.has(file.name)) throw new UnreadableError();
-    seen.add(file.name);
-    if (file.originalSize !== undefined && file.originalSize > budget.left) throw new TooLargeError();
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const out: Record<string, string> = {};
+  for (const [name, entry] of centralDirectory(bytes, new Set(names))) {
+    if (entry.size > budget.left) throw new TooLargeError();
+    if (entry.offset + 30 > bytes.length || view.getUint32(entry.offset, true) !== 0x04034b50) throw new UnreadableError();
+    const dataStart = entry.offset + 30 + view.getUint16(entry.offset + 26, true) + view.getUint16(entry.offset + 28, true);
+    const dataEnd = dataStart + entry.compressed;
+    if (dataEnd > bytes.length) throw new UnreadableError();
     const parts: Uint8Array[] = [];
-    chunks.set(file.name, parts);
     let produced = 0;
-    file.ondata = (error, data, final) => {
-      if (error) throw new UnreadableError();
+    let over = false;
+    const take = (data: Uint8Array) => {
       produced += data.length;
       budget.left -= data.length;
-      if (budget.left < 0) throw new TooLargeError();
-      parts.push(data);
-      if (final && file.originalSize !== undefined && file.originalSize !== produced) throw new UnreadableError();
+      if (budget.left < 0) over = true;
+      else parts.push(data);
     };
-    file.start();
-  });
-  unzip.register(UnzipInflate);
-  unzip.register(UnzipPassThrough);
-  unzip.push(bytes, true);
-  const out: Record<string, string> = {};
-  for (const [name, parts] of chunks) {
-    const all = new Uint8Array(parts.reduce((n, c) => n + c.length, 0));
+    if (entry.method === 0) {
+      take(bytes.subarray(dataStart, dataEnd));
+    } else if (entry.method === 8) {
+      const inflater = new Inflate((data) => take(data));
+      try {
+        for (let i = dataStart; i < dataEnd && !over; i += CHUNK) inflater.push(bytes.subarray(i, Math.min(i + CHUNK, dataEnd)), i + CHUNK >= dataEnd);
+        if (dataStart === dataEnd) inflater.push(new Uint8Array(0), true);
+      } catch {
+        if (!over) throw new UnreadableError();
+      }
+    } else throw new UnreadableError();
+    if (over) throw new TooLargeError();
+    if (produced !== entry.size) throw new UnreadableError();
+    const all = new Uint8Array(produced);
     let at = 0;
     for (const c of parts) {
       all.set(c, at);
