@@ -1,13 +1,23 @@
 import { Inflate, strToU8, zipSync } from "fflate";
+import { IMPORT_MAX_ROWS } from "@/domain/guest-import";
 
 /** Total size of everything we inflate from one upload. */
 export const MAX_INFLATED_BYTES = 20_000_000;
-/** Far beyond any guest list; protects against `r="XFD1048576"` blowing up memory. */
+/** Far beyond any guest list; protects against `r="XFD1048576"` blowing up memory. Only cells with a value count. */
 const MAX_ROWS = 100_000;
-const MAX_COLUMNS = 1_000;
+const MAX_COLUMNS = 256;
+/** Cells materialized after padding rows to their last value. */
+const MAX_CELLS = 300_000;
+/**
+ * Rows with a value we read at most: the header and one more than the importer accepts, so it
+ * still reports "too many rows". Formatting-only rows and cells do not count.
+ */
+const MAX_FILLED_ROWS = IMPORT_MAX_ROWS + 2;
 
 export class TooLargeError extends Error {}
 export class UnreadableError extends Error {}
+class EnoughRows extends Error {}
+
 
 const NAMED: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
 
@@ -188,6 +198,11 @@ function inflate(bytes: Uint8Array, names: string[], budget: { left: number }): 
   return out;
 }
 
+/** C0 controls except tab and line breaks: Postgres rejects NUL, and none belong in a guest list. */
+export const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g;
+/** Control characters are dropped when reading (index.ts), so a cell of only those is blank too. */
+const isBlank = (s: string) => s.replace(CONTROL, "").trim() === "";
+
 function sharedStrings(xml: string | undefined): string[] {
   if (!xml) return [];
   const out: string[] = [];
@@ -234,74 +249,103 @@ export function readXlsx(bytes: Uint8Array): string[][] {
   if (sheet === undefined) throw new UnreadableError();
   const shared = sharedStrings(parts["xl/sharedStrings.xml"]);
 
-  const rows: string[][] = [];
+  // Sparse: only cells with a value are kept, as [column, value]; rows are padded once at the end.
+  const sparse = new Map<number, { cells: [number, string][]; width: number }>();
+  let filledRows = 0;
+  let cellsTotal = 0;
+  let lastRow = 0;
   let rowNumber = 0;
-  let row: string[] | null = null;
+  let row: { cells: [number, string][]; width: number } | null = null;
+  let rowOpen = false;
   let nextColumn = 0;
   let cell: { attrs: Record<string, string>; v: string | undefined; inline: string } | null = null;
   let inInline = false;
   let phonetic = false;
 
   const flush = () => {
-    if (!cell || !row) return void (cell = null);
+    if (!cell || !rowOpen) return void (cell = null);
     const a = cell.attrs;
     const ref = /^([A-Za-z]{1,4})\d*$/.exec(a.r ?? "");
     const column = ref ? columnIndex(ref[1]!) : nextColumn;
     nextColumn = column + 1;
-    if (column >= MAX_COLUMNS) throw new TooLargeError();
     let value: string;
     if (a.t === "inlineStr") value = cell.inline;
     else if (a.t === "s") value = shared[Number(cell.v ?? "")] ?? "";
     else value = cell.v ?? "";
-    for (let i = row.length; i < column; i++) row[i] = "";
-    row[column] = value;
     cell = null;
+    if (isBlank(value)) return;
+    if (column >= MAX_COLUMNS) throw new TooLargeError();
+    if (!row) {
+      if (rowNumber > MAX_ROWS) throw new TooLargeError();
+      row = sparse.get(rowNumber) ?? { cells: [], width: 0 };
+      if (row.cells.length === 0) filledRows++;
+      sparse.set(rowNumber, row);
+      lastRow = Math.max(lastRow, rowNumber);
+    }
+    row.cells.push([column, value]);
+    if (column + 1 > row.width) {
+      cellsTotal += column + 1 - row.width;
+      row.width = column + 1;
+      if (cellsTotal > MAX_CELLS) throw new TooLargeError();
+    }
+  };
+  const endRow = () => {
+    flush();
+    if (row && filledRows >= MAX_FILLED_ROWS) throw new EnoughRows();
+    row = null;
+    rowOpen = false;
   };
 
-  scan(sheet, (tag, textAfter) => {
-    switch (tag.name) {
-      case "row": {
-        flush();
-        inInline = false;
-        if (tag.closing) {
-          row = null;
+  try {
+    scan(sheet, (tag, textAfter) => {
+      switch (tag.name) {
+        case "row": {
+          endRow();
+          inInline = false;
+          if (tag.closing) break;
+          const given = Number(attributes(tag.attrs).r);
+          rowNumber = Number.isInteger(given) && given > 0 ? given : rowNumber + 1;
+          rowOpen = !tag.selfClosing;
+          nextColumn = 0;
           break;
         }
-        const given = Number(attributes(tag.attrs).r);
-        rowNumber = Number.isInteger(given) && given > 0 ? given : rowNumber + 1;
-        if (rowNumber > MAX_ROWS) throw new TooLargeError();
-        row = rows[rowNumber - 1] ??= [];
-        nextColumn = 0;
-        if (tag.selfClosing) row = null;
-        break;
+        case "c":
+          flush();
+          inInline = false;
+          if (!tag.closing && rowOpen) {
+            cell = { attrs: attributes(tag.attrs), v: undefined, inline: "" };
+            if (tag.selfClosing) flush();
+          }
+          break;
+        case "v":
+          if (cell && !tag.closing && !tag.selfClosing) cell.v = decodeEntities(textAfter());
+          break;
+        case "is":
+          inInline = !tag.closing && !tag.selfClosing;
+          break;
+        case "rPh":
+          phonetic = !tag.closing && !tag.selfClosing;
+          break;
+        case "t":
+          if (cell && inInline && !phonetic && !tag.closing && !tag.selfClosing) cell.inline += decodeEntities(textAfter());
+          break;
+        case "sheetData":
+          endRow();
+          break;
       }
-      case "c":
-        flush();
-        inInline = false;
-        if (!tag.closing && row) {
-          cell = { attrs: attributes(tag.attrs), v: undefined, inline: "" };
-          if (tag.selfClosing) flush();
-        }
-        break;
-      case "v":
-        if (cell && !tag.closing && !tag.selfClosing) cell.v = decodeEntities(textAfter());
-        break;
-      case "is":
-        inInline = !tag.closing && !tag.selfClosing;
-        break;
-      case "rPh":
-        phonetic = !tag.closing && !tag.selfClosing;
-        break;
-      case "t":
-        if (cell && inInline && !phonetic && !tag.closing && !tag.selfClosing) cell.inline += decodeEntities(textAfter());
-        break;
-      case "sheetData":
-        flush();
-        break;
-    }
-  });
-  flush();
-  for (let i = 0; i < rows.length; i++) rows[i] ??= [];
+    });
+    endRow();
+  } catch (error) {
+    if (!(error instanceof EnoughRows)) throw error;
+  }
+
+  const rows: string[][] = [];
+  for (let r = 1; r <= lastRow; r++) {
+    const found = sparse.get(r);
+    const out: string[] = found ? new Array<string>(found.width).fill("") : [];
+    for (const [column, value] of found?.cells ?? []) out[column] = value;
+    rows.push(out);
+  }
   return rows;
 }
 

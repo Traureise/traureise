@@ -1,12 +1,12 @@
 import type { SheetRead, SpreadsheetCodec } from "@/application/ports";
 import { parseCsv } from "./csv";
-import { readXlsx, TooLargeError, writeXlsx } from "./xlsx";
+import { CONTROL, readXlsx, TooLargeError, writeXlsx } from "./xlsx";
 
 const isZip = (b: Uint8Array) => b.length >= 4 && b[0] === 0x50 && b[1] === 0x4b && b[2] === 0x03 && b[3] === 0x04;
 
-/** Cells trimmed, trailing empty rows dropped. */
+/** Control characters (except tab and line breaks) removed, cells trimmed, trailing empty rows dropped. */
 function tidy(rows: string[][]): string[][] {
-  const out = rows.map((row) => row.map((c) => c.trim()));
+  const out = rows.map((row) => row.map((c) => c.replace(CONTROL, "").trim()));
   while (out.length > 0 && out[out.length - 1]!.every((c) => c === "")) out.pop();
   return out;
 }

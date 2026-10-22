@@ -6,6 +6,12 @@ const codec = new FflateSpreadsheets();
 const text = (s: string) => new TextEncoder().encode(s);
 const NS = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
 
+const sheetXml = (rows: string) => `<worksheet ${NS}><sheetData>${rows}</sheetData></worksheet>`;
+const workbookParts = () => ({
+  "xl/workbook.xml": strToU8(`<workbook ${NS} xmlns:r="x"><sheets><sheet name="a" sheetId="1" r:id="rId3"/></sheets></workbook>`),
+  "xl/_rels/workbook.xml.rels": strToU8('<Relationships><Relationship Id="rId3" Target="worksheets/blatt.xml"/></Relationships>'),
+});
+
 function workbook(parts: { sheet: string; shared?: string; sheetPath?: string; rid?: string }) {
   const path = parts.sheetPath ?? "worksheets/blatt.xml";
   const files: Record<string, Uint8Array> = {
@@ -249,5 +255,56 @@ describe("XLSX, data-descriptor zips", () => {
   it("reports too_large for an honest over-budget deflated entry", () => {
     const bytes = ddZip(files("<row/>".repeat(4_000_000)), { sig: true, method: 8 });
     expect(codec.read(bytes)).toEqual({ ok: false, error: "too_large" });
+  });
+});
+
+describe("XLSX, sizes", () => {
+  const rows = (count: number, row: (r: number) => string) => Array.from({ length: count }, (_, i) => row(i + 1)).join("");
+  const measure = (bytes: Uint8Array) => {
+    const heap = process.memoryUsage().heapUsed;
+    const t0 = performance.now();
+    const result = codec.read(bytes);
+    return { result, ms: performance.now() - t0, heapMb: (process.memoryUsage().heapUsed - heap) / 1e6 };
+  };
+
+  it("rejects 100,000 wide sparse rows quickly and with bounded memory", () => {
+    const bytes = zipSync({ ...workbookParts(), "xl/worksheets/blatt.xml": strToU8(sheetXml(rows(100_000, (r) => `<row r="${r}"><c r="ALL${r}"><v>1</v></c></row>`))) }, { level: 9 });
+    const { result, ms, heapMb } = measure(bytes);
+    expect(result).toEqual({ ok: false, error: "too_large" });
+    expect(ms).toBeLessThan(1000);
+    expect(heapMb).toBeLessThan(200);
+  });
+  it("stops after one row more than the importer accepts, so it reports too many rows", () => {
+    const bytes = workbook({ sheet: rows(100_000, (r) => `<row r="${r}"><c r="A${r}"><v>${r}</v></c></row>`) });
+    const { result, ms } = measure(bytes);
+    expect(ms).toBeLessThan(1000);
+    expect(result.ok && result.rows.length).toBe(1002);
+  });
+  it("does not pad formatting-only cells at the last column", () => {
+    const bytes = workbook({ sheet: rows(100_000, (r) => `<row r="${r}"><c r="IV${r}" s="1"/></row>`) });
+    const { result, ms, heapMb } = measure(bytes);
+    expect(result).toEqual({ ok: true, rows: [] });
+    expect(ms).toBeLessThan(1000);
+    expect(heapMb).toBeLessThan(200);
+  });
+  it("reads a real list among thousands of formatted empty rows and cells", () => {
+    const filled = '<row r="1"><c r="A1" t="inlineStr"><is><t>Name</t></is></c></row>' + rows(3, (r) => `<row r="${r + 1}"><c r="A${r + 1}" t="inlineStr"><is><t>P${r}</t></is></c><c r="Z${r + 1}" s="2"/></row>`);
+    const formatted = rows(5_000, (r) => `<row r="${r + 4}" s="3"><c r="A${r + 4}" s="1"/><c r="XFD${r + 4}" s="1"/></row>`) + '<row r="150000" s="1"/>';
+    expect(codec.read(workbook({ sheet: filled + formatted }))).toEqual({ ok: true, rows: [["Name"], ["P1"], ["P2"], ["P3"]] });
+  });
+  it("rejects a value beyond the 256th column", () => {
+    expect(codec.read(workbook({ sheet: '<row r="1"><c r="IW1"><v>1</v></c></row>' }))).toEqual({ ok: false, error: "too_large" });
+    expect(codec.read(workbook({ sheet: '<row r="1"><c r="IV1"><v>1</v></c></row>' })).ok).toBe(true);
+  });
+  it("rejects a value beyond row 100,000", () => {
+    expect(codec.read(workbook({ sheet: '<row r="100001"><c r="A100001"><v>1</v></c></row>' }))).toEqual({ ok: false, error: "too_large" });
+  });
+});
+
+describe("control characters", () => {
+  it("are removed from CSV and XLSX cells, except tabs and line breaks", () => {
+    expect(codec.read(text('Name\n"A\u0000n\u0007na\tB\nC"\n'))).toEqual({ ok: true, rows: [["Name"], ["Anna\tB\nC"]] });
+    const bytes = workbook({ sheet: '<row r="1"><c r="A1" t="inlineStr"><is><t>B&#1;en</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>&#2;</t></is></c></row>' });
+    expect(codec.read(bytes)).toEqual({ ok: true, rows: [["Ben"]] });
   });
 });
