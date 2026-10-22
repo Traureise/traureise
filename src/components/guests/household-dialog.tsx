@@ -14,20 +14,19 @@ import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { FieldErrors } from "@/domain/result";
 
-type Person = { key: string; id: string | null; name: string; isChild: boolean };
+type Person = { key: string; id: string | null; name: string; isChild: boolean; email: string };
 export type HouseholdDraft = {
   id: string;
   name: string;
   invitedEventIds: string[] | null;
-  email: string | null;
   personalLine: string;
-  /** The household asked for no more emails (which cleared the address). */
+  /** The household asked for no more emails (which cleared every address). */
   unsubscribed: boolean;
-  people: { id: string; name: string; isChild: boolean }[];
+  people: { id: string; name: string; isChild: boolean; email: string | null }[];
 };
 
 let counter = 0;
-const newPerson = (): Person => ({ key: `new-${++counter}`, id: null, name: "", isChild: false });
+const newPerson = (): Person => ({ key: `new-${++counter}`, id: null, name: "", isChild: false, email: "" });
 
 /**
  * Adds a household, or edits one (`household` set): name, people, and the events it is invited to. Opened from
@@ -58,9 +57,8 @@ export function HouseholdDialog({
   const [pending, start] = useTransition();
   const [errors, setErrors] = useState<FieldErrors>({});
   const [name, setName] = useState(household?.name ?? initialName);
-  const [people, setPeople] = useState<Person[]>(household ? household.people.map((p) => ({ ...p, key: p.id })) : [newPerson()]);
+  const [people, setPeople] = useState<Person[]>(household ? household.people.map((p) => ({ ...p, email: p.email ?? "", key: p.id })) : [newPerson()]);
   const [invited, setInvited] = useState<string[]>(household?.invitedEventIds ?? events.map((e) => e.id));
-  const [email, setEmail] = useState(household?.email ?? "");
   const [personalLine, setPersonalLine] = useState(household?.personalLine ?? "");
   const idPrefix = household ? `household-${household.id}` : "household-new";
 
@@ -68,7 +66,6 @@ export function HouseholdDialog({
     setErrors({});
     if (!household) {
       setName("");
-      setEmail("");
       setPersonalLine("");
       setPeople([newPerson()]);
       setInvited(events.map((e) => e.id));
@@ -82,9 +79,8 @@ export function HouseholdDialog({
       const result = await saveHouseholdAction(weddingId, household?.id ?? null, {
         name,
         invitedEventIds: allInvited ? null : invited,
-        email,
         personalLine,
-        people: people.map(({ id, name, isChild }) => ({ id, name, isChild })),
+        people: people.map(({ id, name, isChild, email }) => ({ id, name, isChild, email })),
       });
       if (!result.ok) {
         setErrors(result.fieldErrors ?? {});
@@ -118,15 +114,19 @@ export function HouseholdDialog({
             <legend className="text-sm font-medium">{t("people")}</legend>
             <ul className="space-y-2">
               {people.map((p, i) => (
-                <li key={p.key} className="flex items-center gap-2" data-testid="household-person">
-                  <Input aria-label={t("personName", { n: i + 1 })} value={p.name} onChange={(e) => update(p.key, { name: e.target.value })} />
-                  <label className="flex items-center gap-1.5 text-sm whitespace-nowrap">
-                    <input type="checkbox" checked={p.isChild} onChange={(e) => update(p.key, { isChild: e.target.checked })} className="size-4 accent-primary" />
-                    {t("child")}
-                  </label>
-                  <Button type="button" variant="ghost" size="icon" aria-label={t("removePerson", { n: i + 1 })} onClick={() => setPeople((list) => list.filter((x) => x.key !== p.key))}>
-                    <Trash2 aria-hidden />
-                  </Button>
+                <li key={p.key} className="space-y-1" data-testid="household-person">
+                  <div className="flex items-center gap-2">
+                    <Input aria-label={t("personName", { n: i + 1 })} value={p.name} onChange={(e) => update(p.key, { name: e.target.value })} />
+                    <label className="flex items-center gap-1.5 text-sm whitespace-nowrap">
+                      <input type="checkbox" checked={p.isChild} onChange={(e) => update(p.key, { isChild: e.target.checked })} className="size-4 accent-primary" />
+                      {t("child")}
+                    </label>
+                    <Button type="button" variant="ghost" size="icon" aria-label={t("removePerson", { n: i + 1 })} onClick={() => setPeople((list) => list.filter((x) => x.key !== p.key))}>
+                      <Trash2 aria-hidden />
+                    </Button>
+                  </div>
+                  <Input type="email" aria-label={t("personEmail", { n: i + 1 })} placeholder={t("personEmailPlaceholder")} value={p.email} onChange={(e) => update(p.key, { email: e.target.value })} />
+                  <FieldError code={errors[`people.${i}.email`]} />
                 </li>
               ))}
             </ul>
@@ -135,15 +135,8 @@ export function HouseholdDialog({
               {t("addPerson")}
             </Button>
             <FieldError code={errors.people} />
+            <p className="text-xs text-muted-foreground">{household?.unsubscribed ? t("emailUnsubscribed") : t("emailHint")}</p>
           </fieldset>
-          <div className="space-y-2">
-            <Label htmlFor={`${idPrefix}-email`}>{t("email")}</Label>
-            <Input id={`${idPrefix}-email`} type="email" value={email} onChange={(e) => setEmail(e.target.value)} aria-describedby={`${idPrefix}-email-hint`} />
-            <p id={`${idPrefix}-email-hint`} className="text-xs text-muted-foreground">
-              {household?.unsubscribed ? t("emailUnsubscribed") : t("emailHint")}
-            </p>
-            <FieldError code={errors.email} />
-          </div>
           <div className="space-y-2">
             <Label htmlFor={`${idPrefix}-personal-line`}>{t("personalLine")}</Label>
             <Input id={`${idPrefix}-personal-line`} value={personalLine} onChange={(e) => setPersonalLine(e.target.value)} placeholder={t("personalLinePlaceholder")} />

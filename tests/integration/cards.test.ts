@@ -13,7 +13,7 @@ import { buildCardModel, defaultCardContent, type CardKind } from "@/domain/card
 import { cardLayoutsFor, resolveDesign } from "@/domain/theme";
 import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
 import { SatoriCardRenderer } from "@/infrastructure/cards/renderer";
-import { cardDeliveries, cardOpens, cards, householdVersions, households } from "@/infrastructure/db/schema";
+import { cardDeliveries, cardOpens, cards, householdVersions } from "@/infrastructure/db/schema";
 import { createCardMailTemplates, createCardTexts } from "@/infrastructure/mail/card-templates";
 import { createSiteTexts } from "@/infrastructure/site-texts";
 import { SmtpMailer } from "@/infrastructure/mail/smtp";
@@ -81,7 +81,7 @@ function deps(options: { smtp?: boolean } = {}) {
 }
 
 const household = (name: string, email: string | null = null) =>
-  guests.createHousehold(weddingId, { name, invitedEventIds: null, email, personalLine: "", people: [{ id: null, name: "Clara", isChild: false }] }, (id) => guestLinks.hash(guestLinks.tokenFor(id)));
+  guests.createHousehold(weddingId, { name, invitedEventIds: null, personalLine: "", people: [{ id: null, name: "Clara", isChild: false, email }] }, (id) => guestLinks.hash(guestLinks.tokenFor(id)));
 
 /** The first version of a kind, generated with the wedding. */
 async function firstCard(kind: CardKind = "saveTheDate"): Promise<Card> {
@@ -182,15 +182,6 @@ describe("DrizzleCardRepository", () => {
     expect(await db.select().from(cards).where(eq(cards.weddingId, weddingId))).toEqual([]);
   });
 
-  it("clears the address on unsubscribe, and a new address ends it", async () => {
-    const weber = await household("Weber", "weber@example.org");
-    expect(await guests.unsubscribe(weber.id, new Date())).toBe(true);
-    const [row] = await db.select().from(households).where(eq(households.id, weber.id));
-    expect(row).toMatchObject({ email: null });
-    expect(row!.unsubscribedAt).toBeInstanceOf(Date);
-    await guests.updateHousehold(weddingId, weber.id, { name: "Weber", invitedEventIds: null, email: "neu@example.org", personalLine: "", people: [] });
-    expect((await guests.findHousehold(weddingId, weber.id))?.unsubscribedAt).toBeNull();
-  });
 });
 
 describe("SatoriCardRenderer", () => {
@@ -286,6 +277,6 @@ describe("account export", () => {
     expect(wedding.deliveries).toMatchObject([{ household: "Weber", kind: "saveTheDate", sharedVia: "link" }]);
     expect(wedding.opens).toMatchObject([{ household: "Weber", card: "Standard" }]);
     expect(wedding.guests.versions).toMatchObject([{ household: "Weber", item: "saveTheDate", version: "Standard" }]);
-    expect(wedding.guests.households[0]).toMatchObject({ email: "weber@example.org" });
+    expect(wedding.guests.households[0]).toMatchObject({ people: [{ email: "weber@example.org" }] });
   });
 });

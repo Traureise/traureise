@@ -191,7 +191,7 @@ export interface ImageProcessor {
 export type MailAttachment = { filename: string; content: Uint8Array; contentType: string; /** Set for images shown inline (`cid:` in the HTML). */ cid?: string };
 
 export type MailMessage = {
-  to: string;
+  to: string | string[];
   subject: string;
   text: string;
   html: string;
@@ -282,7 +282,7 @@ export interface ArchiveWriter {
 
 export type PollRecord = Poll & { position: number };
 export type NewPoll = Omit<PollInput, "options"> & { options: Poll["options"] };
-export type HouseholdData = Omit<HouseholdInput, "people"> & { people: { id: string | null; name: string; isChild: boolean }[] };
+export type HouseholdData = Omit<HouseholdInput, "people"> & { people: { id: string | null; name: string; isChild: boolean; email: string | null }[] };
 
 /** Guest lists. Everything hangs off the wedding (ON DELETE CASCADE). */
 export interface GuestRepository {
@@ -314,7 +314,7 @@ export interface GuestRepository {
   /** The version must belong to the household's wedding and fit the item; the use case checks both. */
   assign(householdId: string, item: AssignableItem, target: { cardId: string } | { websiteId: string }): Promise<void>;
 
-  /** Clears the household's email address (one-click unsubscribe); false for unknown households. */
+  /** Clears every person's email address in the household (one-click unsubscribe); false for unknown households. */
   unsubscribe(householdId: string, at: Date): Promise<boolean>;
   /** Retention: removes households, people, answers and requests of a wedding; returns how many households. */
   deleteGuestData(weddingId: string): Promise<number>;

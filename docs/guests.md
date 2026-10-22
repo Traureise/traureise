@@ -28,9 +28,10 @@ It has three tabs:
 **Person hinzufügen** next to the list adds one person as their own household in one step (just the name);
 **Haushalt hinzufügen** opens the full form.
 
-Each household can have an **email address** (optional, for cards and reminders by email) and a
-**personal line** for the thank-you card. A household that unsubscribed from emails shows "Keine E-Mails
-gewünscht"; its address is gone.
+Each person can have an **email address** (optional, for cards and reminders by email). A household is
+still mailed once, at every address of its people. A household also has a **personal line** for the
+thank-you card. The unsubscribe link stops mail for the whole household: it clears every person's address,
+and the household shows "Keine E-Mails gewünscht" until you enter a new address.
 
 A household is invited to all RSVP events unless you untick some; its form then shows only those events,
 and the meal choice only if it is invited to the meal's event.

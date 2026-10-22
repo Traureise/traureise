@@ -471,6 +471,7 @@ export class InMemoryGuests implements GuestRepository {
     id: p.id ?? this.id("guest"),
     name: p.name,
     isChild: p.isChild,
+    email: p.email,
     attending: null,
     eventIds: [],
     mealOptionId: null,
@@ -491,7 +492,6 @@ export class InMemoryGuests implements GuestRepository {
       respondedAt: null,
       answeredBy: null,
       createdAt: new Date(),
-      email: data.email,
       personalLine: data.personalLine,
       unsubscribedAt: null,
       people: data.people.map((p) => this.person({ ...p, id: null })),
@@ -504,12 +504,12 @@ export class InMemoryGuests implements GuestRepository {
     const h = this.households.find((x) => x.id === householdId && x.weddingId === weddingId)!;
     h.name = data.name;
     h.invitedEventIds = data.invitedEventIds;
-    if (data.email !== h.email) h.unsubscribedAt = null;
-    h.email = data.email;
+    const before = new Set(h.people.flatMap((x) => (x.email ? [x.email] : [])));
+    if (data.people.some((p) => p.email && !before.has(p.email))) h.unsubscribedAt = null;
     h.personalLine = data.personalLine;
     h.people = data.people.map((p) => {
       const existing = h.people.find((x) => x.id === p.id);
-      return existing ? { ...existing, name: p.name, isChild: p.isChild } : this.person({ ...p, id: null });
+      return existing ? { ...existing, name: p.name, isChild: p.isChild, email: p.email } : this.person({ ...p, id: null });
     });
   }
   async deleteHousehold(weddingId: string, householdId: string) {
@@ -533,7 +533,7 @@ export class InMemoryGuests implements GuestRepository {
     if (!h || !request || request.status !== "pending") return false;
     request.status = status;
     request.decidedAt = at;
-    if (status === "added") h.people.push({ ...this.person({ id: null, name: request.name, isChild: false }), fromRequest: true });
+    if (status === "added") h.people.push({ ...this.person({ id: null, name: request.name, isChild: false, email: null }), fromRequest: true });
     return true;
   }
   /** Version choices go with their household and their version (ON DELETE CASCADE). */
@@ -555,7 +555,7 @@ export class InMemoryGuests implements GuestRepository {
   async unsubscribe(householdId: string, at: Date) {
     const h = this.households.find((x) => x.id === householdId);
     if (!h) return false;
-    h.email = null;
+    for (const p of h.people) p.email = null;
     h.unsubscribedAt ??= at;
     return true;
   }

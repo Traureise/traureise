@@ -9,6 +9,7 @@ import {
   householdStatus,
   isReplyOpen,
   mealApplies,
+  householdEmails,
   parseHouseholdInput,
   parsePoll,
   parseResponse,
@@ -37,6 +38,7 @@ const guest = (over: Partial<Guest> = {}): Guest => ({
   allergies: "",
   pollAnswers: {},
   fromRequest: false,
+  email: null,
   ...over,
 });
 
@@ -49,7 +51,6 @@ const household = (over: Partial<Household> = {}): Household => ({
   respondedAt: null,
   answeredBy: null,
   createdAt: new Date("2026-10-01T00:00:00Z"),
-  email: null,
   personalLine: "",
   unsubscribedAt: null,
   people: [guest()],
@@ -204,14 +205,15 @@ describe("settings, polls and households", () => {
     expect(parseHouseholdInput({ name: "", people: [] })).toEqual({ ok: false, fieldErrors: { name: "required", people: "no_people" } });
     expect(parseHouseholdInput({ name: "Weber", invitedEventIds: null, people: [{ name: "Clara" }, { id: "g2", name: "Ida", isChild: true }, { name: " " }] })).toEqual({
       ok: true,
-      value: { name: "Weber", invitedEventIds: null, email: null, personalLine: "", people: [{ id: null, name: "Clara", isChild: false }, { id: "g2", name: "Ida", isChild: true }] },
+      value: { name: "Weber", invitedEventIds: null, personalLine: "", people: [{ id: null, name: "Clara", isChild: false, email: null }, { id: "g2", name: "Ida", isChild: true, email: null }] },
     });
   });
 
-  it("takes an optional email address (normalised) and a personal line for the thank-you card", () => {
-    const parsed = parseHouseholdInput({ name: "Weber", email: " Clara@Example.ORG ", personalLine: " Danke für den Kuchen! ", people: [{ name: "Clara" }] });
-    expect(parsed).toMatchObject({ ok: true, value: { email: "clara@example.org", personalLine: "Danke für den Kuchen!" } });
-    expect(parseHouseholdInput({ name: "Weber", email: "kein-at", people: [{ name: "Clara" }] })).toEqual({ ok: false, fieldErrors: { email: "invalid_email" } });
+  it("takes an optional email address per person (normalised) and a personal line for the thank-you card", () => {
+    const parsed = parseHouseholdInput({ name: "M", personalLine: " Danke für den Kuchen! ", people: [{ name: "A", email: " A@X.de " }] });
+    expect(parsed).toMatchObject({ ok: true, value: { personalLine: "Danke für den Kuchen!" } });
+    expect(parsed.ok && parsed.value.people[0]!.email).toBe("a@x.de");
+    expect(parseHouseholdInput({ name: "M", people: [{ name: "A", email: "kein-at" }] })).toEqual({ ok: false, fieldErrors: { "people.0.email": "invalid_email" } });
     expect(parseHouseholdInput({ name: "Weber", personalLine: "x".repeat(301), people: [{ name: "Clara" }] })).toEqual({ ok: false, fieldErrors: { personalLine: "too_long" } });
   });
 });
@@ -301,5 +303,13 @@ describe("dailySummaryDue", () => {
     expect(dailySummaryDue(null, tz, new Date("2027-05-02T06:00:00Z"))).toBe(true);
     expect(dailySummaryDue(new Date("2027-05-02T06:00:00Z"), tz, new Date("2027-05-02T20:00:00Z"))).toBe(false);
     expect(dailySummaryDue(new Date("2027-05-02T06:00:00Z"), tz, new Date("2027-05-03T06:30:00Z"))).toBe(true);
+  });
+});
+
+describe("householdEmails", () => {
+  it("lists the distinct addresses of the people, in person order", () => {
+    const people = [guest({ email: "a@x.de" }), guest({ email: null }), guest({ email: "a@x.de" }), guest({ email: "b@x.de" })];
+    expect(householdEmails({ people })).toEqual(["a@x.de", "b@x.de"]);
+    expect(householdEmails({ people: [guest()] })).toEqual([]);
   });
 });

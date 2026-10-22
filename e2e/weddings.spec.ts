@@ -130,8 +130,8 @@ test("a couple creates their wedding, gets every item, adds versions, chooses wh
 
     await test.step("on the guest list each household gets one version per item", async () => {
       await page.goto(guestsUrl(weddingId));
-      await addHousehold(page, "Familie Weber", [{ name: "Clara" }], undefined, { email: mail.weber });
-      await addHousehold(page, "Familie Kern", [{ name: "Eva" }], undefined, { email: mail.kern });
+      await addHousehold(page, "Familie Weber", [{ name: "Clara", email: mail.weber }]);
+      await addHousehold(page, "Familie Kern", [{ name: "Eva", email: mail.kern }]);
       const versions = household(page, "Familie Weber").getByTestId("household-versions");
       // Only items with more than one version are offered.
       await expect(versions.getByRole("combobox")).toHaveCount(2);

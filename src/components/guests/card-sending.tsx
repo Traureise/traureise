@@ -28,7 +28,7 @@ import type { HouseholdCardKind } from "@/domain/cards";
 import { whatsappUrl } from "@/domain/guests";
 import { HouseholdDialog, type HouseholdDraft } from "./household-dialog";
 
-type Household = { id: string; name: string; email: string | null; link: string };
+type Household = { id: string; name: string; emails: string[]; link: string };
 
 function useRun() {
   const tErrors = useTranslations("errors");
@@ -79,7 +79,7 @@ export function CardShareButtons({
     <>
       <WhatsAppButton message={message} name={household.name} link={household.link} onOpened={() => share("whatsapp")} />
       <CopyLinkButton url={household.link} copiedMessage={tList("linkCopied", { household: household.name })} onCopied={() => share("link")} />
-      {household.email && emailSending && (
+      {household.emails.length > 0 && emailSending && (
         <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => run(() => sendCardEmailsAction(weddingId, kind, { householdId: household.id }), () => toast.success(t("emailQueued", { household: household.name })))}>
           <Mail aria-hidden />
           {t("email")}
@@ -117,7 +117,7 @@ export function HouseholdMenu({
 
   function remind() {
     if (!reminder) return;
-    if (reminder.byEmail && household.email) run(() => sendRemindersAction(weddingId, { householdId: id }), () => toast.success(t("reminderQueued", { household: household.name })));
+    if (reminder.byEmail && household.people.some((p) => p.email)) run(() => sendRemindersAction(weddingId, { householdId: id }), () => toast.success(t("reminderQueued", { household: household.name })));
     else if (household.link) window.open(whatsappUrl(reminder.message, household.name, household.link), "_blank", "noopener,noreferrer");
   }
 

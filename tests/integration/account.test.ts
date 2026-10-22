@@ -60,7 +60,7 @@ async function seed(deps: Deps, email: string) {
   await deps.websites.update(website!.id, { coverImageKey: key });
   const faqs = (await deps.websites.listSections(website!.id)).at(-1)!;
   await deps.websites.addBlock(website!.id, faqs.id, { type: "faq", question: "Dresscode?", answer: "Sommerlich", imageKey: null });
-  const household = await deps.guests.createHousehold(wedding.id, { name: "Weber", invitedEventIds: null, email: "weber@example.org", personalLine: "", people: [{ id: null, name: "Eva", isChild: false }] }, (id) => `hash-${id}`);
+  const household = await deps.guests.createHousehold(wedding.id, { name: "Weber", invitedEventIds: null, personalLine: "", people: [{ id: null, name: "Eva", isChild: false, email: "weber@example.org" }] }, (id) => `hash-${id}`);
   const [card] = await deps.cards.listByWedding(wedding.id);
   await deps.cards.markShared(household.id, "saveTheDate", "link", new Date());
   await deps.cards.markOpened(card!.id, household.id, new Date());

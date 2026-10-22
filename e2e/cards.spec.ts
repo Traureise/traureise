@@ -51,8 +51,8 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
       websiteId = weddingIdOf(editorUrl);
       await addEvent(page, editorUrl, "Trauung", "2027-06-12", "14:30");
       await page.goto(guestsUrl(editorUrl));
-      await addHousehold(page, "Familie Weber", [{ name: "Clara" }], undefined, { email: mail.weber, personalLine: "Danke für den Kuchen!" });
-      await addHousehold(page, "Familie Kern", [{ name: "Eva" }], undefined, { email: mail.kern });
+      await addHousehold(page, "Familie Weber", [{ name: "Clara", email: mail.weber }], undefined, { personalLine: "Danke für den Kuchen!" });
+      await addHousehold(page, "Familie Kern", [{ name: "Eva", email: mail.kern }]);
       await addHousehold(page, "Familie Roth", [{ name: "Paul" }]);
       await expect(household(page, "Familie Weber").getByTestId("household-channel")).toHaveText(`E-Mail: ${mail.weber}`);
       await expect(household(page, "Familie Roth").getByTestId("household-channel")).toHaveText("Link oder WhatsApp");
@@ -293,7 +293,7 @@ test("Save the Dates, invitations and cards: design, send by link, WhatsApp and 
       expect(wedding.deliveries.find(weberStd)).toMatchObject({ sharedVia: "whatsapp" });
       expect(wedding.opens.find((o: { household: string; cardId: string }) => o.household === "Familie Weber" && o.cardId === std.id).openedAt).toBeTruthy();
       const weber = wedding.guests.households.find((h: { name: string }) => h.name === "Familie Weber");
-      expect(weber).toMatchObject({ email: null, personalLine: "Danke für den Kuchen!" });
+      expect(weber).toMatchObject({ personalLine: "Danke für den Kuchen!", people: [{ email: null }] });
       expect(weber.unsubscribedAt).toBeTruthy();
     });
 

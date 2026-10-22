@@ -34,7 +34,7 @@ beforeEach(async () => {
 const add = (item: Parameters<AddVersion["execute"]>[2], label: string, copyFrom: string | null = null, userId = anna.id) =>
   new AddVersion(f.deps).execute(userId, weddingId, item, { label, copyFrom });
 const cardsOf = async (kind: string) => (await f.cards.listByWedding(weddingId)).filter((c) => c.kind === kind);
-const household = (name: string, email: string | null = null) => new SaveHousehold(f.deps).execute(anna.id, weddingId, null, { name, email, people: [{ name: `${name} 1` }] });
+const household = (name: string, email: string | null = null) => new SaveHousehold(f.deps).execute(anna.id, weddingId, null, { name, people: [{ name: `${name} 1`, email }] });
 const grant = async (tier: PaidTier) => {
   f.deps.billing.enabled = true;
   await f.billingRepo.applyEvent(`evt-${Math.random()}`, { kind: "grant", weddingId, tier, purchaseRef: `ord-${Math.random()}`, provider: "testpay", validUntil: new Date("2028-06-13T00:00:00Z") });
