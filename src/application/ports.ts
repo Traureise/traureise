@@ -2,6 +2,7 @@ import type { BlockData, BlockType, EventData, SectionTemplate } from "@/domain/
 import type { Entitlement, PaidTier, Tier, TierOffer } from "@/domain/billing";
 import type { ThemeManifest } from "@/domain/theme";
 import type { AnswerSource, Household, HouseholdInput, HouseholdResponse, Poll, PollInput, RequestStatus, RsvpSettings } from "@/domain/guests";
+import type { ImportPlan } from "@/domain/guest-import";
 import type { CardContent, CardInput, CardKind, CardLabels, CardModel, Delivery, HouseholdCardKind, SharedVia } from "@/domain/cards";
 import type { AssignableItem, Assignment } from "@/domain/weddings";
 
@@ -289,6 +290,8 @@ export interface SpreadsheetCodec {
   writeXlsx(rows: string[][]): Uint8Array;
 }
 
+export type GuestImportBatch = Pick<ImportPlan, "create" | "join" | "overwrite">;
+
 export type PollRecord = Poll & { position: number };
 export type NewPoll = Omit<PollInput, "options"> & { options: Poll["options"] };
 export type HouseholdData = Omit<HouseholdInput, "people"> & { people: { id: string | null; name: string; isChild: boolean; email: string | null }[] };
@@ -309,6 +312,8 @@ export interface GuestRepository {
   findByTokenHash(tokenHash: string): Promise<{ weddingId: string; household: Household } | null>;
   /** `tokenHashFor` turns the new household's id into the hash of its personal link. */
   createHousehold(weddingId: string, data: HouseholdData, tokenHashFor: (householdId: string) => string): Promise<Household>;
+  /** One transaction. Overwrites and joins are limited to the wedding's own households; anything else rolls everything back. */
+  importGuests(weddingId: string, batch: GuestImportBatch, tokenHashFor: (householdId: string) => string): Promise<void>;
   /** People with an id are updated, people without one added, people left out removed. */
   updateHousehold(weddingId: string, householdId: string, data: HouseholdData): Promise<void>;
   deleteHousehold(weddingId: string, householdId: string): Promise<void>;

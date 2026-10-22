@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
-import type { GuestRepository, HouseholdData, NewPoll, PollRecord } from "@/application/ports";
+import type { GuestImportBatch, GuestRepository, HouseholdData, NewPoll, PollRecord } from "@/application/ports";
 import type { AssignableItem, Assignment } from "@/domain/weddings";
 import {
   DEFAULT_RSVP_SETTINGS,
@@ -134,6 +134,34 @@ export class DrizzleGuestRepository implements GuestRepository {
       await tx.insert(guests).values(data.people.map((p, position) => ({ householdId: id, position, name: p.name, isChild: p.isChild, email: p.email })));
     });
     return (await this.findHousehold(weddingId, id))!;
+  }
+
+  async importGuests(weddingId: string, batch: GuestImportBatch, tokenHashFor: (householdId: string) => string): Promise<void> {
+    // Anything that does not belong to the wedding throws, which rolls the whole import back.
+    await this.db.transaction(async (tx) => {
+      for (const household of batch.create) {
+        const id = crypto.randomUUID();
+        await tx.insert(households).values({ id, weddingId, name: household.name, invitedEventIds: household.invitedEventIds, personalLine: household.personalLine, tokenHash: tokenHashFor(id) });
+        await tx.insert(guests).values(household.people.map((p, position) => ({ householdId: id, position, name: p.name, isChild: p.isChild, email: p.email, allergies: p.allergies })));
+      }
+      for (const join of batch.join) {
+        if (!UUID.test(join.householdId)) throw new Error("household not found");
+        const [own] = await tx.select({ id: households.id }).from(households).where(and(eq(households.id, join.householdId), eq(households.weddingId, weddingId)));
+        if (!own) throw new Error("household not found");
+        const [last] = await tx.select({ position: sql<number>`coalesce(max(${guests.position}), -1)` }).from(guests).where(eq(guests.householdId, join.householdId));
+        const start = Number(last!.position) + 1;
+        await tx.insert(guests).values(join.people.map((p, i) => ({ householdId: join.householdId, position: start + i, name: p.name, isChild: p.isChild, email: p.email, allergies: p.allergies })));
+      }
+      for (const o of batch.overwrite) {
+        if (!UUID.test(o.guestId)) throw new Error("guest not found");
+        const updated = await tx
+          .update(guests)
+          .set({ name: o.name, isChild: o.isChild, email: o.email, allergies: o.allergies })
+          .where(and(eq(guests.id, o.guestId), inArray(guests.householdId, tx.select({ id: households.id }).from(households).where(eq(households.weddingId, weddingId)))))
+          .returning({ id: guests.id });
+        if (updated.length === 0) throw new Error("guest not found");
+      }
+    });
   }
 
   async updateHousehold(weddingId: string, householdId: string, data: HouseholdData): Promise<void> {

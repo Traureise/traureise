@@ -26,6 +26,7 @@ import type {
   GuestRepository,
   HouseholdData,
   ImageProcessor,
+  GuestImportBatch,
   NewPoll,
   PollRecord,
   Block,
@@ -514,6 +515,36 @@ export class InMemoryGuests implements GuestRepository {
     };
     this.households.push(household);
     return this.strip(household);
+  }
+  async importGuests(weddingId: string, batch: GuestImportBatch, tokenHashFor: (id: string) => string) {
+    // All or nothing, like the transaction: check everything before writing.
+    const own = (id: string) => this.households.find((h) => h.id === id && h.weddingId === weddingId);
+    for (const j of batch.join) if (!own(j.householdId)) throw new Error("household not found");
+    for (const o of batch.overwrite) if (!this.households.some((h) => h.weddingId === weddingId && h.people.some((p) => p.id === o.guestId))) throw new Error("guest not found");
+    for (const c of batch.create) {
+      const id = this.id("household");
+      this.households.push({
+        id,
+        weddingId,
+        tokenHash: tokenHashFor(id),
+        name: c.name,
+        invitedEventIds: c.invitedEventIds,
+        message: "",
+        pollAnswers: {},
+        respondedAt: null,
+        answeredBy: null,
+        createdAt: new Date(),
+        personalLine: c.personalLine,
+        unsubscribedAt: null,
+        people: c.people.map((p) => ({ ...this.person({ ...p, id: null }), allergies: p.allergies })),
+        requests: [],
+      });
+    }
+    for (const j of batch.join) own(j.householdId)!.people.push(...j.people.map((p) => ({ ...this.person({ ...p, id: null }), allergies: p.allergies })));
+    for (const o of batch.overwrite) {
+      const guest = this.households.filter((h) => h.weddingId === weddingId).flatMap((h) => h.people).find((p) => p.id === o.guestId)!;
+      Object.assign(guest, { name: o.name, isChild: o.isChild, email: o.email, allergies: o.allergies });
+    }
   }
   async updateHousehold(weddingId: string, householdId: string, data: HouseholdData) {
     const h = this.households.find((x) => x.id === householdId && x.weddingId === weddingId)!;

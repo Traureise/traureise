@@ -33,6 +33,7 @@ import {
   GetCoupleAnswerForm,
   SaveCoupleAnswer,
 } from "@/application/guests";
+import { DownloadGuestTemplate, ImportGuests, PlanGuestImport, PreviewGuestImport } from "@/application/guest-import";
 import { createGuestMailTemplates } from "@/infrastructure/mail/guest-templates";
 import {
   ExportCard,
@@ -239,6 +240,10 @@ function build() {
     deletePoll: new DeletePoll(deps),
     decideGuestRequest: new DecideGuestRequest(deps),
     exportGuestsCsv: new ExportGuestsCsv(deps),
+    downloadGuestTemplate: new DownloadGuestTemplate(deps),
+    previewGuestImport: new PreviewGuestImport(deps),
+    planGuestImport: new PlanGuestImport(deps),
+    importGuests: new ImportGuests(deps),
     getGuestFormPreview: new GetGuestFormPreview(deps),
     submitGuestResponse: new SubmitGuestResponse(deps),
     getCoupleAnswerForm: new GetCoupleAnswerForm(deps),

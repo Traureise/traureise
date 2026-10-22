@@ -107,6 +107,48 @@ describe("DrizzleGuestRepository", () => {
     ]);
   });
 
+  describe("importGuests", () => {
+    const person = (name: string, extra: Partial<{ isChild: boolean; email: string | null; allergies: string }> = {}) => ({ name, isChild: false, email: null, allergies: "", ...extra });
+    const everyone = async () => (await repo.listHouseholds(weddingId)).flatMap((h) => h.people.map((p) => p.name));
+
+    it("creates, joins and overwrites in one call and keeps answers", async () => {
+      const weber = await newHousehold("Weber", ["Clara", "Max"]);
+      await db.update(guests).set({ attending: true, eventIds: [party], allergies: "alt" }).where(eq(guests.id, weber.people[0]!.id));
+      await repo.importGuests(
+        weddingId,
+        {
+          create: [{ name: "Oma", invitedEventIds: [party], personalLine: "Liebe Oma", people: [person("Oma", { email: "oma@example.org", allergies: "Nüsse" }), person("Opa")] }],
+          join: [{ householdId: weber.id, householdName: "Weber", people: [person("Ida", { isChild: true })] }],
+          overwrite: [{ guestId: weber.people[0]!.id, name: "Clara W.", isChild: false, email: "clara@example.org", allergies: "neu" }],
+        },
+        (id) => `hash-${id}`,
+      );
+      const all = await repo.listHouseholds(weddingId);
+      const oma = all.find((h) => h.name === "Oma")!;
+      expect(await repo.findByTokenHash(`hash-${oma.id}`)).toMatchObject({ household: { name: "Oma", personalLine: "Liebe Oma", invitedEventIds: [party] } });
+      expect(oma.people.map((p) => [p.name, p.email, p.allergies])).toEqual([["Oma", "oma@example.org", "Nüsse"], ["Opa", null, ""]]);
+      const updated = all.find((h) => h.id === weber.id)!;
+      expect(updated.people.map((p) => p.name)).toEqual(["Clara W.", "Max", "Ida"]);
+      expect(updated.people[0]).toMatchObject({ email: "clara@example.org", allergies: "neu", attending: true, eventIds: [party] });
+      expect(updated.people[2]!.isChild).toBe(true);
+    });
+
+    it("rolls everything back for a household of another wedding", async () => {
+      const other = (await weddings.create({ ownerId, slug: `other-${Date.now()}`, title: "Andere", weddingDate: null, timezone: "Europe/Berlin" })).id;
+      const foreign = await repo.createHousehold(other, { name: "Fremd", invitedEventIds: null, personalLine: "", people: [{ id: null, name: "Fremder", isChild: false, email: null }] }, (id) => `hash-${id}`);
+      await newHousehold("Weber", ["Clara"]);
+      const batch = { create: [{ name: "Neu", invitedEventIds: null, personalLine: "", people: [person("Neu")] }], overwrite: [] };
+      await expect(repo.importGuests(weddingId, { ...batch, join: [{ householdId: foreign.id, householdName: "Fremd", people: [person("Eindringling")] }] }, (id) => `hash-${id}`)).rejects.toThrow();
+      expect(await everyone()).toEqual(["Clara"]);
+      expect((await repo.findHousehold(other, foreign.id))!.people.map((p) => p.name)).toEqual(["Fremder"]);
+
+      const stranger = foreign.people[0]!.id;
+      await expect(repo.importGuests(weddingId, { ...batch, join: [], overwrite: [{ guestId: stranger, name: "X", isChild: false, email: null, allergies: "" }] }, (id) => `hash-${id}`)).rejects.toThrow();
+      expect(await everyone()).toEqual(["Clara"]);
+      expect((await repo.findHousehold(other, foreign.id))!.people[0]!.name).toBe("Fremder");
+    });
+  });
+
   describe("email addresses per person", () => {
     const withEmails = async (emails: (string | null)[]) => {
       const household = await newHousehold("Weber", ["Clara", "Max"]);
