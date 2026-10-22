@@ -5,6 +5,7 @@ import type { Deps } from "@/application/deps";
 import { ExportGuestsCsv, RunGuestJobs, SaveHousehold, SubmitGuestResponse } from "@/application/guests";
 import type { CsvLabels } from "@/domain/guests";
 import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
+import { FflateSpreadsheets } from "@/infrastructure/spreadsheets";
 import { guestRequests, guests, households, rsvpPolls, rsvpSettings } from "@/infrastructure/db/schema";
 import { createGuestMailTemplates } from "@/infrastructure/mail/guest-templates";
 import { PostgresRateLimiter } from "@/infrastructure/repositories/auth";
@@ -61,6 +62,7 @@ function deps(clock = new FakeClock()) {
     clock,
     tokens: cryptoTokens,
     archive: new FflateArchiveWriter(),
+    spreadsheets: new FflateSpreadsheets(),
     billing: { enabled: false, offers: [], unlockedTiers: [] },
     payments: null,
     appUrl: "http://localhost:3000",

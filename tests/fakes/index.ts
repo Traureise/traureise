@@ -11,6 +11,8 @@ import type {
   QueuedMail,
   ArchiveEntry,
   ArchiveWriter,
+  SheetRead,
+  SpreadsheetCodec,
   BillingChange,
   BillingRepository,
   CheckoutRequest,
@@ -416,6 +418,19 @@ export class FakeArchive implements ArchiveWriter {
   }
   static read(bytes: Uint8Array): ArchiveEntry[] {
     return (JSON.parse(new TextDecoder().decode(bytes)) as { path: string; bytes: number[] }[]).map((e) => ({ path: e.path, bytes: new Uint8Array(e.bytes) }));
+  }
+}
+
+/** Returns a preset table; writeXlsx records what it was given. */
+export class FakeSpreadsheets implements SpreadsheetCodec {
+  result: SheetRead = { ok: true, rows: [] };
+  written: string[][][] = [];
+  read(): SheetRead {
+    return this.result;
+  }
+  writeXlsx(rows: string[][]) {
+    this.written.push(rows);
+    return new TextEncoder().encode(JSON.stringify(rows));
   }
 }
 
@@ -928,6 +943,7 @@ export function createFakes() {
     billingRepo,
     payments: new FakePayments() as FakePayments | null,
     archive: new FakeArchive(),
+    spreadsheets: new FakeSpreadsheets(),
     guests,
     guestLinks: fakeGuestLinks,
     guestMail: fakeGuestMail,

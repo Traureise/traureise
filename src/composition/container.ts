@@ -14,6 +14,7 @@ import { GetPricing, HandlePaymentWebhook, ListPurchases, ListWeddingPlans, Star
 import type { Deps } from "@/application/deps";
 import type { BillingSettings, FileStorage, PaymentProvider } from "@/application/ports";
 import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
+import { FflateSpreadsheets } from "@/infrastructure/spreadsheets";
 import { CreemPaymentProvider } from "@/infrastructure/payments/creem";
 import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing";
 import { GetEventIcs, GetPublicWebsite, GetWeddingIcs } from "@/application/public";
@@ -143,6 +144,7 @@ function build() {
     billingRepo: new DrizzleBillingRepository(db),
     payments,
     archive: new FflateArchiveWriter(),
+    spreadsheets: new FflateSpreadsheets(),
     guests: new DrizzleGuestRepository(db),
     guestLinks: hmacGuestLinks(appSecret(config)),
     guestMail: createGuestMailTemplates(),

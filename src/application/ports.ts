@@ -280,6 +280,15 @@ export interface ArchiveWriter {
   zip(entries: ArchiveEntry[]): Promise<Uint8Array>;
 }
 
+export type SheetRead = { ok: true; rows: string[][] } | { ok: false; error: "unreadable" | "too_large" };
+
+export interface SpreadsheetCodec {
+  /** XLSX by zip signature (PK\x03\x04), CSV otherwise. Cells come back trimmed; trailing empty rows are dropped. */
+  read(bytes: Uint8Array): SheetRead;
+  /** One sheet, every cell a string cell (t="inlineStr"). */
+  writeXlsx(rows: string[][]): Uint8Array;
+}
+
 export type PollRecord = Poll & { position: number };
 export type NewPoll = Omit<PollInput, "options"> & { options: Poll["options"] };
 export type HouseholdData = Omit<HouseholdInput, "people"> & { people: { id: string | null; name: string; isChild: boolean; email: string | null }[] };

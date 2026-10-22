@@ -12,6 +12,7 @@ import { CreateWedding } from "@/application/weddings";
 import { buildCardModel, defaultCardContent, type CardKind } from "@/domain/cards";
 import { cardLayoutsFor, resolveDesign } from "@/domain/theme";
 import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
+import { FflateSpreadsheets } from "@/infrastructure/spreadsheets";
 import { SatoriCardRenderer } from "@/infrastructure/cards/renderer";
 import { cardDeliveries, cardOpens, cards, householdVersions } from "@/infrastructure/db/schema";
 import { createCardMailTemplates, createCardTexts } from "@/infrastructure/mail/card-templates";
@@ -74,6 +75,7 @@ function deps(options: { smtp?: boolean } = {}) {
     clock: new FakeClock(),
     tokens: cryptoTokens,
     archive: new FflateArchiveWriter(),
+    spreadsheets: new FflateSpreadsheets(),
     billing: { enabled: false, offers: [], unlockedTiers: [] },
     payments: null,
     appUrl: "http://localhost:3000",

@@ -10,6 +10,7 @@ import { cardDeliveries, cardOpens, cards, householdVersions, households, weddin
 import { createCardTexts } from "@/infrastructure/mail/card-templates";
 import { createSiteTexts } from "@/infrastructure/site-texts";
 import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
+import { FflateSpreadsheets } from "@/infrastructure/spreadsheets";
 import { DrizzleMagicLinkRepository, DrizzleSessionRepository, PostgresRateLimiter } from "@/infrastructure/repositories/auth";
 import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing";
 import { DrizzleCardRepository } from "@/infrastructure/repositories/cards";
@@ -41,6 +42,7 @@ async function realDeps() {
     guests: new DrizzleGuestRepository(db),
     cards: new DrizzleCardRepository(db),
     archive: new FflateArchiveWriter(),
+    spreadsheets: new FflateSpreadsheets(),
     clock: systemClock,
     tokens: cryptoTokens,
     themes: new FakeThemes(),
