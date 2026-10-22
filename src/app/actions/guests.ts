@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { ValidationError } from "@/application/errors";
 import { container } from "@/composition/container";
+import { IMPORT_MAX_BYTES } from "@/domain/guest-import";
 import { importHeaders } from "@/lib/import-headers";
 import { runAction, type ActionResult } from "@/lib/action-result";
 import { clientIp } from "@/lib/client-ip";
@@ -65,7 +66,9 @@ export async function previewGuestImportAction(weddingId: string, form: FormData
   const headers = await importHeaders();
   return runAction(async () => {
     if (!(file instanceof File)) throw new ValidationError({ file: "empty" });
-    return container().previewGuestImport.execute(user.id, weddingId, { bytes: new Uint8Array(await file.arrayBuffer()), size: file.size }, headers);
+    // Checked before reading the upload into memory; the use case checks the bytes again.
+    if (file.size > IMPORT_MAX_BYTES) throw new ValidationError({ file: "too_large" });
+    return container().previewGuestImport.execute(user.id, weddingId, { bytes: new Uint8Array(await file.arrayBuffer()) }, headers);
   });
 }
 

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Duplicate, ImportDecision, ImportPlan, ImportRow, RowProblem } from "@/domain/guest-import";
+import { IMPORT_MAX_BYTES, pruneDecisions, type Duplicate, type ImportDecision, type ImportPlan, type ImportRow, type ImportWarning, type RowProblem } from "@/domain/guest-import";
 
 type Review = { rows: ImportRow[]; decisions: Record<number, ImportDecision>; ignoredColumns: string[]; plan: ImportPlan };
 type EventRef = { id: string; name: string };
@@ -29,17 +29,36 @@ export function GuestImport({ weddingId, events }: { weddingId: string; events: 
   const [review, setReview] = useState<Review | null>(null);
   const [fileError, setFileError] = useState<string>();
   const [outdated, setOutdated] = useState(false);
+  /** The last re-plan failed, so the plan on screen may be wrong: importing waits for a successful one. */
+  const [stale, setStale] = useState(false);
   const [editing, setEditing] = useState<number | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   function upload(file: File) {
-    const form = new FormData();
-    form.set("file", file);
-    start(async () => {
-      const result = await previewGuestImportAction(weddingId, form);
+    const reset = () => {
       if (fileInput.current) fileInput.current.value = "";
       setEditing(null);
       setOutdated(false);
+      setStale(false);
+    };
+    if (file.size > IMPORT_MAX_BYTES) {
+      reset();
+      setReview(null);
+      setFileError(t("fileErrors.too_large"));
+      return;
+    }
+    const form = new FormData();
+    form.set("file", file);
+    start(async () => {
+      let result: Awaited<ReturnType<typeof previewGuestImportAction>>;
+      try {
+        result = await previewGuestImportAction(weddingId, form);
+      } catch {
+        reset();
+        toast.error(tErrors("unknown"));
+        return;
+      }
+      reset();
       if (!result.ok) {
         const code = result.fieldErrors?.file;
         setReview(null);
@@ -51,16 +70,33 @@ export function GuestImport({ weddingId, events }: { weddingId: string; events: 
     });
   }
 
-  /** Re-plans after an edit or a decision; the server's plan replaces ours. */
+  /**
+   * Plans against the current guest list; the server's plan replaces ours, and decisions it no
+   * longer offers are dropped (otherwise they would refuse every import). False when it failed.
+   */
+  async function replan(current: Review, next: { rows: ImportRow[]; decisions: Record<number, ImportDecision> }): Promise<boolean> {
+    let result: Awaited<ReturnType<typeof planGuestImportAction>>;
+    try {
+      result = await planGuestImportAction(weddingId, { ...next, ignoredColumns: current.ignoredColumns });
+    } catch {
+      result = { ok: false, error: "unknown" };
+    }
+    if (!result.ok) {
+      setStale(true);
+      toast.error(tErrors(result.error ?? "unknown"));
+      return false;
+    }
+    setStale(false);
+    setReview({ ...current, rows: next.rows, decisions: pruneDecisions(next.decisions, result.data), plan: result.data });
+    return true;
+  }
+
+  /** Re-plans after an edit or a decision. */
   function change(next: { rows: ImportRow[]; decisions: Record<number, ImportDecision> }, onDone?: () => void) {
     if (!review) return;
     start(async () => {
-      const result = await planGuestImportAction(weddingId, { ...next, ignoredColumns: review.ignoredColumns });
-      if (!result.ok) {
-        toast.error(tErrors(result.error ?? "unknown"));
-        return;
-      }
-      setReview({ ...review, ...next, plan: result.data });
+      if (!(await replan(review, next))) return;
+      setOutdated(false);
       onDone?.();
     });
   }
@@ -68,7 +104,13 @@ export function GuestImport({ weddingId, events }: { weddingId: string; events: 
   function submit() {
     if (!review) return;
     start(async () => {
-      const result = await importGuestsAction(weddingId, { rows: review.rows, decisions: review.decisions });
+      let result: Awaited<ReturnType<typeof importGuestsAction>>;
+      try {
+        result = await importGuestsAction(weddingId, { rows: review.rows, decisions: review.decisions });
+      } catch {
+        toast.error(tErrors("unknown"));
+        return;
+      }
       if (result.ok) {
         toast.success(t("done", result.data));
         router.push(`/hochzeiten/${weddingId}/gaeste`);
@@ -77,8 +119,7 @@ export function GuestImport({ weddingId, events }: { weddingId: string; events: 
       if (result.fieldErrors?._ === "review_outdated") {
         setOutdated(true);
         toast.error(t("outdated"));
-        const replanned = await planGuestImportAction(weddingId, { rows: review.rows, decisions: review.decisions, ignoredColumns: review.ignoredColumns });
-        if (replanned.ok) setReview({ ...review, plan: replanned.data });
+        await replan(review, { rows: review.rows, decisions: review.decisions });
         return;
       }
       toast.error(tErrors(result.error ?? "unknown"));
@@ -105,7 +146,7 @@ export function GuestImport({ weddingId, events }: { weddingId: string; events: 
           id="import-file"
           ref={fileInput}
           type="file"
-          accept=".xlsx,.csv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           disabled={pending}
           aria-describedby="import-file-hint"
           onChange={(e) => {
@@ -130,9 +171,9 @@ export function GuestImport({ weddingId, events }: { weddingId: string; events: 
 
       {review && (
         <div className="space-y-10">
-          {outdated && (
-            <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm">
-              {t("outdated")}
+          {(outdated || stale) && (
+            <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm" data-testid="import-outdated">
+              {stale ? t("stale") : t("outdated")}
             </p>
           )}
 
@@ -217,6 +258,7 @@ export function GuestImport({ weddingId, events }: { weddingId: string; events: 
                     row={rowOf(dup.line)!}
                     events={events}
                     decision={review.decisions[dup.line]}
+                    undecided={review.plan.undecided.includes(dup.line)}
                     busy={pending}
                     editing={editing === dup.line}
                     onEdit={() => setEditing(dup.line)}
@@ -252,9 +294,17 @@ export function GuestImport({ weddingId, events }: { weddingId: string; events: 
           <PlanSection plan={review.plan} />
 
           <div className="flex flex-wrap items-center gap-3">
-            <Button type="button" disabled={!review.plan.ready || pending} onClick={submit}>
+            <Button type="button" disabled={!review.plan.ready || stale || pending} aria-describedby="import-waiting" onClick={submit}>
               {pending ? t("importing") : t("submit")}
             </Button>
+            {stale && (
+              <Button type="button" variant="outline" disabled={pending} onClick={() => change({ rows: review.rows, decisions: review.decisions })}>
+                {t("recheck")}
+              </Button>
+            )}
+            <p id="import-waiting" className="text-sm text-muted-foreground" data-testid="import-waiting">
+              {review.plan.undecided.length > 0 && t("undecided", { count: review.plan.undecided.length, lines: review.plan.undecided.join(", ") })}
+            </p>
           </div>
         </div>
       )}
@@ -289,6 +339,7 @@ function DuplicateItem({
   row,
   events,
   decision,
+  undecided,
   busy,
   editing,
   onEdit,
@@ -300,6 +351,7 @@ function DuplicateItem({
   row: ImportRow;
   events: EventRef[];
   decision: ImportDecision | undefined;
+  undecided: boolean;
   busy: boolean;
   editing: boolean;
   onEdit: () => void;
@@ -324,11 +376,17 @@ function DuplicateItem({
                 ? t("duplicates.existingEmail", { name: m.name, household: m.householdName, email: m.email })
                 : t("duplicates.existing", { name: m.name, household: m.householdName })
               : t("duplicates.row", { line: m.line })}
+            {m.kind === "existing" && m.claimedBy !== undefined && <> · {t("duplicates.claimed", { line: m.claimedBy })}</>}
           </li>
         ))}
       </ul>
       {decision?.action === "add" && <p className="text-sm text-muted-foreground">{t("added")}</p>}
-      {decision?.action === "overwrite" && <p className="text-sm text-muted-foreground">{t("overwritten", { name: existing.find((m) => m.guestId === decision.guestId)?.name ?? "" })}</p>}
+      {decision?.action === "overwrite" && !undecided && <p className="text-sm text-muted-foreground">{t("overwritten", { name: existing.find((m) => m.guestId === decision.guestId)?.name ?? "" })}</p>}
+      {undecided && (
+        <p className="text-sm font-medium text-destructive" data-testid="import-needs-decision">
+          {t("needsDecision")}
+        </p>
+      )}
       {editing ? (
         <RowEditor row={row} events={events} busy={busy} onCancel={onCancel} onSave={onSave} />
       ) : (
@@ -344,7 +402,7 @@ function DuplicateItem({
               {t("edit")}
             </Button>
             {existing.map((m) => {
-              const pressed = decision?.action === "overwrite" && decision.guestId === m.guestId;
+              const pressed = !undecided && decision?.action === "overwrite" && decision.guestId === m.guestId;
               return (
                 <Button
                   key={m.guestId}
@@ -352,7 +410,7 @@ function DuplicateItem({
                   size="sm"
                   variant={pressed ? "default" : "outline"}
                   aria-pressed={pressed}
-                  disabled={busy}
+                  disabled={busy || m.claimedBy !== undefined}
                   aria-label={t("rowAction", { action: t("overwrite", { name: m.name, household: m.householdName }), line })}
                   onClick={() => onDecide({ action: "overwrite", guestId: m.guestId })}
                 >
@@ -437,11 +495,7 @@ function PlanSection({ plan }: { plan: ImportPlan }) {
         <ul className="space-y-1 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm" data-testid="import-warnings">
           {plan.warnings.map((w, i) => (
             <li key={i}>
-              {w.code === "ignored_columns"
-                ? t("warnings.ignored_columns", { columns: w.columns.join(", ") })
-                : w.code === "conflicting_values"
-                  ? t("warnings.conflicting_values", { household: w.household, field: t(w.field === "events" ? "warnings.fieldEvents" : "warnings.fieldPersonalLine") })
-                  : t("warnings.ambiguous_household", { household: w.household })}
+              <WarningText warning={w} />
             </li>
           ))}
         </ul>
@@ -474,4 +528,18 @@ function PlanSection({ plan }: { plan: ImportPlan }) {
       )}
     </section>
   );
+}
+
+function WarningText({ warning: w }: { warning: ImportWarning }) {
+  const t = useTranslations("guests.import");
+  switch (w.code) {
+    case "ignored_columns":
+      return <>{t("warnings.ignored_columns", { columns: w.columns.join(", ") })}</>;
+    case "conflicting_values":
+      return <>{t("warnings.conflicting_values", { household: w.household, field: t(w.field === "events" ? "warnings.fieldEvents" : "warnings.fieldPersonalLine") })}</>;
+    case "ambiguous_household":
+      return <>{t("warnings.ambiguous_household", { household: w.household })}</>;
+    case "unsubscribed_household":
+      return <>{t("warnings.unsubscribed_household", { household: w.household })}</>;
+  }
 }
