@@ -134,7 +134,7 @@ describe("planImport problems", () => {
     expect(p.create).toHaveLength(1);
     expect(p.ready).toBe(true);
   });
-  it("does not count overwrites or skips toward the cap", () => {
+  it("does not count an overwrite toward the cap", () => {
     const existing = [household("h1", "M", [guest("g1", "Anna", { })])];
     const rows = [row(2, { name: "Anna", household: "M" }), ...Array.from({ length: 29 }, (_, i) => row(i + 3, { household: "M" }))];
     const p = plan(rows, existing, { 2: { action: "overwrite", guestId: "g1" } });
@@ -195,9 +195,9 @@ describe("planImport duplicates", () => {
     const add = plan(rows, [anna], { 2: { action: "add" } });
     expect(add.ready).toBe(true);
     expect(add.create[0]?.people[0]?.name).toBe("Anna Meier");
-    const skip = plan(rows, [anna], { 2: { action: "skip" } });
+    const skip = plan([...rows, row(3, { name: "Other" })], [anna], { 2: { action: "skip" } });
     expect(skip.ready).toBe(true);
-    expect(skip.create).toEqual([]);
+    expect(skip.create).toHaveLength(1);
     expect(skip.overwrite).toEqual([]);
   });
   it("overwrites, keeping old values for empty cells", () => {
@@ -223,5 +223,51 @@ describe("planImport duplicates", () => {
 describe("templateTable", () => {
   it("has the headers followed by the event names", () => {
     expect(templateTable(headers, events)).toEqual([["Name", "Haushalt", "Kind", "E-Mail", "Allergien", "Persönliche Zeile", "Standesamt", "Feier"]]);
+  });
+});
+
+describe("planImport edge cases", () => {
+  const anna = household("h1", "Meier", [guest("g1", "Anna Meier")]);
+
+  it("lets only one row overwrite a guest; a second claim is undecided", () => {
+    const rows = [row(2, { name: "Anna Meier", household: "A" }), row(3, { name: "anna meier", household: "B" })];
+    const p = plan(rows, [anna], { 2: { action: "overwrite", guestId: "g1" }, 3: { action: "overwrite", guestId: "g1" } });
+    expect(p.overwrite.map((o) => o.guestId)).toEqual(["g1"]);
+    expect(p.ready).toBe(false);
+    expect(plan(rows, [anna], { 2: { action: "overwrite", guestId: "g1" }, 3: { action: "add" } }).ready).toBe(true);
+  });
+  it("is not ready when nothing would be imported", () => {
+    expect(plan([]).ready).toBe(false);
+    expect(plan([row(2)], [], { 2: { action: "skip" } }).ready).toBe(false);
+  });
+  it("does not let a problem row be a duplicate target", () => {
+    const p = plan([row(2, { name: "Ben", email: "nope" }), row(3, { name: "Ben" })]);
+    expect(p.duplicates).toEqual([]);
+    expect(p.problems).toHaveLength(1);
+  });
+  it("counts an add-decided duplicate toward the cap", () => {
+    const people = [guest("g1", "Anna")];
+    const existing = [household("h1", "M", people)];
+    const rows = [row(2, { name: "Anna", household: "M" }), ...Array.from({ length: 29 }, (_, i) => row(i + 3, { household: "M" }))];
+    const p = plan(rows, existing, { 2: { action: "add" } });
+    expect(p.problems).toEqual([{ line: 31, field: "household", code: "household_full" }]);
+    expect(p.join[0]?.people).toHaveLength(29);
+  });
+  it("reports household_full for a row that is also a duplicate", () => {
+    const rows = [...Array.from({ length: 30 }, (_, i) => row(i + 2, { household: "Groß" })), row(32, { name: "Person 2", household: "Groß" })];
+    const p = plan(rows, [], { 32: { action: "add" } });
+    expect(p.duplicates.map((d) => d.line)).toEqual([32]);
+    expect(p.problems).toEqual([{ line: 32, field: "household", code: "household_full" }]);
+    expect(p.ready).toBe(false);
+  });
+  it("plans 1000 rows against 1000 existing guests quickly", () => {
+    const existing = Array.from({ length: 100 }, (_, h) =>
+      household(`h${h}`, `Haus ${h}`, Array.from({ length: 10 }, (_, i) => guest(`g${h}-${i}`, `Gast ${h}-${i}`, { email: `g${h}-${i}@example.com` }))),
+    );
+    const rows = Array.from({ length: 1000 }, (_, i) => row(i + 2, { name: `Neu ${i}`, household: `Neu ${i % 100}`, email: `neu${i}@example.com` }));
+    const start = performance.now();
+    const p = plan(rows, existing);
+    expect(performance.now() - start).toBeLessThan(200);
+    expect(p.duplicates).toEqual([]);
   });
 });

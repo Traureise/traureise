@@ -144,8 +144,8 @@ export function planImport(input: {
   let openProblems = false;
   for (const row of input.rows) {
     const skipped = decisions[row.line]?.action === "skip";
-    const found = validate(row, events);
     if (skipped) continue;
+    const found = validate(row, events);
     if (found.length > 0) {
       problems.push(...found);
       openProblems = true;
@@ -154,36 +154,53 @@ export function planImport(input: {
     candidates.push({ row, target: resolveTarget(row, existing), email: normalizeEmail(row.email) });
   }
 
-  // 4: duplicates, in file order.
+  // 4: duplicates, in file order. Indexes of existing guests and of earlier rows avoid rescanning everything.
   const guests = existing.flatMap((h) => h.people.map((g) => ({ household: h, guest: g })));
+  type Known = { order: number; household: Household; guest: Household["people"][number] };
+  const byName = new Map<string, Known[]>();
+  const byEmail = new Map<string, Known[]>();
+  const push = <T>(map: Map<string, T[]>, k: string, value: T) => {
+    const list = map.get(k);
+    if (list) list.push(value);
+    else map.set(k, [value]);
+  };
+  guests.forEach(({ household, guest }, order) => {
+    const known = { order, household, guest };
+    push(byName, key(guest.name), known);
+    if (guest.email) push(byEmail, normalizeEmail(guest.email), known);
+  });
+  type Earlier = { order: number; candidate: Candidate };
+  const rowsByName = new Map<string, Earlier[]>();
+  const rowsByEmail = new Map<string, Earlier[]>();
+
   const toAdd: Candidate[] = [];
   const toOverwrite: { candidate: Candidate; guestId: string }[] = [];
+  const claimed = new Set<string>();
   let undecided = false;
-  candidates.forEach((c, index) => {
+  candidates.forEach((c, order) => {
     const name = key(c.row.name);
-    const matches: DuplicateMatch[] = [];
-    let byName = false;
-    for (const { household, guest } of guests) {
-      const nameMatch = key(guest.name) === name;
-      const emailMatch = c.email !== "" && guest.email !== null && normalizeEmail(guest.email) === c.email && !(c.target.kind === "existing" && c.target.household.id === household.id);
-      if (!nameMatch && !emailMatch) continue;
-      byName ||= nameMatch;
-      matches.push({ kind: "existing", guestId: guest.id, householdName: household.name, name: guest.name, email: guest.email });
-    }
-    for (const earlier of candidates.slice(0, index)) {
-      const nameMatch = key(earlier.row.name) === name;
-      const emailMatch = c.email !== "" && earlier.email === c.email && !sameTarget(c.target, earlier.target);
-      if (!nameMatch && !emailMatch) continue;
-      byName ||= nameMatch;
-      matches.push({ kind: "row", line: earlier.row.line });
-    }
-    if (matches.length === 0) return void toAdd.push(c);
+    const sameName = byName.get(name) ?? [];
+    const sameEmail = c.email === "" ? [] : (byEmail.get(c.email) ?? []).filter((k) => !(c.target.kind === "existing" && c.target.household.id === k.household.id));
+    const known = [...new Map([...sameName, ...sameEmail].map((k) => [k.order, k])).values()].sort((a, b) => a.order - b.order);
+    const earlierName = rowsByName.get(name) ?? [];
+    const earlierEmail = c.email === "" ? [] : (rowsByEmail.get(c.email) ?? []).filter((e) => !sameTarget(c.target, e.candidate.target));
+    const earlier = [...new Map([...earlierName, ...earlierEmail].map((e) => [e.order, e])).values()].sort((a, b) => a.order - b.order);
 
-    duplicates.push({ line: c.row.line, by: byName ? "name" : "email", matches });
+    push(rowsByName, name, { order, candidate: c });
+    if (c.email !== "") push(rowsByEmail, c.email, { order, candidate: c });
+
+    if (known.length === 0 && earlier.length === 0) return void toAdd.push(c);
+    const matches: DuplicateMatch[] = [
+      ...known.map((k): DuplicateMatch => ({ kind: "existing", guestId: k.guest.id, householdName: k.household.name, name: k.guest.name, email: k.guest.email })),
+      ...earlier.map((e): DuplicateMatch => ({ kind: "row", line: e.candidate.row.line })),
+    ];
+    const matchedByName = sameName.length > 0 || earlierName.length > 0;
+    duplicates.push({ line: c.row.line, by: matchedByName ? "name" : "email", matches });
     const decision = decisions[c.row.line];
-    if (decision?.action === "skip") return;
     if (decision?.action === "add") return void toAdd.push(c);
-    if (decision?.action === "overwrite" && matches.some((m) => m.kind === "existing" && m.guestId === decision.guestId)) {
+    // A person can be overwritten by one row only; a second claim counts as undecided.
+    if (decision?.action === "overwrite" && !claimed.has(decision.guestId) && known.some((k) => k.guest.id === decision.guestId)) {
+      claimed.add(decision.guestId);
       return void toOverwrite.push({ candidate: c, guestId: decision.guestId });
     }
     undecided = true;
@@ -252,6 +269,6 @@ export function planImport(input: {
     };
   });
 
-  return { problems, duplicates, create, join, overwrite, warnings, ready: !openProblems && !undecided };
+  return { problems, duplicates, create, join, overwrite, warnings, ready: !openProblems && !undecided && (create.length > 0 || join.length > 0 || overwrite.length > 0) };
 }
 
