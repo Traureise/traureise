@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { NotFoundError, ValidationError } from "@/application/errors";
 import { DownloadGuestTemplate, ImportGuests, PlanGuestImport, PreviewGuestImport } from "@/application/guest-import";
-import { SaveHousehold } from "@/application/guests";
+import { DeleteHousehold, SaveHousehold } from "@/application/guests";
 import { AddEvent } from "@/application/schedule";
 import { CreateWedding } from "@/application/weddings";
 import { IMPORT_MAX_BYTES, type ImportHeaders, type ImportRow } from "@/domain/guest-import";
@@ -31,6 +31,14 @@ describe("DownloadGuestTemplate", () => {
     const result = await new DownloadGuestTemplate(f.deps).execute(anna.id, weddingId, headers);
     expect(result.filename).toBe("gaeste-vorlage.xlsx");
     expect(sheet.written[0]![0]).toEqual(["Name", "Haushalt", "Kind", "E-Mail", "Allergien", "Persönliche Zeile", "Feier"]);
+  });
+});
+
+describe("someone else's wedding", () => {
+  it("is not found for the template and for planning", async () => {
+    const bob = await f.users.create("bob@example.org");
+    await expect(new DownloadGuestTemplate(f.deps).execute(bob.id, weddingId, headers)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(new PlanGuestImport(f.deps).execute(bob.id, weddingId, { rows: [], decisions: {}, ignoredColumns: [] })).rejects.toBeInstanceOf(NotFoundError);
   });
 });
 
@@ -82,6 +90,16 @@ describe("ImportGuests", () => {
     expect(stored.map((h) => h.name)).toEqual(["Weber", "Oma"]);
     for (const h of stored) expect(h.tokenHash).toBe(f.guestLinks.hash(f.guestLinks.tokenFor(h.id)));
     expect(stored[0]!.people.map((p) => [p.name, p.allergies])).toEqual([["Clara", "Nüsse"], ["Max", ""]]);
+  });
+
+  it("joins an existing household, and re-plans against the current list when it is gone", async () => {
+    const h = await new SaveHousehold(f.deps).execute(anna.id, weddingId, null, { name: "Weber", people: [{ name: "Clara" }] });
+    const rows = [row(2, "Max", { household: "weber" })];
+    expect(await run(rows)).toEqual({ households: 0, people: 1, overwritten: 0 });
+    expect(f.guests.households.find((x) => x.id === h.id)!.people.map((p) => p.name)).toEqual(["Clara", "Max"]);
+    await new DeleteHousehold(f.deps).execute(anna.id, weddingId, h.id);
+    // Without the household, "Weber" is a new one; a plan made against the old list must not be applied blindly.
+    expect(await run(rows)).toEqual({ households: 1, people: 1, overwritten: 0 });
   });
 
   it("refuses an undecided duplicate and writes nothing", async () => {

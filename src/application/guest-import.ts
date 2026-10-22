@@ -48,8 +48,8 @@ function parseReview(input: { rows: unknown; decisions: unknown; ignoredColumns?
   if (!decisions.success) throw new ValidationError({ decisions: "invalid" });
   if (!ignored.success) throw new ValidationError({ ignoredColumns: "invalid" });
   return {
-    rows: rows.data as ImportRow[],
-    decisions: Object.fromEntries(Object.entries(decisions.data).map(([line, d]) => [Number(line), d as ImportDecision])) as Record<number, ImportDecision>,
+    rows: rows.data satisfies ImportRow[],
+    decisions: Object.fromEntries(Object.entries(decisions.data).map(([line, d]) => [Number(line), d satisfies ImportDecision])) as Record<number, ImportDecision>,
     ignoredColumns: ignored.data,
   };
 }
@@ -76,8 +76,8 @@ export class PreviewGuestImport {
 
   async execute(userId: string, weddingId: string, file: { bytes: Uint8Array; size: number }, headers: ImportHeaders): Promise<ImportReview> {
     const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
-    if (file.size === 0) throw new ValidationError({ file: "empty" });
-    if (file.size > IMPORT_MAX_BYTES) throw new ValidationError({ file: "too_large" });
+    if (file.bytes.byteLength === 0) throw new ValidationError({ file: "empty" });
+    if (file.bytes.byteLength > IMPORT_MAX_BYTES) throw new ValidationError({ file: "too_large" });
     const sheet = this.deps.spreadsheets.read(file.bytes);
     if (!sheet.ok) throw new ValidationError({ file: sheet.error });
     const { events } = await loadGuestContext(this.deps, wedding);

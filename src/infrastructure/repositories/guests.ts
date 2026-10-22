@@ -146,7 +146,8 @@ export class DrizzleGuestRepository implements GuestRepository {
       }
       for (const join of batch.join) {
         if (!UUID.test(join.householdId)) throw new Error("household not found");
-        const [own] = await tx.select({ id: households.id }).from(households).where(and(eq(households.id, join.householdId), eq(households.weddingId, weddingId)));
+        const [own] = await tx.select({ id: households.id }).from(households).where(and(eq(households.id, join.householdId), eq(households.weddingId, weddingId)))
+          .for("update");
         if (!own) throw new Error("household not found");
         const [last] = await tx.select({ position: sql<number>`coalesce(max(${guests.position}), -1)` }).from(guests).where(eq(guests.householdId, join.householdId));
         const start = Number(last!.position) + 1;
