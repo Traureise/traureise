@@ -14,6 +14,7 @@ import { GetPricing, HandlePaymentWebhook, ListPurchases, ListWeddingPlans, Star
 import type { Deps } from "@/application/deps";
 import type { BillingSettings, FileStorage, PaymentProvider } from "@/application/ports";
 import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
+import { FflateSpreadsheets } from "@/infrastructure/spreadsheets";
 import { CreemPaymentProvider } from "@/infrastructure/payments/creem";
 import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing";
 import { GetEventIcs, GetPublicWebsite, GetWeddingIcs } from "@/application/public";
@@ -32,6 +33,7 @@ import {
   GetCoupleAnswerForm,
   SaveCoupleAnswer,
 } from "@/application/guests";
+import { DownloadGuestTemplate, ImportGuests, PlanGuestImport, PreviewGuestImport } from "@/application/guest-import";
 import { createGuestMailTemplates } from "@/infrastructure/mail/guest-templates";
 import {
   ExportCard,
@@ -143,6 +145,7 @@ function build() {
     billingRepo: new DrizzleBillingRepository(db),
     payments,
     archive: new FflateArchiveWriter(),
+    spreadsheets: new FflateSpreadsheets(),
     guests: new DrizzleGuestRepository(db),
     guestLinks: hmacGuestLinks(appSecret(config)),
     guestMail: createGuestMailTemplates(),
@@ -237,6 +240,10 @@ function build() {
     deletePoll: new DeletePoll(deps),
     decideGuestRequest: new DecideGuestRequest(deps),
     exportGuestsCsv: new ExportGuestsCsv(deps),
+    downloadGuestTemplate: new DownloadGuestTemplate(deps),
+    previewGuestImport: new PreviewGuestImport(deps),
+    planGuestImport: new PlanGuestImport(deps),
+    importGuests: new ImportGuests(deps),
     getGuestFormPreview: new GetGuestFormPreview(deps),
     submitGuestResponse: new SubmitGuestResponse(deps),
     getCoupleAnswerForm: new GetCoupleAnswerForm(deps),

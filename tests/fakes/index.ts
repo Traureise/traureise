@@ -11,6 +11,8 @@ import type {
   QueuedMail,
   ArchiveEntry,
   ArchiveWriter,
+  SheetRead,
+  SpreadsheetCodec,
   BillingChange,
   BillingRepository,
   CheckoutRequest,
@@ -24,6 +26,7 @@ import type {
   GuestRepository,
   HouseholdData,
   ImageProcessor,
+  GuestImportBatch,
   NewPoll,
   PollRecord,
   Block,
@@ -419,6 +422,19 @@ export class FakeArchive implements ArchiveWriter {
   }
 }
 
+/** Returns a preset table; writeXlsx records what it was given. */
+export class FakeSpreadsheets implements SpreadsheetCodec {
+  result: SheetRead = { ok: true, rows: [] };
+  written: string[][][] = [];
+  read(): SheetRead {
+    return this.result;
+  }
+  writeXlsx(rows: string[][]) {
+    this.written.push(rows);
+    return new TextEncoder().encode(JSON.stringify(rows));
+  }
+}
+
 export class InMemoryGuests implements GuestRepository {
   settings = new Map<string, RsvpSettings & { lastSummaryAt: Date | null; warnedFor: Date | null }>();
   polls: (PollRecord & { weddingId: string })[] = [];
@@ -471,6 +487,7 @@ export class InMemoryGuests implements GuestRepository {
     id: p.id ?? this.id("guest"),
     name: p.name,
     isChild: p.isChild,
+    email: p.email,
     attending: null,
     eventIds: [],
     mealOptionId: null,
@@ -491,7 +508,6 @@ export class InMemoryGuests implements GuestRepository {
       respondedAt: null,
       answeredBy: null,
       createdAt: new Date(),
-      email: data.email,
       personalLine: data.personalLine,
       unsubscribedAt: null,
       people: data.people.map((p) => this.person({ ...p, id: null })),
@@ -500,16 +516,46 @@ export class InMemoryGuests implements GuestRepository {
     this.households.push(household);
     return this.strip(household);
   }
+  async importGuests(weddingId: string, batch: GuestImportBatch, tokenHashFor: (id: string) => string) {
+    // All or nothing, like the transaction: check everything before writing.
+    const own = (id: string) => this.households.find((h) => h.id === id && h.weddingId === weddingId);
+    for (const j of batch.join) if (!own(j.householdId)) throw new Error("household not found");
+    for (const o of batch.overwrite) if (!this.households.some((h) => h.weddingId === weddingId && h.people.some((p) => p.id === o.guestId))) throw new Error("guest not found");
+    for (const c of batch.create) {
+      const id = this.id("household");
+      this.households.push({
+        id,
+        weddingId,
+        tokenHash: tokenHashFor(id),
+        name: c.name,
+        invitedEventIds: c.invitedEventIds,
+        message: "",
+        pollAnswers: {},
+        respondedAt: null,
+        answeredBy: null,
+        createdAt: new Date(),
+        personalLine: c.personalLine,
+        unsubscribedAt: null,
+        people: c.people.map((p) => ({ ...this.person({ ...p, id: null }), allergies: p.allergies })),
+        requests: [],
+      });
+    }
+    for (const j of batch.join) own(j.householdId)!.people.push(...j.people.map((p) => ({ ...this.person({ ...p, id: null }), allergies: p.allergies })));
+    for (const o of batch.overwrite) {
+      const guest = this.households.filter((h) => h.weddingId === weddingId).flatMap((h) => h.people).find((p) => p.id === o.guestId)!;
+      Object.assign(guest, { name: o.name, isChild: o.isChild, email: o.email, allergies: o.allergies });
+    }
+  }
   async updateHousehold(weddingId: string, householdId: string, data: HouseholdData) {
     const h = this.households.find((x) => x.id === householdId && x.weddingId === weddingId)!;
     h.name = data.name;
     h.invitedEventIds = data.invitedEventIds;
-    if (data.email !== h.email) h.unsubscribedAt = null;
-    h.email = data.email;
+    const before = new Set(h.people.flatMap((x) => (x.email ? [x.email] : [])));
+    if (data.people.some((p) => p.email && !before.has(p.email))) h.unsubscribedAt = null;
     h.personalLine = data.personalLine;
     h.people = data.people.map((p) => {
       const existing = h.people.find((x) => x.id === p.id);
-      return existing ? { ...existing, name: p.name, isChild: p.isChild } : this.person({ ...p, id: null });
+      return existing ? { ...existing, name: p.name, isChild: p.isChild, email: p.email } : this.person({ ...p, id: null });
     });
   }
   async deleteHousehold(weddingId: string, householdId: string) {
@@ -533,7 +579,7 @@ export class InMemoryGuests implements GuestRepository {
     if (!h || !request || request.status !== "pending") return false;
     request.status = status;
     request.decidedAt = at;
-    if (status === "added") h.people.push({ ...this.person({ id: null, name: request.name, isChild: false }), fromRequest: true });
+    if (status === "added") h.people.push({ ...this.person({ id: null, name: request.name, isChild: false, email: null }), fromRequest: true });
     return true;
   }
   /** Version choices go with their household and their version (ON DELETE CASCADE). */
@@ -555,7 +601,7 @@ export class InMemoryGuests implements GuestRepository {
   async unsubscribe(householdId: string, at: Date) {
     const h = this.households.find((x) => x.id === householdId);
     if (!h) return false;
-    h.email = null;
+    for (const p of h.people) p.email = null;
     h.unsubscribedAt ??= at;
     return true;
   }
@@ -928,6 +974,7 @@ export function createFakes() {
     billingRepo,
     payments: new FakePayments() as FakePayments | null,
     archive: new FakeArchive(),
+    spreadsheets: new FakeSpreadsheets(),
     guests,
     guestLinks: fakeGuestLinks,
     guestMail: fakeGuestMail,

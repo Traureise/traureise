@@ -17,9 +17,9 @@ export const household = (page: Page, name: string) => page.getByTestId("househo
 export async function addHousehold(
   page: Page,
   name: string,
-  people: { name: string; child?: boolean }[],
+  people: { name: string; child?: boolean; email?: string }[],
   events?: { uninvite: string[] },
-  extra: { email?: string; personalLine?: string } = {},
+  extra: { personalLine?: string } = {},
 ) {
   await page.getByRole("form", { name: "Gäste hinzufügen" }).getByRole("button", { name: "Weitere Möglichkeiten" }).click();
   await page.getByRole("menuitem", { name: "Haushalt hinzufügen" }).click();
@@ -28,10 +28,10 @@ export async function addHousehold(
   for (const [i, person] of people.entries()) {
     if (i > 0) await form.getByRole("button", { name: "Person hinzufügen" }).click();
     await form.getByLabel(`Person ${i + 1}`, { exact: true }).fill(person.name);
+    if (person.email) await form.getByLabel(`E-Mail-Adresse von Person ${i + 1}`).fill(person.email);
     if (person.child) await form.getByTestId("household-person").nth(i).getByLabel("Kind").check();
   }
   for (const event of events?.uninvite ?? []) await form.getByLabel(event, { exact: true }).uncheck();
-  if (extra.email) await form.getByLabel("E-Mail-Adresse (optional)").fill(extra.email);
   if (extra.personalLine) await form.getByLabel("Persönliche Zeile für die Dankeskarte (optional)").fill(extra.personalLine);
   await form.getByRole("button", { name: "Speichern" }).click();
   await expect(form).toBeHidden();

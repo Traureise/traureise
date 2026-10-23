@@ -140,7 +140,9 @@
     "last_version": "Die letzte Version lässt sich nicht löschen.",
     "no_date": "Das geht, sobald eure Hochzeit ein Datum hat.",
     "not_manual": "Nur von Hand markierte Karten lassen sich zurücksetzen.",
-    "already_sent": "Diese Karte hat der Haushalt schon."
+    "already_sent": "Diese Karte hat der Haushalt schon.",
+    "invalid_yes_no": "Bitte schreibe „ja“ oder „nein“.",
+    "household_full": "Ein Haushalt kann höchstens 30 Personen haben."
   },
   "editor": {
     "back": "Zur Hochzeit",
@@ -566,7 +568,9 @@
       "whatsapp": "WhatsApp",
       "whatsappDefault": "Hallo '{name}', wir heiraten! Sagt uns bitte über diesen Link, ob ihr dabei seid. Liebe Grüße, {title}",
       "child": "{name} (Kind)",
-      "more": "Weitere Aktionen für {name}"
+      "more": "Weitere Aktionen für {name}",
+      "template": "Vorlage herunterladen",
+      "import": "Gästeliste importieren"
     },
     "household": {
       "add": "Haushalt hinzufügen",
@@ -588,9 +592,10 @@
       "confirmDelete": "„{name}“ mit allen Antworten löschen?",
       "deleted": "Haushalt gelöscht",
       "delete": "Löschen",
-      "email": "E-Mail-Adresse (optional)",
-      "emailHint": "Für Karten und Erinnerungen per E-Mail. Ohne Adresse verschickt ihr per Link oder WhatsApp.",
-      "emailUnsubscribed": "Dieser Haushalt hat sich von E-Mails abgemeldet. Tragt nur eine Adresse ein, wenn er euch ausdrücklich darum bittet.",
+      "personEmail": "E-Mail-Adresse von Person {n}",
+      "personEmailPlaceholder": "E-Mail-Adresse (optional)",
+      "emailHint": "Für Karten und Erinnerungen per E-Mail: ein Versand pro Haushalt, an alle eingetragenen Adressen. Ohne Adresse verschickt ihr per Link oder WhatsApp.",
+      "emailUnsubscribed": "Dieser Haushalt hat sich von E-Mails abgemeldet. Tragt nur Adressen ein, wenn er euch ausdrücklich darum bittet.",
       "personalLine": "Persönliche Zeile für die Dankeskarte (optional)",
       "personalLinePlaceholder": "z. B. Danke für den wunderbaren Kuchen!",
       "quickLabel": "Name",
@@ -781,6 +786,106 @@
       "label": "Versionen",
       "choose": "{item}",
       "saved": "Version für {household} gespeichert"
+    },
+    "import": {
+      "title": "Gästeliste importieren",
+      "lead": "Lade eine Excel- oder CSV-Datei hoch. Ihr prüft alles, bevor etwas gespeichert wird. Die Vorlage zeigt, welche Spalten es gibt.",
+      "back": "Zur Gästeliste",
+      "template": "Vorlage herunterladen",
+      "file": "Datei auswählen",
+      "fileHint": "Excel (.xlsx) oder CSV, bis 1 MB und 1000 Zeilen.",
+      "reading": "Datei wird gelesen …",
+      "fileErrors": {
+        "empty": "Diese Datei ist leer.",
+        "too_large": "Diese Datei ist größer als 1 MB.",
+        "unreadable": "Diese Datei konnten wir nicht lesen. Bitte nutzt eine Excel-Datei (.xlsx) oder CSV.",
+        "no_name_column": "In der Datei fehlt die Spalte „Name“. Die Vorlage zeigt den Aufbau.",
+        "too_many_rows": "Die Datei hat mehr als 1000 Zeilen. Bitte teilt sie auf."
+      },
+      "columns": {
+        "name": "Name",
+        "household": "Haushalt",
+        "child": "Kind",
+        "email": "E-Mail",
+        "allergies": "Allergien",
+        "personalLine": "Persönliche Zeile",
+        "unnamedColumn": "Spalte"
+      },
+      "fields": {
+        "name": "Name",
+        "household": "Haushalt",
+        "child": "Kind",
+        "email": "E-Mail",
+        "allergies": "Allergien",
+        "personalLine": "Persönliche Zeile",
+        "events": "Einladungen"
+      },
+      "line": "Zeile {line}",
+      "values": "{name} · Haushalt: {household}",
+      "noHousehold": "keiner",
+      "problems": {
+        "title": "Zeilen mit Problemen ({count})",
+        "lead": "Korrigiert diese Zeilen oder überspringt sie.",
+        "none": "Keine Probleme."
+      },
+      "problem": "{field}: {message}",
+      "skipped": {
+        "title": "Übersprungen ({count})",
+        "row": "Zeile {line} ({name}) wird übersprungen.",
+        "undo": "Rückgängig"
+      },
+      "duplicates": {
+        "title": "Mögliche Dopplungen ({count})",
+        "lead": "Diese Personen gibt es schon, oder sie stehen mehrfach in der Datei. Entscheidet für jede Zeile.",
+        "byName": "gleicher Name",
+        "byEmail": "gleiche E-Mail-Adresse",
+        "existing": "Schon in der Liste: {name} (Haushalt {household})",
+        "existingEmail": "Schon in der Liste: {name} (Haushalt {household}, {email})",
+        "row": "Auch in Zeile {line} der Datei",
+        "claimed": "wird schon von Zeile {line} überschrieben"
+      },
+      "skip": "Überspringen",
+      "skipAll": "Alle überspringen",
+      "addAnyway": "Trotzdem hinzufügen",
+      "addAllAnyway": "Alle trotzdem hinzufügen",
+      "added": "Wird trotzdem hinzugefügt.",
+      "overwrite": "{name} in {household} überschreiben",
+      "overwritten": "Überschreibt {name}.",
+      "overwriteHint": "Leere Zellen behalten den bisherigen Wert.",
+      "edit": "Korrigieren",
+      "editTitle": "Zeile {line} korrigieren",
+      "apply": "Übernehmen",
+      "cancel": "Abbrechen",
+      "yes": "ja",
+      "no": "nein",
+      "unset": "(leer)",
+      "inviteLabel": "Eingeladen zu {event}",
+      "plan": {
+        "title": "Wird importiert",
+        "none": "Noch nichts, das importiert würde.",
+        "new": "Neu",
+        "join": "Kommt zu bestehendem Haushalt",
+        "overwrite": "Überschreibt",
+        "people": "{count, plural, one {# Person} other {# Personen}}: {names}",
+        "overwriteLine": "{name} (bestehende Person)"
+      },
+      "warnings": {
+        "ignored_columns": "Diese Spalten werden ignoriert: {columns}",
+        "conflicting_values": "Haushalt {household}: Die Zeilen widersprechen sich bei „{field}“, es gilt der erste Wert.",
+        "ambiguous_household": "Es gibt mehrere Haushalte mit dem Namen {household}. Die Gäste kommen in einen neuen Haushalt.",
+        "fieldPersonalLine": "Persönliche Zeile",
+        "fieldEvents": "Einladungen",
+        "unsubscribed_household": "Haushalt {household} hat sich von E-Mails abgemeldet, deshalb übernehmen wir die E-Mail-Adressen aus der Datei nicht. Möchte jemand wieder E-Mails bekommen, tragt die Adresse beim Bearbeiten des Haushalts ein."
+      },
+      "submit": "Importieren",
+      "importing": "Importiert …",
+      "done": "{households, plural, one {# Haushalt} other {# Haushalte}}, {people, plural, one {# Person} other {# Personen}}, {overwritten} überschrieben",
+      "outdated": "Die Gästeliste hat sich geändert. Bitte prüft die Zeilen noch einmal.",
+      "rowAction": "{action} (Zeile {line})",
+      "needsDecision": "Bitte entscheidet, was mit dieser Zeile passiert.",
+      "undecided": "{count, plural, one {Noch eine Zeile ohne Entscheidung: {lines}} other {Noch # Zeilen ohne Entscheidung: {lines}}}",
+      "stale": "Die Prüfung ließ sich nicht aktualisieren. Bitte prüft noch einmal.",
+      "recheck": "Noch einmal prüfen"
     }
   },
   "rsvp": {
@@ -887,9 +992,9 @@
   },
   "unsubscribe": {
     "title": "Keine E-Mails mehr",
-    "body": "Möchtet ihr keine E-Mails mehr zur Hochzeit von {couple} bekommen? Dann löschen wir die E-Mail-Adresse von {household} aus ihrer Gästeliste. Euer Link funktioniert weiter.",
+    "body": "Möchtet ihr keine E-Mails mehr zur Hochzeit von {couple} bekommen? Dann löschen wir alle E-Mail-Adressen von {household} aus ihrer Gästeliste. Euer Link funktioniert weiter.",
     "confirm": "Keine E-Mails mehr senden",
-    "done": "Erledigt: {household} bekommt keine E-Mails mehr zur Hochzeit von {couple}. Die Adresse ist gelöscht."
+    "done": "Erledigt: {household} bekommt keine E-Mails mehr zur Hochzeit von {couple}. Die gespeicherten Adressen sind gelöscht."
   },
   "cardKinds": {
     "saveTheDate": "Save the Date",

@@ -239,11 +239,10 @@ export class GetGuestFormPreview {
       respondedAt: null,
       answeredBy: null,
       createdAt: ctx.now,
-      email: null,
       personalLine: "",
       unsubscribedAt: null,
       requests: [],
-      people: sample.people.map((name, i) => ({ id: `preview-${i}`, name, isChild: false, attending: null, eventIds: [], mealOptionId: null, allergies: "", pollAnswers: {}, fromRequest: false })),
+      people: sample.people.map((name, i) => ({ id: `preview-${i}`, name, isChild: false, attending: null, eventIds: [], mealOptionId: null, allergies: "", pollAnswers: {}, fromRequest: false, email: null })),
     };
     return formFor(this.deps, ctx, household, "preview");
   }

@@ -4,6 +4,7 @@ import type {
   CardRepository,
   CardTexts,
   ArchiveWriter,
+  SpreadsheetCodec,
   BillingRepository,
   BillingSettings,
   PaymentProvider,
@@ -48,6 +49,7 @@ export type Deps = {
   /** Set only when billing is enabled and configured. */
   payments: PaymentProvider | null;
   archive: ArchiveWriter;
+  spreadsheets: SpreadsheetCodec;
   guests: GuestRepository;
   guestLinks: GuestLinks;
   guestMail: GuestMailTemplates;

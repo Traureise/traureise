@@ -2,6 +2,7 @@ import type { BlockData, BlockType, EventData, SectionTemplate } from "@/domain/
 import type { Entitlement, PaidTier, Tier, TierOffer } from "@/domain/billing";
 import type { ThemeManifest } from "@/domain/theme";
 import type { AnswerSource, Household, HouseholdInput, HouseholdResponse, Poll, PollInput, RequestStatus, RsvpSettings } from "@/domain/guests";
+import type { ImportPlan } from "@/domain/guest-import";
 import type { CardContent, CardInput, CardKind, CardLabels, CardModel, Delivery, HouseholdCardKind, SharedVia } from "@/domain/cards";
 import type { AssignableItem, Assignment } from "@/domain/weddings";
 
@@ -191,7 +192,7 @@ export interface ImageProcessor {
 export type MailAttachment = { filename: string; content: Uint8Array; contentType: string; /** Set for images shown inline (`cid:` in the HTML). */ cid?: string };
 
 export type MailMessage = {
-  to: string;
+  to: string | string[];
   subject: string;
   text: string;
   html: string;
@@ -280,9 +281,20 @@ export interface ArchiveWriter {
   zip(entries: ArchiveEntry[]): Promise<Uint8Array>;
 }
 
+export type SheetRead = { ok: true; rows: string[][] } | { ok: false; error: "unreadable" | "too_large" };
+
+export interface SpreadsheetCodec {
+  /** XLSX by zip signature (PK\x03\x04), CSV otherwise. Cells come back trimmed; trailing empty rows are dropped. */
+  read(bytes: Uint8Array): SheetRead;
+  /** One sheet, every cell a string cell (t="inlineStr"). */
+  writeXlsx(rows: string[][]): Uint8Array;
+}
+
+export type GuestImportBatch = Pick<ImportPlan, "create" | "join" | "overwrite">;
+
 export type PollRecord = Poll & { position: number };
 export type NewPoll = Omit<PollInput, "options"> & { options: Poll["options"] };
-export type HouseholdData = Omit<HouseholdInput, "people"> & { people: { id: string | null; name: string; isChild: boolean }[] };
+export type HouseholdData = Omit<HouseholdInput, "people"> & { people: { id: string | null; name: string; isChild: boolean; email: string | null }[] };
 
 /** Guest lists. Everything hangs off the wedding (ON DELETE CASCADE). */
 export interface GuestRepository {
@@ -300,6 +312,8 @@ export interface GuestRepository {
   findByTokenHash(tokenHash: string): Promise<{ weddingId: string; household: Household } | null>;
   /** `tokenHashFor` turns the new household's id into the hash of its personal link. */
   createHousehold(weddingId: string, data: HouseholdData, tokenHashFor: (householdId: string) => string): Promise<Household>;
+  /** One transaction. Overwrites and joins are limited to the wedding's own households; anything else rolls everything back. */
+  importGuests(weddingId: string, batch: GuestImportBatch, tokenHashFor: (householdId: string) => string): Promise<void>;
   /** People with an id are updated, people without one added, people left out removed. */
   updateHousehold(weddingId: string, householdId: string, data: HouseholdData): Promise<void>;
   deleteHousehold(weddingId: string, householdId: string): Promise<void>;
@@ -314,7 +328,7 @@ export interface GuestRepository {
   /** The version must belong to the household's wedding and fit the item; the use case checks both. */
   assign(householdId: string, item: AssignableItem, target: { cardId: string } | { websiteId: string }): Promise<void>;
 
-  /** Clears the household's email address (one-click unsubscribe); false for unknown households. */
+  /** Clears every person's email address in the household (one-click unsubscribe); false for unknown households. */
   unsubscribe(householdId: string, at: Date): Promise<boolean>;
   /** Retention: removes households, people, answers and requests of a wedding; returns how many households. */
   deleteGuestData(weddingId: string): Promise<number>;

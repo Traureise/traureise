@@ -10,6 +10,7 @@ import { cardDeliveries, cardOpens, cards, householdVersions, households, weddin
 import { createCardTexts } from "@/infrastructure/mail/card-templates";
 import { createSiteTexts } from "@/infrastructure/site-texts";
 import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
+import { FflateSpreadsheets } from "@/infrastructure/spreadsheets";
 import { DrizzleMagicLinkRepository, DrizzleSessionRepository, PostgresRateLimiter } from "@/infrastructure/repositories/auth";
 import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing";
 import { DrizzleCardRepository } from "@/infrastructure/repositories/cards";
@@ -41,6 +42,7 @@ async function realDeps() {
     guests: new DrizzleGuestRepository(db),
     cards: new DrizzleCardRepository(db),
     archive: new FflateArchiveWriter(),
+    spreadsheets: new FflateSpreadsheets(),
     clock: systemClock,
     tokens: cryptoTokens,
     themes: new FakeThemes(),
@@ -60,7 +62,7 @@ async function seed(deps: Deps, email: string) {
   await deps.websites.update(website!.id, { coverImageKey: key });
   const faqs = (await deps.websites.listSections(website!.id)).at(-1)!;
   await deps.websites.addBlock(website!.id, faqs.id, { type: "faq", question: "Dresscode?", answer: "Sommerlich", imageKey: null });
-  const household = await deps.guests.createHousehold(wedding.id, { name: "Weber", invitedEventIds: null, email: "weber@example.org", personalLine: "", people: [{ id: null, name: "Eva", isChild: false }] }, (id) => `hash-${id}`);
+  const household = await deps.guests.createHousehold(wedding.id, { name: "Weber", invitedEventIds: null, personalLine: "", people: [{ id: null, name: "Eva", isChild: false, email: "weber@example.org" }] }, (id) => `hash-${id}`);
   const [card] = await deps.cards.listByWedding(wedding.id);
   await deps.cards.markShared(household.id, "saveTheDate", "link", new Date());
   await deps.cards.markOpened(card!.id, household.id, new Date());

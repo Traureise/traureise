@@ -5,6 +5,7 @@ import type { Deps } from "@/application/deps";
 import { ExportGuestsCsv, RunGuestJobs, SaveHousehold, SubmitGuestResponse } from "@/application/guests";
 import type { CsvLabels } from "@/domain/guests";
 import { FflateArchiveWriter } from "@/infrastructure/archive/zip";
+import { FflateSpreadsheets } from "@/infrastructure/spreadsheets";
 import { guestRequests, guests, households, rsvpPolls, rsvpSettings } from "@/infrastructure/db/schema";
 import { createGuestMailTemplates } from "@/infrastructure/mail/guest-templates";
 import { PostgresRateLimiter } from "@/infrastructure/repositories/auth";
@@ -61,6 +62,7 @@ function deps(clock = new FakeClock()) {
     clock,
     tokens: cryptoTokens,
     archive: new FflateArchiveWriter(),
+    spreadsheets: new FflateSpreadsheets(),
     billing: { enabled: false, offers: [], unlockedTiers: [] },
     payments: null,
     appUrl: "http://localhost:3000",
@@ -69,7 +71,7 @@ function deps(clock = new FakeClock()) {
 }
 
 const newHousehold = (name = "Familie Weber", people = ["Clara", "Max"]) =>
-  repo.createHousehold(weddingId, { name, invitedEventIds: null, email: null, personalLine: "", people: people.map((p) => ({ id: null, name: p, isChild: p === "Ida" })) }, (id) => `hash-${id}`);
+  repo.createHousehold(weddingId, { name, invitedEventIds: null, personalLine: "", people: people.map((p) => ({ id: null, name: p, isChild: p === "Ida", email: null })) }, (id) => `hash-${id}`);
 
 describe("DrizzleGuestRepository", () => {
   it("stores settings and polls per website", async () => {
@@ -96,13 +98,101 @@ describe("DrizzleGuestRepository", () => {
     expect(await repo.findHousehold(crypto.randomUUID(), household.id)).toBeNull();
 
     const [clara] = household.people;
-    await repo.updateHousehold(weddingId, household.id, { name: "Weber", invitedEventIds: [party], email: null, personalLine: "", people: [{ id: null, name: "Ida", isChild: true }, { id: clara!.id, name: "Clara W.", isChild: false }] });
+    await repo.updateHousehold(weddingId, household.id, { name: "Weber", invitedEventIds: [party], personalLine: "", people: [{ id: null, name: "Ida", isChild: true, email: null }, { id: clara!.id, name: "Clara W.", isChild: false, email: null }] });
     const updated = (await repo.findHousehold(weddingId, household.id))!;
     expect(updated).toMatchObject({ name: "Weber", invitedEventIds: [party] });
     expect(updated.people.map((p) => [p.name, p.isChild, p.id === clara!.id])).toEqual([
       ["Ida", true, false],
       ["Clara W.", false, true],
     ]);
+  });
+
+  describe("importGuests", () => {
+    const person = (name: string, extra: Partial<{ isChild: boolean; email: string | null; allergies: string }> = {}) => ({ name, isChild: false, email: null, allergies: "", ...extra });
+    const everyone = async () => (await repo.listHouseholds(weddingId)).flatMap((h) => h.people.map((p) => p.name));
+
+    it("creates, joins and overwrites in one call and keeps answers", async () => {
+      const weber = await newHousehold("Weber", ["Clara", "Max"]);
+      await db.update(guests).set({ attending: true, eventIds: [party], allergies: "alt" }).where(eq(guests.id, weber.people[0]!.id));
+      await repo.importGuests(
+        weddingId,
+        {
+          create: [{ name: "Oma", invitedEventIds: [party], personalLine: "Liebe Oma", people: [person("Oma", { email: "oma@example.org", allergies: "Nüsse" }), person("Opa")] }],
+          join: [{ householdId: weber.id, householdName: "Weber", people: [person("Ida", { isChild: true })] }],
+          overwrite: [{ guestId: weber.people[0]!.id, name: "Clara W.", isChild: false, email: "clara@example.org", allergies: "neu" }],
+        },
+        (id) => `hash-${id}`,
+      );
+      const all = await repo.listHouseholds(weddingId);
+      const oma = all.find((h) => h.name === "Oma")!;
+      expect(await repo.findByTokenHash(`hash-${oma.id}`)).toMatchObject({ household: { name: "Oma", personalLine: "Liebe Oma", invitedEventIds: [party] } });
+      expect(oma.people.map((p) => [p.name, p.email, p.allergies])).toEqual([["Oma", "oma@example.org", "Nüsse"], ["Opa", null, ""]]);
+      const updated = all.find((h) => h.id === weber.id)!;
+      expect(updated.people.map((p) => p.name)).toEqual(["Clara W.", "Max", "Ida"]);
+      expect(updated.people[0]).toMatchObject({ email: "clara@example.org", allergies: "neu", attending: true, eventIds: [party] });
+      expect(updated.people[2]!.isChild).toBe(true);
+    });
+
+    it("rolls everything back for a household of another wedding", async () => {
+      const other = (await weddings.create({ ownerId, slug: `other-${Date.now()}`, title: "Andere", weddingDate: null, timezone: "Europe/Berlin" })).id;
+      const foreign = await repo.createHousehold(other, { name: "Fremd", invitedEventIds: null, personalLine: "", people: [{ id: null, name: "Fremder", isChild: false, email: null }] }, (id) => `hash-${id}`);
+      await newHousehold("Weber", ["Clara"]);
+      const batch = { create: [{ name: "Neu", invitedEventIds: null, personalLine: "", people: [person("Neu")] }], overwrite: [] };
+      await expect(repo.importGuests(weddingId, { ...batch, join: [{ householdId: foreign.id, householdName: "Fremd", people: [person("Eindringling")] }] }, (id) => `hash-${id}`)).rejects.toThrow();
+      expect(await everyone()).toEqual(["Clara"]);
+      expect((await repo.findHousehold(other, foreign.id))!.people.map((p) => p.name)).toEqual(["Fremder"]);
+
+      const stranger = foreign.people[0]!.id;
+      await expect(repo.importGuests(weddingId, { ...batch, join: [], overwrite: [{ guestId: stranger, name: "X", isChild: false, email: null, allergies: "" }] }, (id) => `hash-${id}`)).rejects.toThrow();
+      expect(await everyone()).toEqual(["Clara"]);
+      expect((await repo.findHousehold(other, foreign.id))!.people[0]!.name).toBe("Fremder");
+    });
+  });
+
+  describe("email addresses per person", () => {
+    const withEmails = async (emails: (string | null)[]) => {
+      const household = await newHousehold("Weber", ["Clara", "Max"]);
+      await repo.updateHousehold(weddingId, household.id, {
+        name: "Weber",
+        invitedEventIds: null,
+        personalLine: "",
+        people: household.people.map((p, i) => ({ id: p.id, name: p.name, isChild: false, email: emails[i] ?? null })),
+      });
+      return household;
+    };
+    const save = async (householdId: string, emails: (string | null)[]) => {
+      const current = (await repo.findHousehold(weddingId, householdId))!;
+      await repo.updateHousehold(weddingId, householdId, {
+        name: "Weber",
+        invitedEventIds: null,
+        personalLine: "",
+        people: current.people.map((p, i) => ({ id: p.id, name: p.name, isChild: false, email: emails[i] ?? null })),
+      });
+      return (await repo.findHousehold(weddingId, householdId))!;
+    };
+
+    it("unsubscribe clears every person's address and sets unsubscribedAt", async () => {
+      const household = await withEmails(["a@x.de", "b@x.de"]);
+      expect(await repo.unsubscribe(household.id, new Date("2026-10-18T10:00:00Z"))).toBe(true);
+      const after = (await repo.findHousehold(weddingId, household.id))!;
+      expect(after.people.map((p) => p.email)).toEqual([null, null]);
+      expect(after.unsubscribedAt).toBeInstanceOf(Date);
+    });
+
+    it("a new address on any person ends an unsubscribe", async () => {
+      const household = await withEmails(["a@x.de", null]);
+      await repo.unsubscribe(household.id, new Date());
+      expect((await save(household.id, [null, "neu@x.de"])).unsubscribedAt).toBeNull();
+    });
+
+    it("keeping or removing addresses keeps the unsubscribe", async () => {
+      const household = await withEmails(["a@x.de", "b@x.de"]);
+      // Unsubscribed, then the couple re-enters nothing: the set of addresses did not gain one.
+      await db.update(households).set({ unsubscribedAt: new Date() }).where(eq(households.id, household.id));
+      expect((await save(household.id, ["a@x.de", null])).unsubscribedAt).toBeInstanceOf(Date);
+      expect((await save(household.id, ["a@x.de", null])).unsubscribedAt).toBeInstanceOf(Date);
+      expect((await save(household.id, [null, null])).unsubscribedAt).toBeInstanceOf(Date);
+    });
   });
 
   it("saves answers and requests, and adds a requested guest exactly once", async () => {
@@ -182,7 +272,7 @@ describe("retention", () => {
     const household = await newHousehold();
     await repo.saveResponse(household.id, { people: [], pollAnswers: {}, message: "Hallo", requests: ["Lena"] }, new Date(), "guest");
     const otherSite = (await newWedding("spaet", "Später", "2030-01-01")).id;
-    await repo.createHousehold(otherSite, { name: "Bleibt", invitedEventIds: null, email: null, personalLine: "", people: [{ id: null, name: "Tom", isChild: false }] }, (id) => `hash-${id}`);
+    await repo.createHousehold(otherSite, { name: "Bleibt", invitedEventIds: null, personalLine: "", people: [{ id: null, name: "Tom", isChild: false, email: null }] }, (id) => `hash-${id}`);
     const ids = [household.id];
 
     clock.current = new Date("2028-06-13T00:00:01Z");

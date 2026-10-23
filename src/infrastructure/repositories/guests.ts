@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
-import type { GuestRepository, HouseholdData, NewPoll, PollRecord } from "@/application/ports";
+import type { GuestImportBatch, GuestRepository, HouseholdData, NewPoll, PollRecord } from "@/application/ports";
 import type { AssignableItem, Assignment } from "@/domain/weddings";
 import {
   DEFAULT_RSVP_SETTINGS,
@@ -42,6 +42,7 @@ const toGuest = (row: GuestRow): Guest => ({
   allergies: row.allergies,
   pollAnswers: row.pollAnswers,
   fromRequest: row.fromRequest,
+  email: row.email,
 });
 const toRequest = (row: RequestRow): GuestRequest => ({ id: row.id, name: row.name, status: row.status as RequestStatus, createdAt: row.createdAt, decidedAt: row.decidedAt });
 
@@ -101,7 +102,6 @@ export class DrizzleGuestRepository implements GuestRepository {
       respondedAt: r.respondedAt,
       answeredBy: r.answeredBy ?? null,
       createdAt: r.createdAt,
-      email: r.email,
       personalLine: r.personalLine,
       unsubscribedAt: r.unsubscribedAt,
       people: people.filter((p) => p.householdId === r.id).map(toGuest),
@@ -130,36 +130,66 @@ export class DrizzleGuestRepository implements GuestRepository {
     await this.db.transaction(async (tx) => {
       await tx
         .insert(households)
-        .values({ id, weddingId, name: data.name, invitedEventIds: data.invitedEventIds, email: data.email, personalLine: data.personalLine, tokenHash: tokenHashFor(id) });
-      await tx.insert(guests).values(data.people.map((p, position) => ({ householdId: id, position, name: p.name, isChild: p.isChild })));
+        .values({ id, weddingId, name: data.name, invitedEventIds: data.invitedEventIds, personalLine: data.personalLine, tokenHash: tokenHashFor(id) });
+      await tx.insert(guests).values(data.people.map((p, position) => ({ householdId: id, position, name: p.name, isChild: p.isChild, email: p.email })));
     });
     return (await this.findHousehold(weddingId, id))!;
   }
 
+  async importGuests(weddingId: string, batch: GuestImportBatch, tokenHashFor: (householdId: string) => string): Promise<void> {
+    // Anything that does not belong to the wedding throws, which rolls the whole import back.
+    await this.db.transaction(async (tx) => {
+      for (const household of batch.create) {
+        const id = crypto.randomUUID();
+        await tx.insert(households).values({ id, weddingId, name: household.name, invitedEventIds: household.invitedEventIds, personalLine: household.personalLine, tokenHash: tokenHashFor(id) });
+        await tx.insert(guests).values(household.people.map((p, position) => ({ householdId: id, position, name: p.name, isChild: p.isChild, email: p.email, allergies: p.allergies })));
+      }
+      for (const join of batch.join) {
+        if (!UUID.test(join.householdId)) throw new Error("household not found");
+        const [own] = await tx.select({ id: households.id }).from(households).where(and(eq(households.id, join.householdId), eq(households.weddingId, weddingId)))
+          .for("update");
+        if (!own) throw new Error("household not found");
+        const [last] = await tx.select({ position: sql<number>`coalesce(max(${guests.position}), -1)` }).from(guests).where(eq(guests.householdId, join.householdId));
+        const start = Number(last!.position) + 1;
+        await tx.insert(guests).values(join.people.map((p, i) => ({ householdId: join.householdId, position: start + i, name: p.name, isChild: p.isChild, email: p.email, allergies: p.allergies })));
+      }
+      for (const o of batch.overwrite) {
+        if (!UUID.test(o.guestId)) throw new Error("guest not found");
+        const updated = await tx
+          .update(guests)
+          .set({ name: o.name, isChild: o.isChild, email: o.email, allergies: o.allergies })
+          .where(and(eq(guests.id, o.guestId), inArray(guests.householdId, tx.select({ id: households.id }).from(households).where(eq(households.weddingId, weddingId)))))
+          .returning({ id: guests.id });
+        if (updated.length === 0) throw new Error("guest not found");
+      }
+    });
+  }
+
   async updateHousehold(weddingId: string, householdId: string, data: HouseholdData): Promise<void> {
     await this.db.transaction(async (tx) => {
+      const existing = await tx.select({ id: guests.id, email: guests.email }).from(guests).where(eq(guests.householdId, householdId));
+      // A new address (entered by the couple) ends an earlier unsubscribe; keeping or removing addresses does not.
+      const before = new Set(existing.flatMap((e) => (e.email ? [e.email] : [])));
+      const gainsAddress = data.people.some((p) => p.email && !before.has(p.email));
       const updated = await tx
         .update(households)
-        // A new address (entered by the couple) ends an earlier unsubscribe.
         .set({
           name: data.name,
           invitedEventIds: data.invitedEventIds,
-          email: data.email,
           personalLine: data.personalLine,
-          unsubscribedAt: sql`case when ${households.email} is not distinct from ${data.email} then ${households.unsubscribedAt} else null end`,
+          ...(gainsAddress ? { unsubscribedAt: null } : {}),
         })
         .where(and(eq(households.id, householdId), eq(households.weddingId, weddingId)))
         .returning({ id: households.id });
       if (updated.length === 0) return;
-      const existing = await tx.select({ id: guests.id }).from(guests).where(eq(guests.householdId, householdId));
       const kept = new Set(data.people.map((p) => p.id).filter((id): id is string => !!id));
       const removed = existing.map((e) => e.id).filter((id) => !kept.has(id));
       if (removed.length > 0) await tx.delete(guests).where(inArray(guests.id, removed));
       for (const [position, person] of data.people.entries()) {
         if (person.id && existing.some((e) => e.id === person.id)) {
-          await tx.update(guests).set({ name: person.name, isChild: person.isChild, position }).where(and(eq(guests.id, person.id), eq(guests.householdId, householdId)));
+          await tx.update(guests).set({ name: person.name, isChild: person.isChild, email: person.email, position }).where(and(eq(guests.id, person.id), eq(guests.householdId, householdId)));
         } else {
-          await tx.insert(guests).values({ householdId, position, name: person.name, isChild: person.isChild });
+          await tx.insert(guests).values({ householdId, position, name: person.name, isChild: person.isChild, email: person.email });
         }
       }
     });
@@ -225,12 +255,16 @@ export class DrizzleGuestRepository implements GuestRepository {
 
   async unsubscribe(householdId: string, at: Date): Promise<boolean> {
     if (!UUID.test(householdId)) return false;
-    const rows = await this.db
-      .update(households)
-      .set({ email: null, unsubscribedAt: sql`coalesce(${households.unsubscribedAt}, ${at.toISOString()}::timestamptz)` })
-      .where(eq(households.id, householdId))
-      .returning({ id: households.id });
-    return rows.length > 0;
+    return this.db.transaction(async (tx) => {
+      const rows = await tx
+        .update(households)
+        .set({ unsubscribedAt: sql`coalesce(${households.unsubscribedAt}, ${at.toISOString()}::timestamptz)` })
+        .where(eq(households.id, householdId))
+        .returning({ id: households.id });
+      if (rows.length === 0) return false;
+      await tx.update(guests).set({ email: null }).where(eq(guests.householdId, householdId));
+      return true;
+    });
   }
 
   async deleteGuestData(weddingId: string): Promise<number> {

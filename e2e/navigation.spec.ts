@@ -29,9 +29,12 @@ test("every couple page has a way back to the wedding and to the list of wedding
     if (landed.startsWith(home)) expect(back.has(home), `${landed} links to the wedding's home`).toBe(true);
     else expect(back.has("/dashboard") || back.has(home), `${landed} links to the most recent wedding`).toBe(true);
 
-    // Follow every link to a couple page of this wedding or the account (downloads and public pages excluded).
-    for (const href of back) {
-      if ((href.startsWith(home) && !href.endsWith("/export")) || href === "/konto" || href === "/hochzeiten") queue.push(href);
+    // Follow every link to a couple page of this wedding or the account (download links and public pages excluded).
+    const follow = new Set(
+      (await page.locator("a[href^='/']:not([download])").evaluateAll((links) => links.map((a) => a.getAttribute("href")!))).map((h) => h.split(/[?#]/)[0]!),
+    );
+    for (const href of follow) {
+      if (href.startsWith(home) || href === "/konto" || href === "/hochzeiten") queue.push(href);
     }
   }
 

@@ -41,6 +41,8 @@ export type Guest = {
   pollAnswers: PollAnswers;
   /** Added by the couple from a household's request. */
   fromRequest: boolean;
+  /** Optional: cards and reminders by email go to every address of a household. */
+  email: string | null;
 };
 export type GuestRequest = { id: string; name: string; status: RequestStatus; createdAt: Date; decidedAt: Date | null };
 /** Who entered a household's answer. */
@@ -57,11 +59,9 @@ export type Household = {
   /** Who entered that answer: the household through its link, or the couple for it (grandparents without a phone). */
   answeredBy: AnswerSource | null;
   createdAt: Date;
-  /** Optional: cards and reminders by email (v4). */
-  email: string | null;
   /** Optional line on this household's thank-you card. */
   personalLine: string;
-  /** Set when the household asked for no more emails (which cleared the address). */
+  /** Set when the household asked for no more emails (which cleared every address). */
   unsubscribedAt: Date | null;
   people: Guest[];
   requests: GuestRequest[];
@@ -96,6 +96,11 @@ export function householdEvents(household: Pick<Household, "invitedEventIds">, e
 export function mealApplies(meal: MealChoice | null, eventIds: readonly string[]): boolean {
   if (!meal || meal.options.length === 0) return false;
   return meal.eventId === null || eventIds.includes(meal.eventId);
+}
+
+/** The distinct addresses of a household's people, in person order. */
+export function householdEmails(household: Pick<Household, "people">): string[] {
+  return [...new Set(household.people.flatMap((p) => (p.email ? [p.email] : [])))];
 }
 
 export function householdStatus(household: Pick<Household, "respondedAt" | "people">): HouseholdStatus {
@@ -161,10 +166,16 @@ export const PERSONAL_LINE_MAX = 300;
 const householdSchema = z.object({
   name: requiredText(NAME_MAX),
   invitedEventIds: ids.nullable().default(null),
-  email: optional(z.string().transform(normalizeEmail).refine(isValidEmail, "invalid_email")).default(null),
   personalLine: text(PERSONAL_LINE_MAX),
   people: z
-    .array(z.object({ id: optional(z.string().max(64)).default(null), name: text(NAME_MAX), isChild: z.boolean().default(false) }))
+    .array(
+      z.object({
+        id: optional(z.string().max(64)).default(null),
+        name: text(NAME_MAX),
+        isChild: z.boolean().default(false),
+        email: optional(z.string().transform(normalizeEmail).refine(isValidEmail, "invalid_email")).default(null),
+      }),
+    )
     .max(30)
     .transform((list) => list.filter((p) => p.name !== ""))
     .refine((list) => list.length >= 1, "no_people"),
@@ -177,7 +188,7 @@ export function parseHouseholdInput(input: unknown): Parsed<HouseholdInput> {
 
 // ---- the guests' answer ----
 
-export type PersonResponse = Omit<Guest, "id" | "name" | "isChild" | "fromRequest" | "attending"> & { guestId: string; attending: boolean };
+export type PersonResponse = Omit<Guest, "id" | "name" | "isChild" | "fromRequest" | "attending" | "email"> & { guestId: string; attending: boolean };
 export type HouseholdResponse = { people: PersonResponse[]; pollAnswers: PollAnswers; message: string; requests: string[] };
 export type ResponseContext = { household: Household; events: readonly RsvpEvent[]; meal: MealChoice | null; polls: readonly Poll[] };
 

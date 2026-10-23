@@ -18,7 +18,7 @@ import {
   type SharedVia,
 } from "@/domain/cards";
 import { findFontPairing } from "@/domain/fonts";
-import { householdStatus, isReplyOpen, type Household } from "@/domain/guests";
+import { householdEmails, householdStatus, isReplyOpen, type Household } from "@/domain/guests";
 import { uploadPath } from "@/domain/images";
 import { cardLayoutsFor, resolveDesign, type CardLayout, type ResolvedDesign, type ThemeManifest } from "@/domain/theme";
 import { firstVersion, needsDate, VERSION_FEATURES } from "@/domain/weddings";
@@ -314,7 +314,6 @@ export class GetCardPreview {
       respondedAt: null,
       answeredBy: null,
       createdAt: ctx.now,
-      email: null,
       personalLine: "",
       unsubscribedAt: null,
       requests: [],
@@ -494,7 +493,7 @@ export class SendCardEmails {
     else {
       const household = households.find((h) => h.id === target.householdId);
       if (!household) throw new NotFoundError();
-      if (!household.email) throw new ValidationError({ email: "no_email" });
+      if (householdEmails(household).length === 0) throw new ValidationError({ email: "no_email" });
       if (household.delivery?.excluded) throw new ValidationError({ _: "excluded" });
       ids = [household.id];
     }
@@ -522,7 +521,7 @@ export class SendReminders {
     if (target !== "all" && chosen.length === 0) throw new NotFoundError();
     if (target !== "all" && householdStatus(chosen[0]!) !== "open") throw new ValidationError({ _: "answered" });
     const households = chosen.filter((h) => !deliveries.find((d) => d.householdId === h.id)?.excluded);
-    const emailIds = byEmail && ctx.versionsOf("invitation").length > 0 ? households.filter((h) => h.email).map((h) => h.id) : [];
+    const emailIds = byEmail && ctx.versionsOf("invitation").length > 0 ? households.filter((h) => householdEmails(h).length > 0).map((h) => h.id) : [];
     const queued = emailIds.length ? await this.deps.cards.queueMail("reminder", "invitation", emailIds, ctx.now) : 0;
     const whatsapp = ctx.sending
       ? households
@@ -607,7 +606,7 @@ export class RunMailJobs {
     const household = ctx && (await this.deps.guests.findHousehold(queued.weddingId, queued.householdId));
     const card = household && ctx.cardFor(household.id, queued.kind);
     if (!ctx || !card || !household) return "gone";
-    if (!household.email) return "no_email";
+    if (householdEmails(household).length === 0) return "no_email";
     if (queued.channel === "card" ? !ctx.cardActive(card.kind) || !ctx.can("emailSending") : !ctx.can("emailReminders")) return "locked";
     if (queued.channel === "card" && needsDate(card.kind) && !ctx.wedding.weddingDate) return "no_date";
     if (queued.channel === "reminder" && household.respondedAt) return "answered";
@@ -640,7 +639,7 @@ export class RunMailJobs {
     const owner = await this.deps.users.findById(ctx.wedding.ownerId);
     const stop = this.deps.guestLinks.unsubscribeTokenFor(household.id);
     return {
-      to: household.email!,
+      to: householdEmails(household),
       fromName: `${ctx.wedding.title} über Traureise`,
       replyTo: owner?.email,
       headers: { "List-Unsubscribe": `<${this.deps.appUrl}/api/abmelden/${stop}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
@@ -690,7 +689,7 @@ export class RunMailJobs {
       const sent = sentAt(delivery ? { ...delivery, openedAt: null } : null);
       // The days come from the household's invitation version.
       const card = ctx.cardFor(household.id, "invitation");
-      if (!card || !household.email || household.respondedAt || !delivery || delivery.excluded || !sent) continue;
+      if (!card || householdEmails(household).length === 0 || household.respondedAt || !delivery || delivery.excluded || !sent) continue;
       const offset = reminderDue({ replyBy: ctx.settings.replyBy, days: card.reminderDays, lastOffset: delivery.reminderOffset, sentAt: sent, timeZone: ctx.wedding.timezone, now: ctx.now });
       if (offset === null || !(await this.deps.cards.claimAutomaticReminder(household.id, offset, this.deps.clock.now()))) continue;
       try {
@@ -723,7 +722,7 @@ export class GetUnsubscribe {
   async execute(token: string): Promise<{ couple: string; household: string; done: boolean } | null> {
     const found = await householdOfUnsubscribe(this.deps, token);
     if (!found) return null;
-    return { couple: found.wedding.title, household: found.household.name, done: !found.household.email && !!found.household.unsubscribedAt };
+    return { couple: found.wedding.title, household: found.household.name, done: householdEmails(found.household).length === 0 && !!found.household.unsubscribedAt };
   }
 }
 

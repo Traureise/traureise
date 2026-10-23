@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { CalendarClock, ChevronRight, ClipboardPen, Download, Lock, Mail, MessageCircle } from "lucide-react";
+import { CalendarClock, ChevronRight, ClipboardPen, Download, FileSpreadsheet, Lock, Mail, MessageCircle, Upload } from "lucide-react";
 import type { GuestListEntry, GuestPage } from "@/application/guests";
 import { CardShareButtons, HouseholdMenu, MarkAllSentButton, RemindAllButton, SendAllButton } from "@/components/guests/card-sending";
 import { RequestActions } from "@/components/guests/guest-actions";
@@ -14,7 +14,7 @@ import { WhatsAppButton } from "@/components/share/whatsapp-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cardCounts, deliveryStatus, emailRecipients, sentAt, type DeliveryStatus, type HouseholdCardKind } from "@/domain/cards";
-import type { HouseholdStatus } from "@/domain/guests";
+import { householdEmails, type HouseholdStatus } from "@/domain/guests";
 import { loadGuestPage } from "@/lib/guests";
 import { cn } from "@/lib/utils";
 
@@ -285,6 +285,18 @@ export default async function GuestsPage({ params, searchParams }: Props) {
                 {t("list.csv")}
               </a>
             </Button>
+            <Button asChild variant="outline">
+              <a href={`${base}/vorlage`} download>
+                <FileSpreadsheet aria-hidden />
+                {t("list.template")}
+              </a>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={`${base}/import`}>
+                <Upload aria-hidden />
+                {t("list.import")}
+              </Link>
+            </Button>
           </div>
         </div>
         <AddGuests weddingId={id} events={page.events} />
@@ -299,7 +311,7 @@ export default async function GuestsPage({ params, searchParams }: Props) {
           />
           <div className="flex flex-wrap items-center gap-3">
             {remindable && (!card || card.kind === "invitation") && (
-              <RemindAllButton weddingId={id} open={openHouseholds.length} withEmail={page.emailReminders && page.cards.some((c) => c.kind === "invitation") ? openHouseholds.filter((h) => h.email).length : 0} />
+              <RemindAllButton weddingId={id} open={openHouseholds.length} withEmail={page.emailReminders && page.cards.some((c) => c.kind === "invitation") ? openHouseholds.filter((h) => householdEmails(h).length > 0).length : 0} />
             )}
             {page.cards.length > 0 && (
               <CardPicker
@@ -373,7 +385,7 @@ export default async function GuestsPage({ params, searchParams }: Props) {
         ) : (
           <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
             {shown.map((h) => {
-              const household = h.link ? { id: h.id, name: h.name, email: h.email, link: h.link } : null;
+              const household = h.link ? { id: h.id, name: h.name, emails: householdEmails(h), link: h.link } : null;
               const delivery = card ? (h.deliveries[card.kind] ?? null) : null;
               const canRemind = !!household && h.status === "open" && remindable && (!card || card.kind === "invitation");
               return (
@@ -428,10 +440,9 @@ export default async function GuestsPage({ params, searchParams }: Props) {
                             name: h.name,
                             link: h.link,
                             invitedEventIds: h.invitedEventIds,
-                            email: h.email,
                             personalLine: h.personalLine,
-                            unsubscribed: !!h.unsubscribedAt && !h.email,
-                            people: h.people.map((p) => ({ id: p.id, name: p.name, isChild: p.isChild })),
+                            unsubscribed: !!h.unsubscribedAt && householdEmails(h).length === 0,
+                            people: h.people.map((p) => ({ id: p.id, name: p.name, isChild: p.isChild, email: p.email })),
                           }}
                           card={
                             card && household && card.active && !card.waitsForDate
@@ -446,8 +457,8 @@ export default async function GuestsPage({ params, searchParams }: Props) {
                       <span>{t("list.people", { count: h.people.length, names: h.people.map((p) => (p.isChild ? t("list.child", { name: p.name }) : p.name)).join(", ") })}</span>
                       {h.invitedEventIds && page.events.length > 0 && <span>{t("list.invitedTo", { events: h.events.map((e) => e.name).join(", ") || t("list.noEvent") })}</span>}
                       <span className="inline-flex items-center gap-1" data-testid="household-channel">
-                        {h.email ? <Mail className="size-3.5" aria-hidden /> : <MessageCircle className="size-3.5" aria-hidden />}
-                        {h.email ? tSending("channelEmail", { email: h.email }) : h.unsubscribedAt ? tSending("channelUnsubscribed") : tSending("channelLink")}
+                        {householdEmails(h).length > 0 ? <Mail className="size-3.5" aria-hidden /> : <MessageCircle className="size-3.5" aria-hidden />}
+                        {householdEmails(h).length > 0 ? tSending("channelEmail", { email: householdEmails(h).join(", ") }) : h.unsubscribedAt ? tSending("channelUnsubscribed") : tSending("channelLink")}
                       </span>
                     </p>
                     <VersionSelects weddingId={id} household={{ id: h.id, name: h.name, versions: h.versions }} choices={page.versionChoices} />

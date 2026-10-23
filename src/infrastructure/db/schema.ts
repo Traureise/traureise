@@ -261,8 +261,7 @@ export const households = pgTable(
     respondedAt: timestamp("responded_at", { withTimezone: true }),
     // "guest" through the personal link, "couple" entered for the household on the guest list.
     answeredBy: text("answered_by").$type<"guest" | "couple">(),
-    // v4: optional address for cards and reminders by email, a line for the thank-you card, and the unsubscribe.
-    email: text("email"),
+    // v4: a line for the thank-you card and the unsubscribe (which clears every person's email).
     personalLine: text("personal_line").notNull().default(""),
     unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
     createdAt: createdAt(),
@@ -286,6 +285,8 @@ export const guests = pgTable(
     allergies: text("allergies").notNull().default(""),
     pollAnswers: jsonb("poll_answers").$type<PollAnswersJson>().notNull().default({}),
     fromRequest: boolean("from_request").notNull().default(false),
+    // Optional address for cards and reminders by email; a household is mailed at every address of its people.
+    email: text("email"),
   },
   (t) => [index("guests_household_idx").on(t.householdId, t.position)],
 );

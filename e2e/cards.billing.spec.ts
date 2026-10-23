@@ -35,7 +35,7 @@ test.describe("Einladungen and Komplett packages", () => {
       editorUrl = await createWebsite(page, slug, "2027-06-12");
       weddingId = weddingIdOf(editorUrl);
       await page.goto(guestsUrl(editorUrl));
-      await addHousehold(page, "Familie Kern", [{ name: "Eva" }], undefined, { email: guestEmail });
+      await addHousehold(page, "Familie Kern", [{ name: "Eva", email: guestEmail }]);
 
       cards.saveTheDate = await createCard(page, weddingId, "Save the Date");
       await expect(page.getByTestId("card-editor-locked")).toBeVisible();

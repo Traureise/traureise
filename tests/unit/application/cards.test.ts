@@ -46,7 +46,7 @@ beforeEach(async () => {
 const create = async (kind: CardKind) => (await f.cards.listByWedding(weddingId)).find((c) => c.kind === kind && c.position === 0)!;
 const editor = async (kind: CardKind, userId = anna.id) => new GetCardEditor(f.deps).execute(userId, (await create(kind)).id);
 const household = (name: string, email: string | null = null, personalLine = "") =>
-  new SaveHousehold(f.deps).execute(anna.id, weddingId, null, { name, email, personalLine, people: [{ name: `${name} 1` }, { name: `${name} 2` }] });
+  new SaveHousehold(f.deps).execute(anna.id, weddingId, null, { name, personalLine, people: [{ name: `${name} 1`, email }, { name: `${name} 2` }] });
 const token = (householdId: string) => f.guestLinks.tokenFor(householdId);
 const page = (householdId: string) => new GetHouseholdPage(f.deps).execute(token(householdId));
 const share = (kind: CardKind, householdId: string, via: "whatsapp" | "link" = "link") => new ShareCard(f.deps).execute(anna.id, weddingId, kind, householdId, via);
@@ -346,7 +346,7 @@ describe("sending by email", () => {
     expect(await runMail()).toMatchObject({ sent: 0 });
     expect(f.mailer.sent).toHaveLength(1);
     const [mail] = f.mailer.sent;
-    expect(mail).toMatchObject({ to: "weber@example.org", fromName: "Anna & Ben über Traureise", replyTo: "anna@example.org" });
+    expect(mail).toMatchObject({ to: ["weber@example.org"], fromName: "Anna & Ben über Traureise", replyTo: "anna@example.org" });
     expect(mail!.headers).toEqual({
       "List-Unsubscribe": `<http://localhost:3000/api/abmelden/stop-${weber.id}>`,
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
@@ -355,6 +355,19 @@ describe("sending by email", () => {
     expect(JSON.parse(mail!.text)).toMatchObject({ pageUrl: `http://localhost:3000/antwort/link-${weber.id}`, unsubscribeUrl: `http://localhost:3000/abmelden/stop-${weber.id}`, message: "Hallo Weber, merkt euch den Tag!" });
 
     expect(await sendEmails("saveTheDate", "all")).toEqual({ queued: 0 });
+    expect(await sendEmails("saveTheDate", { householdId: weber.id })).toEqual({ queued: 1 });
+  });
+
+  it("sends one email for a household to every address of its people", async () => {
+    const weber = await new SaveHousehold(f.deps).execute(anna.id, weddingId, null, {
+      name: "Weber",
+      personalLine: "",
+      people: [{ name: "Clara", email: "a@x.de" }, { name: "Ida", email: "b@x.de" }, { name: "Tom", email: "a@x.de" }],
+    });
+    expect(await sendEmails("saveTheDate", "all")).toEqual({ queued: 1 });
+    expect(await runMail()).toMatchObject({ sent: 1, failed: 0 });
+    expect(f.mailer.sent).toHaveLength(1);
+    expect(f.mailer.sent[0]).toMatchObject({ to: ["a@x.de", "b@x.de"] });
     expect(await sendEmails("saveTheDate", { householdId: weber.id })).toEqual({ queued: 1 });
   });
 
@@ -410,7 +423,7 @@ describe("unsubscribing", () => {
     expect(await new Unsubscribe(f.deps).execute(stop)).toBe(true);
     expect(await new GetUnsubscribe(f.deps).execute(stop)).toEqual({ couple: "Anna & Ben", household: "Weber", done: true });
     const entry = (await new GetGuestPage(f.deps).execute(anna.id, weddingId)).households[0]!;
-    expect(entry).toMatchObject({ email: null });
+    expect(entry.people.map((p) => p.email)).toEqual([null, null]);
     expect(entry.unsubscribedAt).toBeInstanceOf(Date);
     expect(await new Unsubscribe(f.deps).execute("forged")).toBe(false);
     expect(await new GetUnsubscribe(f.deps).execute("forged")).toBeNull();
@@ -439,7 +452,7 @@ describe("reminders", () => {
     expect((await runMail()).reminders).toBe(1);
     f.clock.current = new Date("2027-05-02T10:00:00Z");
     expect((await runMail()).reminders).toBe(0);
-    expect(f.mailer.sent.map((m) => m.to)).toEqual(["weber@example.org", "weber@example.org"]);
+    expect(f.mailer.sent.map((m) => m.to)).toEqual([["weber@example.org"], ["weber@example.org"]]);
     expect(f.mailer.sent[0]!.subject).toBe("Erinnerung: Anna & Ben");
   });
 
@@ -469,7 +482,7 @@ describe("reminders", () => {
     expect(result.whatsapp.map((w) => w.householdId)).toEqual([roth.id]);
     expect(result.whatsapp[0]).toMatchObject({ link: `http://localhost:3000/antwort/link-${roth.id}`, message: "Hallo {name}, denkt an eure Antwort." });
     await runMail();
-    expect(f.mailer.sent.map((m) => m.to)).toEqual(["weber@example.org"]);
+    expect(f.mailer.sent.map((m) => m.to)).toEqual([["weber@example.org"]]);
     const entry = (await new GetGuestPage(f.deps).execute(anna.id, weddingId)).households.find((h) => h.id === weber.id)!;
     expect(entry.deliveries.invitation?.remindedAt).toBeInstanceOf(Date);
   });
@@ -510,7 +523,7 @@ describe("account rights and retention", () => {
     expect(wedding.cards.find((c: { kind: string }) => c.kind === "saveTheDate")).toMatchObject({ label: "Standard", content: { names: "Anna & Ben" } });
     expect(wedding.deliveries).toMatchObject([{ household: "Weber", kind: "saveTheDate", sharedVia: "link" }]);
     expect(wedding.opens).toMatchObject([{ household: "Weber", card: "Standard" }]);
-    expect(wedding.guests.households[0]).toMatchObject({ email: "weber@example.org", personalLine: "Danke!" });
+    expect(wedding.guests.households[0]).toMatchObject({ personalLine: "Danke!", people: [{ email: "weber@example.org" }, { email: null }] });
   });
 
   it("removes cards, deliveries and opens with the guest data, the wedding and the account", async () => {

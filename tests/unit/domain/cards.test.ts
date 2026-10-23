@@ -17,6 +17,7 @@ import {
   type CardLabels,
   type Delivery,
 } from "@/domain/cards";
+import type { Guest } from "@/domain/guests";
 import { parseThemeManifest, resolveDesign } from "@/domain/theme";
 
 const at = (iso: string) => new Date(iso);
@@ -158,12 +159,12 @@ describe("delivery status", () => {
 
   it("sends a card by email to households with an address that have not had it yet", () => {
     const list = [
-      { id: "a", email: "a@example.org", delivery: null },
-      { id: "b", email: null, delivery: null },
-      { id: "c", email: "c@example.org", delivery: delivery({ sharedAt: at("2026-01-01") }) },
-      { id: "d", email: "d@example.org", delivery: delivery({ excluded: true }) },
-      { id: "e", email: "e@example.org", delivery: delivery({ emailQueuedAt: at("2026-01-01") }) },
-      { id: "f", email: "f@example.org", delivery: delivery({ emailError: "smtp" }) },
+      { id: "a", people: [{ email: "a@example.org" } as Guest], delivery: null },
+      { id: "b", people: [{ email: null } as Guest], delivery: null },
+      { id: "c", people: [{ email: "c@example.org" } as Guest], delivery: delivery({ sharedAt: at("2026-01-01") }) },
+      { id: "d", people: [{ email: "d@example.org" } as Guest], delivery: delivery({ excluded: true }) },
+      { id: "e", people: [{ email: "e@example.org" } as Guest], delivery: delivery({ emailQueuedAt: at("2026-01-01") }) },
+      { id: "f", people: [{ email: "f@example.org" } as Guest], delivery: delivery({ emailError: "smtp" }) },
     ];
     expect(emailRecipients(list).map((h) => h.id)).toEqual(["a", "f"]);
   });

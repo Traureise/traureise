@@ -4,6 +4,7 @@ import { type CardKind, CARD_KINDS, type HouseholdCardKind } from "./card-kinds"
 import { dayNumber, localDay } from "./days";
 import { imageKey, optional, requiredText, text } from "./fields";
 import type { FontPairing } from "./fonts";
+import { householdEmails, type Household } from "./guests";
 import { parseWith, type Parsed } from "./result";
 import type { CardLayout, Palette, ResolvedDesign } from "./theme";
 
@@ -284,8 +285,8 @@ export function cardCounts(deliveries: readonly (Delivery | null)[]): { househol
 }
 
 /** "Send to all": households with an address that have not had this card yet and are not queued. */
-export function emailRecipients<H extends { email: string | null; delivery: Delivery | null }>(households: readonly H[]): H[] {
-  return households.filter((h) => h.email && !h.delivery?.excluded && !sentAt(h.delivery) && !h.delivery?.emailQueuedAt);
+export function emailRecipients<H extends Pick<Household, "people"> & { delivery: Delivery | null }>(households: readonly H[]): H[] {
+  return households.filter((h) => householdEmails(h).length > 0 && !h.delivery?.excluded && !sentAt(h.delivery) && !h.delivery?.emailQueuedAt);
 }
 
 /**
