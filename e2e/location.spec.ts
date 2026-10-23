@@ -101,7 +101,10 @@ test("a couple finds the venue on an OpenStreetMap map, after agreeing to load i
     await page.goto(scheduleUrl(weddingId));
     await page.getByRole("button", { name: "Termin hinzufügen" }).click();
     const form = page.getByRole("form", { name: "Neuer Termin" });
-    await form.getByTestId("location-map").click();
+    // Leaflet loads after the map's box appears and listens for clicks once it has set the box up.
+    const map = form.getByTestId("location-map");
+    await expect(map).toHaveClass(/leaflet-container/);
+    await map.click();
     await expect(form.getByLabel("Veranstaltungsort")).toHaveValue("Rathaus Kempten");
     await expect(form.getByLabel("Adresse")).toHaveValue("Rathausplatz 29, 87435 Kempten");
     expect(osm.some((u) => u.includes("/reverse?") && u.includes("zoom=18"))).toBe(true);
