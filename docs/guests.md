@@ -56,7 +56,8 @@ CSV file of up to 1 MB and 1000 rows. **Vorlage herunterladen** gives a spreadsh
 *Haushalt*, *Kind*, *E-Mail*, *Allergien* and *Persönliche Zeile*, plus one column per event of the Ablauf
 (*ja* or *nein*: invited or not). Only *Name* is required; one row is one person, and rows with the same
 household name form one household. A row without a household becomes a household of its own. Columns the app
-does not know are ignored and listed as a note.
+does not know are ignored and listed as a note; a column without a header is listed by its letter
+(*Spalte D*) when it holds data.
 
 Nothing is saved before the review is done:
 

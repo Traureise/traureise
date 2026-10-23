@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Guest, Household, RsvpEvent } from "@/domain/guests";
 import { planImport, pruneDecisions, readImportTable, templateTable, type ImportDecision, type ImportHeaders, type ImportRow } from "@/domain/guest-import";
 
-const headers: ImportHeaders = { name: "Name", household: "Haushalt", child: "Kind", email: "E-Mail", allergies: "Allergien", personalLine: "Persönliche Zeile" };
+const headers: ImportHeaders = { name: "Name", household: "Haushalt", child: "Kind", email: "E-Mail", allergies: "Allergien", personalLine: "Persönliche Zeile", unnamedColumn: "Spalte" };
 const events: RsvpEvent[] = [
   { id: "e1", name: "Standesamt", startDate: "2027-06-01", startTime: "10:00" },
   { id: "e2", name: "Feier", startDate: "2027-06-01", startTime: "18:00" },
@@ -22,6 +22,15 @@ describe("readImportTable", () => {
   it("maps headers ignoring case and whitespace and lists unknown columns", () => {
     const result = readImportTable([[" name ", "HAUSHALT", "Tisch", "Standesamt"], ["Anna", "Müller", "5", "ja"]], headers, events);
     expect(result).toEqual({ ok: true, ignoredColumns: ["Tisch"], rows: [{ line: 2, name: "Anna", household: "Müller", child: "", email: "", allergies: "", personalLine: "", events: { e1: "ja" } }] });
+  });
+  it("lists columns without a header by their letter when they hold data, in column order", () => {
+    const result = readImportTable([["Name", "", "Tisch", ""], ["Anna", "0171", "5", ""], ["Ben", "", "", "", "Notiz"]], headers, events);
+    expect(result.ok && result.ignoredColumns).toEqual(["Spalte B", "Tisch", "Spalte E"]);
+  });
+  it("names columns past Z with two letters", () => {
+    const head = ["Name", ...Array.from({ length: 26 }, () => "")];
+    const result = readImportTable([head, ["Anna", ...Array.from({ length: 25 }, () => ""), "x"]], headers, events);
+    expect(result.ok && result.ignoredColumns).toEqual(["Spalte AA"]);
   });
   it("needs a name column", () => {
     expect(readImportTable([["Haushalt"], ["Müller"]], headers, events)).toEqual({ ok: false, error: "no_name_column" });

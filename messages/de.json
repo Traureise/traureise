@@ -808,7 +808,8 @@
         "child": "Kind",
         "email": "E-Mail",
         "allergies": "Allergien",
-        "personalLine": "Persönliche Zeile"
+        "personalLine": "Persönliche Zeile",
+        "unnamedColumn": "Spalte"
       },
       "fields": {
         "name": "Name",

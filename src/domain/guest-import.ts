@@ -11,8 +11,11 @@ export const IMPORT_CELL_MAX = 2000;
 /** At most this many ignored column names are reported. */
 export const IMPORT_IGNORED_COLUMNS_MAX = 200;
 
-/** Header labels in the couple's language; the template uses them and the reader matches them. */
-export type ImportHeaders = { name: string; household: string; child: string; email: string; allergies: string; personalLine: string };
+/**
+ * Header labels in the couple's language; the template uses them and the reader matches them.
+ * `unnamedColumn` names an ignored column without a header, followed by its letter ("Spalte D").
+ */
+export type ImportHeaders = { name: string; household: string; child: string; email: string; allergies: string; personalLine: string; unnamedColumn: string };
 /** One person row as the couple sees and edits it. `line` is the spreadsheet row number (header = 1). */
 export type ImportRow = { line: number; name: string; household: string; child: string; email: string; allergies: string; personalLine: string; events: Record<string, string> };
 export type ImportDecision = { action: "skip" } | { action: "add" } | { action: "overwrite"; guestId: string };
@@ -63,6 +66,13 @@ function yesNo(value: string): boolean | null {
 
 const cut = (s: string) => (s.length > IMPORT_CELL_MAX ? s.slice(0, IMPORT_CELL_MAX) : s);
 
+/** The spreadsheet letter of a 0-based column index: 0 = A, 26 = AA. */
+function columnLetter(index: number): string {
+  let letter = "";
+  for (let n = index + 1; n > 0; n = Math.floor((n - 1) / 26)) letter = String.fromCharCode(65 + ((n - 1) % 26)) + letter;
+  return letter;
+}
+
 type Column = "name" | "household" | "child" | "email" | "allergies" | "personalLine";
 const COLUMNS: Column[] = ["name", "household", "child", "email", "allergies", "personalLine"];
 
@@ -76,17 +86,26 @@ export function readImportTable(
 
   const fields = new Map<number, Column>();
   const eventColumns = new Map<number, string>();
-  const ignoredColumns: string[] = [];
+  const ignored = new Map<number, string>();
+  const unnamed = new Set<number>();
   head.forEach((cell, index) => {
     const k = key(cell);
-    if (k === "") return;
+    if (k === "") return void unnamed.add(index);
     const field = COLUMNS.find((c) => key(headers[c]) === k && ![...fields.values()].includes(c));
     if (field) return void fields.set(index, field);
     const event = events.find((e) => key(e.name) === k && ![...eventColumns.values()].includes(e.id));
     if (event) return void eventColumns.set(index, event.id);
-    if (ignoredColumns.length < IMPORT_IGNORED_COLUMNS_MAX) ignoredColumns.push(cut(cell.trim()));
+    ignored.set(index, cut(cell.trim()));
   });
   if (![...fields.values()].includes("name")) return { ok: false, error: "no_name_column" };
+
+  // Columns without a header (also those past the header's end) are only reported when they hold data.
+  for (const cells of body) {
+    cells.forEach((cell, index) => {
+      if ((index >= head.length || unnamed.has(index)) && !ignored.has(index) && cell.trim() !== "") ignored.set(index, `${headers.unnamedColumn} ${columnLetter(index)}`);
+    });
+  }
+  const ignoredColumns = [...ignored].sort(([a], [b]) => a - b).slice(0, IMPORT_IGNORED_COLUMNS_MAX).map(([, label]) => label);
 
   const rows: ImportRow[] = [];
   body.forEach((cells, index) => {

@@ -7,7 +7,7 @@ import { CreateWedding } from "@/application/weddings";
 import { IMPORT_MAX_BYTES, type ImportHeaders, type ImportRow } from "@/domain/guest-import";
 import { createFakes, FakeSpreadsheets } from "../../fakes";
 
-const headers: ImportHeaders = { name: "Name", household: "Haushalt", child: "Kind", email: "E-Mail", allergies: "Allergien", personalLine: "Persönliche Zeile" };
+const headers: ImportHeaders = { name: "Name", household: "Haushalt", child: "Kind", email: "E-Mail", allergies: "Allergien", personalLine: "Persönliche Zeile", unnamedColumn: "Spalte" };
 
 let f: ReturnType<typeof createFakes>;
 let anna: { id: string };
