@@ -283,7 +283,15 @@ export interface BillingRepository {
 }
 
 export type PaymentEvent =
-  | { type: "paid"; eventId: string; purchaseRef: string; productId: string; weddingId: string | null; /** The admin who started the checkout; null when the provider did not echo it. */ userId: string | null }
+  | {
+      type: "paid";
+      eventId: string;
+      purchaseRef: string;
+      productId: string;
+      weddingId: string | null;
+      /** The admin who started the checkout; null when the provider did not echo it. */
+      userId: string | null;
+    }
   | { type: "revoked"; eventId: string; purchaseRef: string | null }
   | { type: "ignored"; eventId: string };
 

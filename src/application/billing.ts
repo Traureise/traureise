@@ -10,6 +10,7 @@ import {
   type PricingRow,
   type Tier,
 } from "@/domain/billing";
+import { z } from "zod";
 import type { Deps } from "./deps";
 import { InvalidSignatureError, NotFoundError, ValidationError } from "./errors";
 import { loadWedding } from "./owned";
@@ -143,7 +144,13 @@ export class HandlePaymentWebhook {
       purchaseRef: event.purchaseRef,
       provider: providerId,
       validUntil: entitlementValidUntil(wedding.weddingDate, now),
-      purchasedBy: event.userId,
+      purchasedBy: await this.knownBuyer(event.userId),
     };
+  }
+
+  /** The buyer from the checkout metadata, only while the account exists: a stale or malformed id must not make the grant fail. */
+  private async knownBuyer(userId: string | null): Promise<string | null> {
+    if (!userId || !z.uuid().safeParse(userId).success) return null;
+    return (await this.deps.users.findById(userId).catch(() => null))?.id ?? null;
   }
 }

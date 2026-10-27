@@ -70,4 +70,10 @@ describe("DrizzleBillingRepository", () => {
     await users.delete(user.id);
     expect((await billing.listForAdmin(ben.id)).map((e) => e.purchasedBy)).toEqual([null]);
   });
+
+  it("rejects a buyer that is no account, so the application must pass null for one", async () => {
+    const { website } = await seed();
+    await expect(billing.applyEvent("evt_u", grant(website.id, "ord_u", "00000000-0000-4000-8000-000000000000"))).rejects.toThrow();
+    expect(await billing.applyEvent("evt_u", grant(website.id, "ord_u", null))).toBe("applied");
+  });
 });

@@ -105,6 +105,12 @@ describe("HandlePaymentWebhook", () => {
     expect((await f.billingRepo.listByWedding(weddingId)).map((e) => e.purchasedBy)).toEqual([anna.id, null]);
   });
 
+  it("still grants when the named buyer no longer exists or is not an id", async () => {
+    await webhook(paid({ userId: "00000000-0000-4000-8000-000000000000" }));
+    await webhook(paid({ eventId: "evt_2", purchaseRef: "ord_2", userId: "not-a-uuid" }));
+    expect((await f.billingRepo.listByWedding(weddingId)).map((e) => [e.purchaseRef, e.purchasedBy])).toEqual([["ord_1", null], ["ord_2", null]]);
+  });
+
   it("takes the tier from the product, not from anything the buyer controls", async () => {
     await webhook(paid({ productId: "prod_all" }));
     expect((await f.billingRepo.listByWedding(weddingId))[0]?.tier).toBe("complete");
