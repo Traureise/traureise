@@ -1284,6 +1284,7 @@
         "title": "Offene Einladungen",
         "details": "{role} · gültig bis {date}",
         "withdraw": "Zurückziehen",
+        "withdrawLabel": "Einladung an {email} zurückziehen",
         "withdrawn": "Einladung zurückgezogen"
       },
       "invite": {

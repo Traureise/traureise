@@ -211,6 +211,7 @@ export function MembersSection({
                   variant="ghost"
                   size="sm"
                   disabled={pending}
+                  aria-label={t("invitations.withdrawLabel", { email: i.email })}
                   onClick={() => run(() => withdrawInvitationAction(weddingId, i.id), t("invitations.withdrawn"))}
                 >
                   {t("invitations.withdraw")}
@@ -265,7 +266,7 @@ function InviteForm({ weddingId }: { weddingId: string }) {
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     start(async () => {
-      const result = await inviteMemberAction(weddingId, null, form);
+      const result = await inviteMemberAction(weddingId, form);
       setState(result);
       if (!result.ok) return;
       toast.success(t("sent", { email: String(form.get("email")) }));

@@ -107,7 +107,7 @@ test("admins invite people to a wedding, editors work on it, and the wedding out
 
   await test.step("an invitation can be withdrawn", async () => {
     await invite(page, weddingId, dora, "Editor");
-    await members(page).getByTestId("invitation").filter({ hasText: dora }).getByRole("button", { name: "Zurückziehen" }).click();
+    await members(page).getByTestId("invitation").filter({ hasText: dora }).getByRole("button", { name: `Einladung an ${dora} zurückziehen` }).click();
     await expect(members(page).getByTestId("invitation")).toHaveCount(0);
   });
 
@@ -151,6 +151,12 @@ test("admins invite people to a wedding, editors work on it, and the wedding out
     await expect(stranger.page.getByText("abgelaufen, wurde zurückgezogen oder schon angenommen")).toBeVisible();
   });
 
+  await test.step("a made-up invitation link does not work either", async () => {
+    await stranger.page.goto("/einladung?token=nonsense");
+    await expect(stranger.page).toHaveURL(/\/login\?error=einladung$/);
+    await expect(stranger.page.getByText("abgelaufen, wurde zurückgezogen oder schon angenommen")).toBeVisible();
+  });
+
   await test.step("Carla, as admin, sees the invite form and the delete section", async () => {
     await carlaAt.page.goto(`/hochzeiten/${weddingId}/hochzeit`);
     await expect(members(carlaAt.page).getByRole("form", { name: "Person einladen" })).toBeVisible();
@@ -162,10 +168,13 @@ test("admins invite people to a wedding, editors work on it, and the wedding out
     await members(page).getByLabel("Kontaktperson für Gäste").selectOption({ label: "Carla" });
     await expect(member(page, "Carla")).toContainText("Kontaktperson");
     await expect(member(page, "Anna")).not.toContainText("Kontaktperson");
+    // Each change is saved (its toast) before the reload, so the reload never cuts the action off.
     await member(page, "Ben").getByLabel("Rolle von Ben").selectOption({ label: "Admin" });
-    await expect(member(page, "Ben").getByLabel("Rolle von Ben")).toHaveValue("admin");
+    await expect(page.getByText("Rolle geändert", { exact: true })).toBeVisible();
     await page.reload();
+    await expect(member(page, "Ben").getByLabel("Rolle von Ben")).toHaveValue("admin");
     await member(page, "Ben").getByLabel("Rolle von Ben").selectOption({ label: "Editor" });
+    await expect(page.getByText("Rolle geändert", { exact: true })).toBeVisible();
     await page.reload();
     await expect(member(page, "Ben").getByLabel("Rolle von Ben")).toHaveValue("editor");
   });

@@ -18,7 +18,7 @@ async function members(weddingId: string, fn: (userId: string) => Promise<unknow
 }
 
 /** The invite form of the Personen section: mails the link to the address. */
-export async function inviteMemberAction(weddingId: string, _prev: unknown, form: FormData): Promise<ActionResult> {
+export async function inviteMemberAction(weddingId: string, form: FormData): Promise<ActionResult> {
   return members(weddingId, (userId) =>
     container().inviteMember.execute(userId, weddingId, { email: String(form.get("email") ?? ""), role: String(form.get("role") ?? "") }),
   );
