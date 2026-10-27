@@ -1,6 +1,8 @@
-import type { Role } from "@/domain/members";
+import { isValidEmail, normalizeEmail } from "@/domain/email";
+import { isRole, type Role } from "@/domain/members";
+import { startSession, type LoginResult } from "./auth";
 import type { Deps } from "./deps";
-import { NotFoundError, ValidationError } from "./errors";
+import { InvalidTokenError, NotFoundError, RateLimitedError, ValidationError } from "./errors";
 import { loadWedding } from "./owned";
 import type { Invitation, Member } from "./ports";
 
@@ -71,5 +73,73 @@ export class SetContactPerson {
     await loadWedding(this.deps, userId, weddingId, "admin");
     if (!(await this.deps.weddings.roleOf(weddingId, memberId))) throw new ValidationError({ contact: "not_a_member" });
     await this.deps.weddings.update(weddingId, { contactUserId: memberId });
+  }
+}
+
+export const INVITATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+const INVITE_WINDOW_MS = 60 * 60 * 1000;
+const MAX_INVITES_PER_USER = 20;
+
+/** Mails a single-use link that makes the address a member; replaces a pending invitation for the same address. */
+export class InviteMember {
+  constructor(private deps: Deps) {}
+
+  async execute(userId: string, weddingId: string, input: { email: string; role: string }): Promise<Invitation> {
+    const { weddings, users, invitations, rateLimiter, clock, tokens, mailer, invitationMail, appUrl } = this.deps;
+    const wedding = await loadWedding(this.deps, userId, weddingId, "admin");
+    const email = normalizeEmail(input.email);
+    if (!isValidEmail(email)) throw new ValidationError({ email: "invalid_email" });
+    if (!isRole(input.role)) throw new ValidationError({ role: "invalid_role" });
+    const role = input.role;
+    if ((await weddings.listMembers(weddingId)).some((m) => normalizeEmail(m.email) === email)) throw new ValidationError({ email: "already_member" });
+
+    const now = clock.now();
+    if (!(await rateLimiter.hit(`invite:user:${userId}`, MAX_INVITES_PER_USER, INVITE_WINDOW_MS, now))) throw new RateLimitedError();
+
+    const token = tokens.generate();
+    const expiresAt = new Date(now.getTime() + INVITATION_TTL_MS);
+    const invitation = await invitations.replace({ weddingId, email, role, invitedBy: userId, expiresAt, tokenHash: tokens.hash(token) });
+    const inviter = await users.findById(userId);
+    const link = `${appUrl}/einladung?token=${encodeURIComponent(token)}`;
+    await mailer.send({
+      to: email,
+      ...invitationMail.render({ link, inviter: inviter?.firstName || inviter?.email || "", weddingTitle: wedding.title, role, expiresOn: expiresAt }),
+    });
+    return invitation;
+  }
+}
+
+export class WithdrawInvitation {
+  constructor(private deps: Deps) {}
+
+  async execute(userId: string, weddingId: string, invitationId: string) {
+    await loadWedding(this.deps, userId, weddingId, "admin");
+    const pending = await this.deps.invitations.listPending(weddingId, this.deps.clock.now());
+    if (!pending.some((i) => i.id === invitationId)) throw new NotFoundError();
+    await this.deps.invitations.delete(invitationId);
+  }
+}
+
+/**
+ * Redeems an invitation link: makes its address a member and logs that account in. Someone logged in with another
+ * account is refused and the invitation stays, so the link never hands a wedding to the wrong person.
+ */
+export class AcceptInvitation {
+  constructor(private deps: Deps) {}
+
+  async execute(input: { token: string; currentUserId: string | null }): Promise<LoginResult & { weddingId: string }> {
+    const { invitations, users, weddings, tokens, clock } = this.deps;
+    const now = clock.now();
+    const invitation = input.token ? await invitations.findByHash(tokens.hash(input.token)) : null;
+    if (!invitation || invitation.expiresAt <= now) throw new InvalidTokenError();
+    if (input.currentUserId) {
+      const current = await users.findById(input.currentUserId);
+      if (current && normalizeEmail(current.email) !== invitation.email) throw new ValidationError({ _: "other_account" });
+    }
+    if (!(await invitations.delete(invitation.id))) throw new InvalidTokenError();
+
+    const user = (await users.findByEmail(invitation.email)) ?? (await users.create(invitation.email));
+    await weddings.addMember(invitation.weddingId, user.id, invitation.role);
+    return { ...(await startSession(this.deps, user, now)), weddingId: invitation.weddingId };
   }
 }

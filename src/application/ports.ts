@@ -234,6 +234,11 @@ export interface Mailer {
   send(message: MailMessage): Promise<void>;
 }
 
+/** Renders the email that invites someone to work on a wedding. */
+export interface InvitationMailTemplate {
+  render(mail: { link: string; inviter: string; weddingTitle: string; role: Role; expiresOn: Date }): Omit<MailMessage, "to">;
+}
+
 /** Renders the magic-link email in the user's language. */
 export interface MagicLinkMailTemplate {
   render(link: string, expiresInMinutes: number): Omit<MailMessage, "to">;

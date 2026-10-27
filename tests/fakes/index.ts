@@ -33,6 +33,7 @@ import type {
   NewPoll,
   PollRecord,
   Block,
+  InvitationMailTemplate,
   MagicLinkMailTemplate,
   MagicLinkRecord,
   MagicLinkRepository,
@@ -936,6 +937,14 @@ export const fakeMailTemplate: MagicLinkMailTemplate = {
   render: (link, minutes) => ({ subject: "Login", text: `${link} (${minutes})`, html: `<a href="${link}">login</a>` }),
 };
 
+export const fakeInvitationMail: InvitationMailTemplate = {
+  render: ({ link, inviter, weddingTitle, role }) => ({
+    subject: `Invitation to ${weddingTitle}`,
+    text: `${inviter} invites you to ${weddingTitle} as ${role}: ${link}`,
+    html: `<a href="${link}">join</a>`,
+  }),
+};
+
 const palette = (id: string) => ({
   id,
   name: { de: id },
@@ -1012,6 +1021,7 @@ export function createFakes() {
     images: new FakeImageProcessor(),
     mailer: new FakeMailer(),
     mailTemplate: fakeMailTemplate,
+    invitationMail: fakeInvitationMail,
     themes: new FakeThemes(),
     clock: new FakeClock(),
     tokens: new FakeTokens(),

@@ -1,6 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { NotFoundError, ValidationError } from "@/application/errors";
-import { ChangeMemberRole, LeaveWedding, ListMembers, RemoveMember, SetContactPerson } from "@/application/members";
+import { InvalidTokenError, NotFoundError, RateLimitedError, ValidationError } from "@/application/errors";
+import {
+  AcceptInvitation,
+  ChangeMemberRole,
+  INVITATION_TTL_MS,
+  InviteMember,
+  LeaveWedding,
+  ListMembers,
+  RemoveMember,
+  SetContactPerson,
+  WithdrawInvitation,
+} from "@/application/members";
 import { CreateWedding, ListWeddings } from "@/application/weddings";
 import type { Role } from "@/domain/members";
 import { createFakes } from "../../fakes";
@@ -139,5 +149,119 @@ describe("listing members", () => {
   it("is not available to strangers", async () => {
     const eve = await f.users.create("eve@example.org");
     await expect(new ListMembers(f.deps).execute(eve.id, weddingId)).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe("invitations", () => {
+  const invite = (email = "carla@example.org", role = "editor", by = anna.id) => new InviteMember(f.deps).execute(by, weddingId, { email, role });
+  const accept = (token: string, currentUserId: string | null = null) => new AcceptInvitation(f.deps).execute({ token, currentUserId });
+  /** The token from the link in the last invitation mail. */
+  const lastToken = () => new URL(/http\S+/.exec(f.mailer.sent.at(-1)!.text)![0]).searchParams.get("token")!;
+
+  it("sends one mail to the address with the link and the inviter's name", async () => {
+    await f.users.updateFirstName(anna.id, "Anna");
+    await invite(" Carla@Example.org ");
+    expect(f.mailer.sent).toHaveLength(1);
+    expect(f.mailer.sent[0]!.to).toBe("carla@example.org");
+    expect(f.mailer.sent[0]!.text).toContain("http://localhost:3000/einladung?token=");
+    expect(f.mailer.sent[0]!.text).toContain("Anna");
+    expect(f.mailer.sent[0]!.text).toContain("Anna & Ben");
+    const pending = f.invitations.invitations[0]!;
+    expect(pending.tokenHash).toBe(f.tokens.hash(lastToken()));
+    expect(pending.tokenHash).not.toBe(lastToken());
+  });
+
+  it("names the inviter by email when they have no first name", async () => {
+    await invite();
+    expect(f.mailer.sent[0]!.text).toContain("anna@example.org");
+  });
+
+  it("replaces a pending invitation for the same address", async () => {
+    await invite();
+    const first = lastToken();
+    await invite("carla@example.org", "admin");
+    expect(f.invitations.invitations).toHaveLength(1);
+    await expect(accept(first)).rejects.toBeInstanceOf(InvalidTokenError);
+    const { user } = await accept(lastToken());
+    expect(await f.weddings.roleOf(weddingId, user.id)).toBe("admin");
+  });
+
+  it("is admin only", async () => {
+    const ben = await join("ben@example.org", "editor", 1);
+    await expect(invite("carla@example.org", "editor", ben.id)).rejects.toBeInstanceOf(NotFoundError);
+    expect(f.mailer.sent).toHaveLength(0);
+  });
+
+  it("validates the address and the role", async () => {
+    await expect(invite("no-address")).rejects.toEqual(new ValidationError({ email: "invalid_email" }));
+    await expect(invite("carla@example.org", "owner")).rejects.toEqual(new ValidationError({ role: "invalid_role" }));
+  });
+
+  it("refuses someone who already is a member", async () => {
+    await join("ben@example.org", "editor", 1);
+    await expect(invite("Ben@example.org")).rejects.toEqual(new ValidationError({ email: "already_member" }));
+  });
+
+  it("limits invitations to 20 an hour per user", async () => {
+    for (let i = 0; i < 20; i++) await invite(`guest${i}@example.org`);
+    await expect(invite("one-more@example.org")).rejects.toBeInstanceOf(RateLimitedError);
+  });
+
+  it("creates the user, an editor membership and a session when accepted without a session", async () => {
+    const { weddingId: id } = await invite();
+    const result = await accept(lastToken());
+    expect(id).toBe(weddingId);
+    expect(result.weddingId).toBe(weddingId);
+    expect(result.user.email).toBe("carla@example.org");
+    expect(result.needsProfile).toBe(true);
+    expect(await f.weddings.roleOf(weddingId, result.user.id)).toBe("editor");
+    expect(await f.deps.sessions.findByHash(f.tokens.hash(result.sessionToken))).toMatchObject({ userId: result.user.id });
+  });
+
+  it("works once", async () => {
+    await invite();
+    const token = lastToken();
+    await accept(token);
+    await expect(accept(token)).rejects.toBeInstanceOf(InvalidTokenError);
+  });
+
+  it("expires after 14 days", async () => {
+    await invite();
+    f.clock.current = new Date(f.clock.current.getTime() + INVITATION_TTL_MS);
+    await expect(accept(lastToken())).rejects.toBeInstanceOf(InvalidTokenError);
+  });
+
+  it("can be withdrawn by an admin", async () => {
+    const invitation = await invite();
+    await new WithdrawInvitation(f.deps).execute(anna.id, weddingId, invitation.id);
+    await expect(accept(lastToken())).rejects.toBeInstanceOf(InvalidTokenError);
+  });
+
+  it("cannot be withdrawn by an editor or through another wedding", async () => {
+    const invitation = await invite();
+    const ben = await join("ben@example.org", "editor", 1);
+    await expect(new WithdrawInvitation(f.deps).execute(ben.id, weddingId, invitation.id)).rejects.toBeInstanceOf(NotFoundError);
+    const other = await new CreateWedding(f.deps).execute(ben.id, { title: "Ben & Dora", hasDate: false });
+    await expect(new WithdrawInvitation(f.deps).execute(ben.id, other.id, invitation.id)).rejects.toBeInstanceOf(NotFoundError);
+    expect(f.invitations.invitations).toHaveLength(1);
+  });
+
+  it("is not accepted by a different logged-in account, and still works for the invited address", async () => {
+    const ben = await f.users.create("ben@example.org");
+    await invite();
+    const token = lastToken();
+    await expect(accept(token, ben.id)).rejects.toEqual(new ValidationError({ _: "other_account" }));
+    expect(await f.weddings.roleOf(weddingId, ben.id)).toBeNull();
+    const { user } = await accept(token);
+    expect(user.email).toBe("carla@example.org");
+    expect(await f.weddings.roleOf(weddingId, user.id)).toBe("editor");
+  });
+
+  it("is accepted by the invited address's existing account while logged in", async () => {
+    const carla = await f.users.create("carla@example.org");
+    await invite();
+    const { user } = await accept(lastToken(), carla.id);
+    expect(user.id).toBe(carla.id);
+    expect(await f.weddings.roleOf(weddingId, carla.id)).toBe("editor");
   });
 });

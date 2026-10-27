@@ -12,6 +12,16 @@
       "expiry": "Der Link ist {minutes} Minuten gültig und funktioniert nur einmal.",
       "ignore": "Du hast keinen Link angefordert? Dann kannst du diese E-Mail ignorieren."
     },
+    "invitation": {
+      "subject": "{inviter} lädt dich zu „{title}“ auf Traureise ein",
+      "greeting": "Hallo!",
+      "intro": "{inviter} lädt dich ein, bei Traureise an „{title}“ mitzuarbeiten.",
+      "roleEditor": "Du kannst Websites, Karten, Gäste und den Ablauf bearbeiten.",
+      "roleAdmin": "Du kannst alles bearbeiten und außerdem Personen verwalten, Pakete kaufen und die Hochzeit löschen.",
+      "button": "Einladung annehmen",
+      "expiry": "Der Link ist bis zum {date} gültig und funktioniert nur einmal. Mit ihm meldest du dich auch gleich an.",
+      "ignore": "Du kennst die Person nicht oder möchtest nicht mitmachen? Dann kannst du diese E-Mail ignorieren."
+    },
     "answer": {
       "subject": "{household} hat geantwortet",
       "intro": "{household} hat für „{title}“ geantwortet.",
@@ -86,6 +96,8 @@
     "sentBody": "Wir haben einen Anmeldelink an {email} geschickt. Er ist 15 Minuten gültig.",
     "sentAgain": "Andere E-Mail-Adresse verwenden",
     "linkInvalid": "Dieser Anmeldelink ist abgelaufen oder wurde schon benutzt. Fordere einfach einen neuen an.",
+    "invitationInvalid": "Diese Einladung ist abgelaufen, wurde zurückgezogen oder schon angenommen. Bitte die Person, die dich eingeladen hat, um eine neue.",
+    "invitationOtherAccount": "Diese Einladung ging an eine andere E-Mail-Adresse als die, mit der du angemeldet bist. Melde dich ab und öffne den Link aus der Einladung noch einmal.",
     "welcomeTitle": "Schön, dass du da bist",
     "welcomeLead": "Wie dürfen wir dich nennen?",
     "firstNameLabel": "Vorname",

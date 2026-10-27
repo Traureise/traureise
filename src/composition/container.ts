@@ -62,11 +62,21 @@ import { AddEvent, DeleteEvent, ListEvents, UpdateEvent } from "@/application/sc
 import { AddBlock, AddSection, DeleteBlock, DeleteSection, MoveBlock, MoveSection, UpdateBlock, UpdateSection } from "@/application/sections";
 import { GetUpload, UploadImage } from "@/application/uploads";
 import { AddVersion, AssignVersion, DeleteVersion, RenameVersion } from "@/application/versions";
-import { ChangeMemberRole, LeaveWedding, ListMembers, RemoveMember, SetContactPerson } from "@/application/members";
+import {
+  AcceptInvitation,
+  ChangeMemberRole,
+  InviteMember,
+  LeaveWedding,
+  ListMembers,
+  RemoveMember,
+  SetContactPerson,
+  WithdrawInvitation,
+} from "@/application/members";
 import { CreateWedding, DeleteWedding, GetRecentWedding, GetWeddingFrame, GetWeddingHome, ListWeddings, MarkWeddingUsed, UpdateWeddingDetails, UpdateWeddingSlug } from "@/application/weddings";
 import { GetWebsiteForOwner, SelectTheme, SetCoverImage, SetPublished, UpdateDesign, UpdateHome, UpdateSlug } from "@/application/websites";
 import { createDatabase } from "@/infrastructure/db/client";
 import { SharpImageProcessor } from "@/infrastructure/images/sharp";
+import { createInvitationTemplate } from "@/infrastructure/mail/invitation-template";
 import { createMagicLinkTemplate } from "@/infrastructure/mail/magic-link-template";
 import { SmtpMailer } from "@/infrastructure/mail/smtp";
 import { DrizzleMagicLinkRepository, DrizzleSessionRepository, PostgresRateLimiter } from "@/infrastructure/repositories/auth";
@@ -140,6 +150,7 @@ function build() {
       from: config.MAIL_FROM,
     }),
     mailTemplate: createMagicLinkTemplate(),
+    invitationMail: createInvitationTemplate(),
     themes,
     clock: config.TEST_HOOKS ? adjustableClock : systemClock,
     tokens: cryptoTokens,
@@ -204,6 +215,9 @@ function build() {
     removeMember: new RemoveMember(deps),
     leaveWedding: new LeaveWedding(deps),
     setContactPerson: new SetContactPerson(deps),
+    inviteMember: new InviteMember(deps),
+    withdrawInvitation: new WithdrawInvitation(deps),
+    acceptInvitation: new AcceptInvitation(deps),
     addVersion: new AddVersion(deps),
     renameVersion: new RenameVersion(deps),
     deleteVersion: new DeleteVersion(deps),
