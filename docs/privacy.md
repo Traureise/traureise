@@ -59,7 +59,7 @@ and its reasons are in [ADR 0005](adr/0005-gdpr-no-runtime-third-party-requests.
 ## Your processors
 
 What leaves your server depends on your configuration: your SMTP provider (login emails, RSVP
-notifications to the couple, which contain guests' names, answers and messages, and cards and reminders to
+notifications to the wedding's admins, which contain guests' names, answers and messages, and cards and reminders to
 guests' email addresses) and, if you
 use it, your S3 provider (photos). Prefer EU providers and sign data processing agreements with them.
 

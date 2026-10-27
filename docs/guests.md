@@ -96,7 +96,7 @@ date. Without a wedding date and without a package nothing is deleted automatica
 ([ADR 0017](adr/0017-automatic-deletion-of-guest-data.md)). The job runs inside the app every
 `GUEST_JOBS_INTERVAL_MINUTES` ([ADR 0018](adr/0018-background-jobs-inside-the-app.md)).
 
-Deleting a household, the website or the account removes its guest data at once; the account export
+Deleting a household, the website or the wedding (or an account that is the wedding's only member) removes its guest data at once; the account export
 (`data.json`) contains all of it.
 
 ## For operators

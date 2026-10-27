@@ -2,7 +2,7 @@
 
 Everything a couple makes in Traureise belongs to a **wedding** (Hochzeit): the cards, the website, the guest
 list and the packages. One account can hold several weddings, for example for wedding planners or for helping a
-friend.
+friend. A wedding can also be shared with other accounts, see [Sharing a wedding](#sharing-a-wedding).
 
 ## Creating a wedding
 
@@ -79,6 +79,40 @@ Extra versions are paid when billing is on (see [Legal pages, account rights and
 an extra Save the Date or website needs **RSVP**, an extra invitation **Einladungen**, an extra engagement
 announcement or thank-you card **Komplett**. Versions you added stay when a package ends; an extra website
 version then goes offline. Self-hosted without billing, everything is unlimited.
+
+## Sharing a wedding
+
+A wedding belongs to its **members**, not to one account. Each member has one role for the whole wedding:
+
+- **Editor**: can change everything in the wedding (Hochzeit, Ablauf, guest list, websites, cards, images).
+- **Admin**: everything an editor can, plus inviting people, changing roles, removing members, buying packages
+  and deleting the wedding.
+
+All admins are equal; whoever created the wedding is simply its first admin. A wedding always has at least one
+admin: the last one cannot leave, be demoted or be removed. People who are not members cannot tell that the wedding
+exists.
+
+Members are managed in the **Personen** section of the Hochzeit tab (editors see it read-only):
+
+- **Person einladen**: an admin enters an email address and a role. The person gets an email with a link that is
+  valid for 14 days, once, and only for that address. Following it logs them in (the account is created if needed)
+  and adds the wedding to their dashboard. Inviting the same address again replaces the pending invitation; open
+  invitations are listed and can be withdrawn (**Zurückziehen**).
+- Admins can change roles and remove members (**Entfernen**). Any member can leave (**Hochzeit verlassen**) unless
+  they are the last admin.
+- **Kontaktperson für Gäste**: guests' replies to cards and reminders go to this member's address (it starts as
+  the wedding's creator). If that person leaves, an admin takes over.
+
+The wedding's own mail goes to **all admins**: RSVP notifications and the daily summary, and the warning before
+guest data is deleted. Purchases are visible to admins only, with who bought each package; the invoice stays with
+the buyer.
+
+Deleting an account removes the person's memberships, not the wedding, and the wedding's images stay. A wedding the
+person was the only member of is deleted with the account. Someone who is the last admin of a wedding with other
+members cannot delete their account until another member is made admin; the deletion page lists those weddings.
+The account export includes the weddings the person is an admin of, and lists their other memberships.
+
+See [ADR 0029](adr/0029-weddings-have-members.md).
 
 ## Addresses
 
