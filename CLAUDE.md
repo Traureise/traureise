@@ -20,6 +20,10 @@ npm run check:names               # reference-name check (see rules)
 
 E2E runs against the built Docker image, so rebuild the stack after app changes.
 
+Release: `git tag -a vX.Y.Z origin/main -m "…" && git push origin vX.Y.Z` publishes `ghcr.io/traureise/traureise:X.Y.Z`
+(`.github/workflows/docker.yml`). traureise.de runs a pinned tag from Traureise/stacks (`traureise/compose.yaml`);
+upgrading it is a commit there. Migrations run when the container starts.
+
 ## Architecture
 
 Layers point inward only; ESLint enforces the import bans:
@@ -49,7 +53,9 @@ from Mailpit (`e2e/helpers/`). Billing E2E uses the Creem stub in `e2e/creem-stu
   OpenStreetMap location picker, loaded after consent (ADR 0026).
 - Legal texts are not in the app: it only links `IMPRINT_URL`/`PRIVACY_URL`/`TERMS_URL` (ADR 0027).
 - No skipped tests, Playwright `retries: 0`.
-- No instance holds real data yet (development only): schema changes still get a Drizzle migration, but
-  existing rows need no data migration or backwards compatibility.
+- traureise.de holds real users' data: every schema change is a Drizzle migration that keeps existing rows valid
+  (with a data migration where needed).
+- An env var in `src/composition/config.ts` that an operator must set also goes into `.env.example` here and in
+  Traureise/stacks (`traureise/.env.example`).
 - Workflow: one issue per version, branch `traureise-<n>-<topic>`, commits prefixed `TRAUREISE #<n>: `,
   ADRs in `docs/adr/` (MADR, numbered), PRs left open for the owner to merge.
