@@ -291,7 +291,7 @@ describe("retention", () => {
     clock.current = new Date("2028-05-20T10:00:00Z");
     const runs = await Promise.all([new RunGuestJobs(d).execute(), new RunGuestJobs(d).execute()]);
     expect(runs.flatMap((r) => r.warned)).toEqual([weddingId]);
-    expect(mailer.sent.map((m) => [m.to, m.subject])).toEqual([["anna@example.org", "Eure Gästeliste wird am 13. Juni 2028 gelöscht"]]);
+    expect(mailer.sent.map((m) => [m.to, m.subject])).toEqual([[["anna@example.org"], "Eure Gästeliste wird am 13. Juni 2028 gelöscht"]]);
   });
 });
 
