@@ -8,6 +8,7 @@ import {
   CreateWedding,
   DeleteWedding,
   GetRecentWedding,
+  GetWeddingFrame,
   GetWeddingHome,
   ListWeddings,
   MarkWeddingUsed,
@@ -93,6 +94,17 @@ describe("several weddings", () => {
     expect((await new GetRecentWedding(f.deps).execute(anna.id))?.id).toBe(a.id);
     await expect(new MarkWeddingUsed(f.deps).execute((await f.users.create("eve@example.org")).id, a.id)).rejects.toBeInstanceOf(NotFoundError);
     expect((await new ListWeddings(f.deps).execute(anna.id)).map((w) => w.title)).toEqual(["Anna & Ben", "Clara & Dana"]);
+  });
+
+  it("marks the other weddings in the switcher with the user's role there", async () => {
+    const own = await create();
+    const ben = await f.users.create("ben@example.org");
+    const shared = await create({ title: "Ben & Clara", hasDate: false }, ben.id);
+    await f.weddings.addMember(shared.id, anna.id, "editor");
+    const frame = await new GetWeddingFrame(f.deps).execute(anna.id, own.id);
+    expect(frame.wedding.role).toBe("admin");
+    expect(frame.others).toEqual([{ id: shared.id, title: "Ben & Clara", role: "editor" }]);
+    expect((await new GetWeddingFrame(f.deps).execute(anna.id, shared.id)).wedding.role).toBe("editor");
   });
 
   it("has none for a new account", async () => {

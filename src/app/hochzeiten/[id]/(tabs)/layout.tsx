@@ -19,7 +19,7 @@ export default async function WeddingTabsLayout({ children, params }: { children
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <WeddingNav wedding={wedding} />
-            <WeddingSwitcher current={wedding.title} others={others} />
+            <WeddingSwitcher current={wedding.title} role={wedding.role} others={others} />
           </div>
           <WeddingTabs
             label={t("label")}

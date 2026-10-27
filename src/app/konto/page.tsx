@@ -21,6 +21,8 @@ export default async function AccountPage() {
   const format = await getFormatter();
   const c = container();
   const purchases = await c.listPurchases.execute(user.id);
+  // Weddings shared with others where the user is the last admin: the account can't go until someone else is admin.
+  const blocking = await c.weddingsBlockingDeletion.execute(user.id);
   const date = (d: Date) => format.dateTime(d, { dateStyle: "long" });
   // validUntil is the exclusive end (midnight UTC after the last day), so show the last day itself.
   const lastDay = (d: Date) => format.dateTime(new Date(d.getTime() - 1), { dateStyle: "long", timeZone: "UTC" });
@@ -74,7 +76,22 @@ export default async function AccountPage() {
           <SettingsSection icon={<Trash2 />} title={t("delete.title")} description={t("delete.lead")} testId="account-delete" tone="danger">
             <div className="space-y-4 rounded-2xl border border-destructive/30 bg-destructive/[0.03] p-5">
               <p className="text-sm">{t("delete.body")}</p>
-              <DeleteAccountForm />
+              {blocking.length > 0 ? (
+                <div className="space-y-2 text-sm" data-testid="account-delete-blocked">
+                  <p className="font-medium">{t("delete.blocked")}</p>
+                  <ul className="list-disc space-y-1 pl-5">
+                    {blocking.map((w) => (
+                      <li key={w.id}>
+                        <Link href={`/hochzeiten/${w.id}/hochzeit#wedding-members`} className="text-primary underline-offset-4 hover:underline">
+                          {w.title}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <DeleteAccountForm />
+              )}
             </div>
           </SettingsSection>
         </div>

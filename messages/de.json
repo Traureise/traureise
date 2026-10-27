@@ -154,7 +154,11 @@
     "not_manual": "Nur von Hand markierte Karten lassen sich zurücksetzen.",
     "already_sent": "Diese Karte hat der Haushalt schon.",
     "invalid_yes_no": "Bitte schreibe „ja“ oder „nein“.",
-    "household_full": "Ein Haushalt kann höchstens 30 Personen haben."
+    "household_full": "Ein Haushalt kann höchstens 30 Personen haben.",
+    "last_admin": "Eine Hochzeit braucht mindestens einen Admin. Mach zuerst jemand anderen zum Admin.",
+    "already_member": "Diese Person arbeitet schon an der Hochzeit mit.",
+    "invalid_role": "Bitte wähle eine Rolle.",
+    "not_a_member": "Diese Person arbeitet nicht an der Hochzeit mit."
   },
   "editor": {
     "back": "Zur Hochzeit",
@@ -509,11 +513,13 @@
     },
     "delete": {
       "title": "Konto löschen",
-      "body": "Damit löschst du dein Konto und alle Hochzeiten mit allem, was dazugehört: Websites, Karten, Gästeliste und Bilder. Die Websites sind danach nicht mehr erreichbar. Das lässt sich nicht rückgängig machen.",
+      "body": "Damit löschst du dein Konto. Hochzeiten, an denen nur du mitarbeitest, werden mit allem gelöscht, was dazugehört: Websites, Karten, Gästeliste und Bilder; ihre Websites sind danach nicht mehr erreichbar. Hochzeiten, die du mit anderen teilst, bleiben für sie bestehen. Das lässt sich nicht rückgängig machen.",
       "confirmLabel": "Gib zur Bestätigung deine E-Mail-Adresse ein",
       "button": "Konto endgültig löschen",
       "deleting": "Wird gelöscht …",
-      "lead": "Endgültig, für alle deine Hochzeiten."
+      "lead": "Endgültig. Geteilte Hochzeiten bleiben für die anderen.",
+      "blocked": "Bei diesen Hochzeiten bist du der einzige Admin, aber nicht die einzige Person. Mach dort zuerst jemand anderen zum Admin oder lösche die Hochzeit:",
+      "blockedNow": "Bei einer deiner Hochzeiten bist du inzwischen der einzige Admin. Lade die Seite neu, um zu sehen, welche."
     },
     "profileLead": "Damit meldest du dich an."
   },
@@ -1251,6 +1257,49 @@
       "website": "Hochzeitswebsite",
       "invitation": "Einladung",
       "thankYou": "Dankeskarte"
+    },
+    "members": {
+      "title": "Personen",
+      "leadAdmin": "Wer an dieser Hochzeit mitarbeitet. Editoren bearbeiten alles; Admins laden außerdem Personen ein, kaufen Pakete und können die Hochzeit löschen.",
+      "leadEditor": "Wer an dieser Hochzeit mitarbeitet. Personen einladen und Rollen ändern können die Admins.",
+      "roles": {
+        "admin": "Admin",
+        "editor": "Editor"
+      },
+      "you": "(du)",
+      "contact": "Kontaktperson",
+      "contactLabel": "Kontaktperson für Gäste",
+      "contactHint": "Antworten eurer Gäste auf Karten und Erinnerungen gehen an diese Person.",
+      "contactChanged": "Kontaktperson geändert",
+      "roleOf": "Rolle von {name}",
+      "roleChanged": "Rolle geändert",
+      "remove": "Entfernen",
+      "removeLabel": "{name} entfernen",
+      "removeTitle": "{name} entfernen?",
+      "removeBody": "{name} kann „{title}“ danach nicht mehr öffnen, bis ihr wieder einladet.",
+      "removed": "{name} entfernt",
+      "cancel": "Abbrechen",
+      "invitations": {
+        "title": "Offene Einladungen",
+        "details": "{role} · gültig bis {date}",
+        "withdraw": "Zurückziehen",
+        "withdrawn": "Einladung zurückgezogen"
+      },
+      "invite": {
+        "title": "Person einladen",
+        "email": "E-Mail-Adresse",
+        "role": "Rolle",
+        "hint": "Die Person bekommt einen Link per E-Mail, der 14 Tage gültig ist. Ein Konto braucht sie dafür noch nicht.",
+        "submit": "Einladen",
+        "sending": "Wird gesendet …",
+        "sent": "Einladung an {email} verschickt"
+      },
+      "leave": {
+        "button": "Hochzeit verlassen",
+        "title": "Hochzeit verlassen?",
+        "body": "Du kannst „{title}“ danach nicht mehr öffnen, bis dich jemand wieder einlädt.",
+        "confirm": "Verlassen"
+      }
     }
   }
 }

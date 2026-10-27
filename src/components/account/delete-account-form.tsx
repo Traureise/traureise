@@ -20,6 +20,12 @@ export function DeleteAccountForm() {
         <Input id="confirm-email" name="email" type="email" autoComplete="off" required aria-describedby="confirm-email-error" className="h-11 max-w-sm" />
         <FieldError id="confirm-email-error" code={state && !state.ok ? state.fieldErrors?.email : undefined} />
       </div>
+      {/* A wedding became blocking after the page loaded (the page itself lists them instead of this form). */}
+      {state && !state.ok && state.fieldErrors?._ === "last_admin" && (
+        <p role="alert" className="text-sm text-destructive">
+          {t("blockedNow")}
+        </p>
+      )}
       {state && !state.ok && state.error && (
         <p role="alert" className="text-sm text-destructive">
           {tErrors(state.error)}

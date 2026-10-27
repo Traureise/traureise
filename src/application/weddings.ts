@@ -113,7 +113,7 @@ export type HomeStep = {
 };
 
 export type WeddingHome = {
-  wedding: Wedding;
+  wedding: Wedding & { role: Role };
   steps: HomeStep[];
   /** Days until the wedding; null without a date. */
   countdown: number | null;
@@ -192,10 +192,10 @@ export class GetWeddingFrame {
   constructor(private deps: Deps) {}
 
   /** What every tab of a wedding shows above its content: the wedding with the user's role and, for the switcher, the account's others. */
-  async execute(userId: string, weddingId: string): Promise<{ wedding: Wedding & { role: Role }; others: { id: string; title: string }[] }> {
+  async execute(userId: string, weddingId: string): Promise<{ wedding: Wedding & { role: Role }; others: { id: string; title: string; role: Role }[] }> {
     const wedding = await loadWedding(this.deps, userId, weddingId);
     const all = await this.deps.weddings.listForMember(userId);
-    return { wedding, others: all.filter((w) => w.id !== weddingId).sort(byRecentUse).map(({ id, title }) => ({ id, title })) };
+    return { wedding, others: all.filter((w) => w.id !== weddingId).sort(byRecentUse).map(({ id, title, role }) => ({ id, title, role })) };
   }
 }
 
