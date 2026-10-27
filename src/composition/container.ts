@@ -2,7 +2,7 @@ import "server-only";
 import path from "node:path";
 import { S3Client } from "@aws-sdk/client-s3";
 import { sql } from "drizzle-orm";
-import { DeleteAccount, ExportAccount } from "@/application/account";
+import { DeleteAccount, ExportAccount, WeddingsBlockingDeletion } from "@/application/account";
 import {
   GetCurrentUser,
   Logout,
@@ -248,6 +248,7 @@ function build() {
     getWeddingIcs: new GetWeddingIcs(deps),
     exportAccount: new ExportAccount(deps),
     deleteAccount: new DeleteAccount(deps),
+    weddingsBlockingDeletion: new WeddingsBlockingDeletion(deps),
     getPricing: new GetPricing(deps),
     listWeddingPlans: new ListWeddingPlans(deps),
     listPurchases: new ListPurchases(deps),

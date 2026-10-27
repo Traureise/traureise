@@ -15,12 +15,13 @@ export class ExportAccount {
     if (!user) throw new NotFoundError();
     const now = clock.now();
 
-    // Stop-gap until the export follows the roles (TRAUREISE #28, Task 7): every wedding the user is a member of,
-    // with its photos, whoever uploaded them.
+    // Every membership is listed; the data and photos (whoever uploaded them) of the weddings the user administers.
+    // An editor's weddings belong to their admins, who export them.
     const memberOf = await weddings.listForMember(userId);
+    const administered = memberOf.filter((w) => w.role === "admin");
     const files: ArchiveEntry[] = [];
     const fileList: { path: string; weddingId: string | null; contentType: string }[] = [];
-    for (const wedding of memberOf) {
+    for (const wedding of administered) {
       for (const key of await uploads.listKeysByWedding(wedding.id)) {
         const file = await storage.get(key);
         if (!file) continue;
@@ -35,7 +36,7 @@ export class ExportAccount {
       return sections.map((s) => ({ ...s, blocks: blocks.filter((b) => b.sectionId === s.id).map(({ id, position, data }) => ({ id, position, data })) }));
     };
     const exported = [];
-    for (const wedding of memberOf) {
+    for (const wedding of administered) {
       const [households, weddingCards, sites, deliveries, opens, assignments] = await Promise.all([
         guests.listHouseholds(wedding.id),
         cards.listByWedding(wedding.id),
@@ -136,6 +137,7 @@ export class ExportAccount {
     const data = {
       exportedAt: now.toISOString(),
       account: { email: user.email, firstName: user.firstName, createdAt: user.createdAt },
+      memberships: memberOf.map((w) => ({ weddingId: w.id, title: w.title, role: w.role })),
       weddings: exported,
       files: fileList,
     };
@@ -147,7 +149,26 @@ export class ExportAccount {
   }
 }
 
-/** DSGVO Art. 17: removes the account with every row, file, session and login trace. */
+/** The weddings the user is the only admin of while others are members: deleting the account would orphan them. */
+export class WeddingsBlockingDeletion {
+  constructor(private deps: Deps) {}
+
+  async execute(userId: string): Promise<{ id: string; title: string }[]> {
+    const blocking: { id: string; title: string }[] = [];
+    for (const wedding of await this.deps.weddings.listForMember(userId)) {
+      if (wedding.role !== "admin") continue;
+      const others = (await this.deps.weddings.listMembers(wedding.id)).filter((m) => m.userId !== userId);
+      if (others.length > 0 && !others.some((m) => m.role === "admin")) blocking.push({ id: wedding.id, title: wedding.title });
+    }
+    return blocking;
+  }
+}
+
+/**
+ * DSGVO Art. 17: removes the account with its sessions and login traces, and the weddings no one else is a member
+ * of with every row and file in them. Weddings shared with others stay; while the user is their last admin, the
+ * deletion is refused (they first hand the wedding over or delete it).
+ */
 export class DeleteAccount {
   constructor(private deps: Deps) {}
 
@@ -157,19 +178,22 @@ export class DeleteAccount {
     if (!user) throw new NotFoundError();
     if (normalizeEmail(confirmEmail) !== user.email) throw new ValidationError({ email: "email_mismatch" });
 
-    // Weddings no one else is a member of go with the account, as everything in them. Stop-gap until shared
-    // weddings block the deletion (TRAUREISE #28, Task 7): weddings with other members simply stay.
+    const blocking = await new WeddingsBlockingDeletion(this.deps).execute(userId);
+    if (blocking.length > 0) throw new ValidationError({ _: "last_admin", weddings: blocking.map((w) => w.title).join(", ") });
+
+    // Everything is worked out first; the rows go in one transaction, the files only after it, so a failing file
+    // delete never leaves a half-deleted account (at worst an orphaned file). Files of other weddings stay.
+    const soleWeddings: string[] = [];
     const keys: string[] = [];
     for (const wedding of await weddings.listForMember(userId)) {
       const members = await weddings.listMembers(wedding.id);
       if (members.some((m) => m.userId !== userId)) continue;
+      soleWeddings.push(wedding.id);
       keys.push(...(await uploads.listKeysByWedding(wedding.id)));
-      await weddings.delete(wedding.id);
     }
-    // Rows first, so a failing file delete never leaves a half-deleted account.
-    await users.delete(userId);
-    for (const key of keys) await storage.delete(key);
+    await users.delete(userId, soleWeddings);
     await magicLinks.deleteByEmail(user.email);
     await rateLimiter.forget(`magic-link:email:${user.email}`);
+    for (const key of keys) await storage.delete(key);
   }
 }

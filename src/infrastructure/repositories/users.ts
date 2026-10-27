@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { User, UserRepository } from "@/application/ports";
 import type { Database } from "../db/client";
-import { users } from "../db/schema";
+import { users, weddings } from "../db/schema";
 
 export class DrizzleUserRepository implements UserRepository {
   constructor(private db: Database) {}
@@ -24,7 +24,10 @@ export class DrizzleUserRepository implements UserRepository {
     await this.db.update(users).set({ firstName }).where(eq(users.id, id));
   }
 
-  async delete(id: string): Promise<void> {
-    await this.db.delete(users).where(eq(users.id, id));
+  async delete(id: string, weddingIds: string[] = []): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      if (weddingIds.length > 0) await tx.delete(weddings).where(inArray(weddings.id, weddingIds));
+      await tx.delete(users).where(eq(users.id, id));
+    });
   }
 }

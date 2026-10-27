@@ -94,6 +94,8 @@ export class InMemoryUsers implements UserRepository {
   users: User[] = [];
   /** Stands in for ON DELETE CASCADE across the other in-memory repositories. */
   cascades: ((userId: string) => void)[] = [];
+  /** Set by createFakes: deletes weddings in the in-memory wedding repository. */
+  deleteWeddings: (ids: string[]) => Promise<void> = async () => {};
   async findById(id: string) {
     return this.users.find((u) => u.id === id) ?? null;
   }
@@ -109,7 +111,8 @@ export class InMemoryUsers implements UserRepository {
     const user = this.users.find((u) => u.id === id);
     if (user) user.firstName = firstName;
   }
-  async delete(id: string) {
+  async delete(id: string, weddingIds: string[] = []) {
+    await this.deleteWeddings(weddingIds);
     this.users = this.users.filter((u) => u.id !== id);
     for (const cascade of this.cascades) cascade(id);
   }
@@ -995,6 +998,9 @@ export function createFakes() {
   const users = new InMemoryUsers();
   const websites = new InMemoryWebsites();
   const weddings = new InMemoryWeddings(websites, users);
+  users.deleteWeddings = async (ids) => {
+    for (const id of ids) await weddings.delete(id);
+  };
   const billingRepo = new InMemoryBilling(weddings);
   const guests = new InMemoryGuests();
   const cards = new InMemoryCards(guests);

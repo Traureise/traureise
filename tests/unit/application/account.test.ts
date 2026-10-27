@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { DeleteAccount, ExportAccount } from "@/application/account";
+import { DeleteAccount, ExportAccount, WeddingsBlockingDeletion } from "@/application/account";
 import { RequestMagicLink, VerifyMagicLink } from "@/application/auth";
 import { ValidationError } from "@/application/errors";
 import { AddEvent } from "@/application/schedule";
@@ -104,6 +104,115 @@ describe("ExportAccount", () => {
     const entries = FakeArchive.read((await new ExportAccount(f.deps).execute(anna)).bytes);
     expect(JSON.parse(new TextDecoder().decode(entries[0]!.bytes)).weddings).toEqual([]);
     expect(entries).toHaveLength(1);
+  });
+});
+
+/** Ben joins Anna's wedding with the given role and uploads a photo of his own. */
+async function shareWith(weddingId: string, role: "admin" | "editor") {
+  const ben = await f.users.create("ben@example.org");
+  await f.weddings.addMember(weddingId, ben.id, role);
+  const photo = await new UploadImage(f.deps).execute(ben.id, weddingId, { bytes: JPEG, size: JPEG.length, contentType: "image/jpeg" });
+  return { ben: ben.id, photo };
+}
+
+const exportOf = async (userId: string) => {
+  const entries = FakeArchive.read((await new ExportAccount(f.deps).execute(userId)).bytes);
+  return { paths: entries.map((e) => e.path), data: JSON.parse(new TextDecoder().decode(entries[0]!.bytes)) };
+};
+
+describe("ExportAccount with shared weddings", () => {
+  it("lists an editor's membership but exports no wedding data and no photos", async () => {
+    const { wedding } = await seedWebsite();
+    const { ben, photo } = await shareWith(wedding.id, "editor");
+    const { paths, data } = await exportOf(ben);
+    expect(data.weddings).toEqual([]);
+    expect(data.memberships).toEqual([{ weddingId: wedding.id, title: "Anna & Ben", role: "editor" }]);
+    expect(data.files).toEqual([]);
+    expect(paths).toEqual(["data.json"]);
+    expect(paths).not.toContain(`images/${photo}`);
+  });
+
+  it("gives an admin the wedding with every photo, including those an editor uploaded", async () => {
+    const { wedding, cover } = await seedWebsite();
+    const { photo } = await shareWith(wedding.id, "editor");
+    const { paths, data } = await exportOf(anna);
+    expect(data.weddings.map((w: { id: string }) => w.id)).toEqual([wedding.id]);
+    expect(data.memberships).toEqual([{ weddingId: wedding.id, title: "Anna & Ben", role: "admin" }]);
+    expect(paths.sort()).toEqual(["data.json", `images/${cover}`, `images/${photo}`].sort());
+  });
+});
+
+describe("WeddingsBlockingDeletion", () => {
+  it("lists the weddings where the user is the only admin and others are members", async () => {
+    const { wedding } = await seedWebsite();
+    await new CreateWedding(f.deps).execute(anna, { title: "Nur Anna", hasDate: false }); // only Anna: not blocking
+    await shareWith(wedding.id, "editor");
+    expect(await new WeddingsBlockingDeletion(f.deps).execute(anna)).toEqual([{ id: wedding.id, title: "Anna & Ben" }]);
+  });
+
+  it("is empty for an editor, and for an admin with a second admin", async () => {
+    const { wedding } = await seedWebsite();
+    const { ben } = await shareWith(wedding.id, "editor");
+    expect(await new WeddingsBlockingDeletion(f.deps).execute(ben)).toEqual([]);
+    await f.weddings.setRole(wedding.id, ben, "admin");
+    expect(await new WeddingsBlockingDeletion(f.deps).execute(anna)).toEqual([]);
+  });
+});
+
+describe("DeleteAccount with shared weddings", () => {
+  it("keeps the wedding, its photos and its data when an editor deletes their account", async () => {
+    const { wedding, cover } = await seedWebsite();
+    const { ben, photo } = await shareWith(wedding.id, "editor");
+    await new DeleteAccount(f.deps).execute(ben, "ben@example.org");
+    expect(await f.users.findById(ben)).toBeNull();
+    expect(await f.weddings.findById(wedding.id)).not.toBeNull();
+    expect((await f.weddings.listMembers(wedding.id)).map((m) => m.userId)).toEqual([anna]);
+    expect([...f.storage.files.keys()].sort()).toEqual([cover, photo].sort());
+    expect(f.uploads.uploads.find((u) => u.key === photo)).toMatchObject({ weddingId: wedding.id, uploadedBy: null });
+    expect(f.websites.websites).toHaveLength(1);
+    expect(f.weddings.events).toHaveLength(1);
+  });
+
+  it("refuses while the user is the only admin of a wedding others belong to, and deletes nothing", async () => {
+    const { wedding } = await seedWebsite();
+    await shareWith(wedding.id, "editor");
+    const alone = await new CreateWedding(f.deps).execute(anna, { title: "Nur Anna", hasDate: false });
+    await expect(new DeleteAccount(f.deps).execute(anna, "anna@example.org")).rejects.toMatchObject({
+      fieldErrors: { _: "last_admin", weddings: "Anna & Ben" },
+    });
+    expect(await f.users.findById(anna)).not.toBeNull();
+    expect(await f.weddings.findById(alone.id)).not.toBeNull();
+    expect(f.storage.files.size).toBe(2);
+  });
+
+  it("names every blocking wedding", async () => {
+    const { wedding } = await seedWebsite();
+    await shareWith(wedding.id, "editor");
+    const second = await new CreateWedding(f.deps).execute(anna, { title: "Clara & Dora", hasDate: false });
+    await f.weddings.addMember(second.id, (await f.users.findByEmail("ben@example.org"))!.id, "editor");
+    await expect(new DeleteAccount(f.deps).execute(anna, "anna@example.org")).rejects.toMatchObject({
+      fieldErrors: { _: "last_admin", weddings: "Anna & Ben, Clara & Dora" },
+    });
+  });
+
+  it("leaves the wedding to the other admin", async () => {
+    const { wedding, cover } = await seedWebsite();
+    const { ben, photo } = await shareWith(wedding.id, "admin");
+    await new DeleteAccount(f.deps).execute(anna, "anna@example.org");
+    expect(await f.users.findById(anna)).toBeNull();
+    expect(await f.weddings.findById(wedding.id)).not.toBeNull();
+    expect(await f.weddings.listMembers(wedding.id)).toEqual([expect.objectContaining({ userId: ben, role: "admin" })]);
+    expect([...f.storage.files.keys()].sort()).toEqual([cover, photo].sort());
+  });
+
+  it("deletes the rows before the files, so a failing file delete leaves no half-deleted account", async () => {
+    const { wedding } = await seedWebsite();
+    f.storage.delete = async () => {
+      throw new Error("storage down");
+    };
+    await expect(new DeleteAccount(f.deps).execute(anna, "anna@example.org")).rejects.toThrow("storage down");
+    expect(await f.users.findById(anna)).toBeNull();
+    expect(await f.weddings.findById(wedding.id)).toBeNull();
   });
 });
 

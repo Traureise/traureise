@@ -87,8 +87,11 @@ export interface UserRepository {
   findByEmail(email: string): Promise<User | null>;
   create(email: string): Promise<User>;
   updateFirstName(id: string, firstName: string): Promise<void>;
-  /** Deletes the user and, through the cascades, everything that belongs to them. */
-  delete(id: string): Promise<void>;
+  /**
+   * Deletes the given weddings (with everything in them, through the cascades) and the user in one transaction:
+   * never a half-deleted account. The user's memberships of other weddings go; those weddings stay.
+   */
+  delete(id: string, weddingIds?: string[]): Promise<void>;
 }
 
 export type MagicLinkRecord = { id: string; email: string; expiresAt: Date; usedAt: Date | null };

@@ -4,6 +4,7 @@ import path from "node:path";
 import { unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { DeleteAccount, ExportAccount } from "@/application/account";
+import { ValidationError } from "@/application/errors";
 import type { Deps } from "@/application/deps";
 import { CreateWedding } from "@/application/weddings";
 import { cardDeliveries, cardOpens, cards, householdVersions, households, weddingEvents } from "@/infrastructure/db/schema";
@@ -142,5 +143,79 @@ describe("account deletion", () => {
     expect(await deps.sessions.findByHash("session-ben@example.org")).not.toBeNull();
     expect(await deps.rateLimiter.hit("magic-link:email:anna@example.org", 1, 60_000, new Date())).toBe(true);
     expect(await deps.rateLimiter.hit("magic-link:email:ben@example.org", 1, 60_000, new Date())).toBe(false);
+  });
+});
+
+/** Ben joins Anna's wedding with the given role and uploads a photo to it. */
+async function join(deps: Deps, weddingId: string, role: "admin" | "editor") {
+  const ben = await deps.users.create("ben@example.org");
+  await deps.weddings.addMember(weddingId, ben.id, role);
+  const key = `${cryptoTokens.generate()}.webp`;
+  await deps.storage.put(key, new Uint8Array([4, 5, 6]), "image/webp");
+  await deps.uploads.create({ key, uploadedBy: ben.id, weddingId, contentType: "image/webp", size: 3 });
+  return { ben, key };
+}
+
+describe("shared weddings", () => {
+  it("export: an editor gets the membership only, an admin also the photos the editor uploaded", async () => {
+    const { deps } = await realDeps();
+    const anna = await seed(deps, "anna@example.org");
+    const { ben, key } = await join(deps, anna.wedding.id, "editor");
+
+    const benFiles = unzipSync((await new ExportAccount(deps).execute(ben.id)).bytes);
+    expect(Object.keys(benFiles)).toEqual(["data.json"]);
+    const benData = JSON.parse(new TextDecoder().decode(benFiles["data.json"]));
+    expect(benData.weddings).toEqual([]);
+    expect(benData.memberships).toEqual([{ weddingId: anna.wedding.id, title: "Anna & Ben", role: "editor" }]);
+
+    const annaFiles = unzipSync((await new ExportAccount(deps).execute(anna.user.id)).bytes);
+    expect(Object.keys(annaFiles).sort()).toEqual(["data.json", `images/${anna.key}`, `images/${key}`].sort());
+    expect(JSON.parse(new TextDecoder().decode(annaFiles["data.json"])).memberships).toEqual([{ weddingId: anna.wedding.id, title: "Anna & Ben", role: "admin" }]);
+  });
+
+  it("an editor's deletion keeps the wedding, its data and every photo", async () => {
+    const { deps, dir } = await realDeps();
+    const anna = await seed(deps, "anna@example.org");
+    const { ben, key } = await join(deps, anna.wedding.id, "editor");
+
+    await new DeleteAccount(deps).execute(ben.id, "ben@example.org");
+
+    expect(await deps.users.findById(ben.id)).toBeNull();
+    expect(await deps.weddings.findById(anna.wedding.id)).not.toBeNull();
+    expect(await deps.websites.findById(anna.website.id)).not.toBeNull();
+    expect((await deps.uploads.listKeysByWedding(anna.wedding.id)).sort()).toEqual([anna.key, key].sort());
+    expect((await readdir(dir)).sort()).toEqual([anna.key, key].sort());
+    expect((await deps.weddings.listMembers(anna.wedding.id)).map((m) => m.userId)).toEqual([anna.user.id]);
+  });
+
+  it("the only admin of a wedding with an editor cannot delete the account; nothing is deleted", async () => {
+    const { deps, dir } = await realDeps();
+    const anna = await seed(deps, "anna@example.org");
+    await join(deps, anna.wedding.id, "editor");
+
+    const attempt = new DeleteAccount(deps).execute(anna.user.id, "anna@example.org");
+    await expect(attempt).rejects.toBeInstanceOf(ValidationError);
+    await expect(attempt).rejects.toMatchObject({ fieldErrors: { _: "last_admin", weddings: "Anna & Ben" } });
+    expect(await deps.users.findById(anna.user.id)).not.toBeNull();
+    expect(await deps.weddings.findById(anna.wedding.id)).not.toBeNull();
+    expect(await readdir(dir)).toHaveLength(2);
+  });
+
+  it("an admin with a second admin leaves the wedding to them; a wedding of their own goes with the account", async () => {
+    const { deps, dir } = await realDeps();
+    const anna = await seed(deps, "anna@example.org");
+    const { ben, key } = await join(deps, anna.wedding.id, "admin");
+    const own = await new CreateWedding(deps).execute(anna.user.id, { title: "Nur Anna", hasDate: false });
+    const ownKey = `${cryptoTokens.generate()}.webp`;
+    await deps.storage.put(ownKey, new Uint8Array([1]), "image/webp");
+    await deps.uploads.create({ key: ownKey, uploadedBy: anna.user.id, weddingId: own.id, contentType: "image/webp", size: 1 });
+
+    await new DeleteAccount(deps).execute(anna.user.id, "anna@example.org");
+
+    expect(await deps.users.findById(anna.user.id)).toBeNull();
+    expect(await deps.weddings.findById(own.id)).toBeNull();
+    expect(await deps.weddings.findById(anna.wedding.id)).not.toBeNull();
+    expect(await deps.weddings.listMembers(anna.wedding.id)).toEqual([expect.objectContaining({ userId: ben.id, role: "admin" })]);
+    expect((await readdir(dir)).sort()).toEqual([anna.key, key].sort());
   });
 });
