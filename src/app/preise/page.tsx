@@ -27,6 +27,8 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
   const t = await getTranslations("pricing");
   const user = await getCurrentUser();
   const plans = user ? await c.listWeddingPlans.execute(user.id) : [];
+  // Packages are bought by a wedding's admins: an editor-only account has weddings but nothing to buy for.
+  const editorOnly = plans.length === 0 && !!user && (await c.listWeddings.execute(user.id)).length > 0;
   // The operator's terms apply to a purchase: said where people buy, not only in the footer.
   const terms = c.legalLinks.find((l) => l.page === "terms")?.href;
   const privacy = c.legalLinks.find((l) => l.page === "privacy")?.href;
@@ -75,7 +77,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
                     <Link href="/login">{t("loginToBuy")}</Link>
                   </Button>
                 ) : plans.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">{t("createWebsiteFirst")}</p>
+                  <p className="text-sm text-muted-foreground">{editorOnly ? t("onlyAdmins") : t("createWebsiteFirst")}</p>
                 ) : buyable.length === 0 ? (
                   <p className="text-sm text-muted-foreground">{t("owned")}</p>
                 ) : (

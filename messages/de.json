@@ -444,6 +444,7 @@
     "planOptionCredit": "{title} · {price, number, ::currency/EUR precision-integer} ({credit, number, ::currency/EUR precision-integer} angerechnet)",
     "loginToBuy": "Anmelden, um zu kaufen",
     "createWebsiteFirst": "Legt zuerst eure Hochzeit an.",
+    "onlyAdmins": "Pakete kaufen die Admins eurer Hochzeit.",
     "owned": "Eure Hochzeiten haben dieses Paket schon.",
     "checkoutFailed": "Die Bezahlseite konnte nicht geöffnet werden. Bitte versuch es noch einmal.",
     "tiers": {
