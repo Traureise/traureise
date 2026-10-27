@@ -24,6 +24,11 @@ export class ListMembers {
   }
 }
 
+/** Email addresses of the wedding's admins: the recipients of the wedding's own mail. */
+export async function adminEmails(deps: Deps, weddingId: string): Promise<string[]> {
+  return (await deps.weddings.listMembers(weddingId)).filter((m) => m.role === "admin").map((m) => m.email);
+}
+
 /** Removes a member after checking the wedding keeps an admin, and hands the contact role on if it was theirs. */
 async function withdraw(deps: Deps, weddingId: string, memberId: string, contactUserId: string | null) {
   const members = await deps.weddings.listMembers(weddingId);

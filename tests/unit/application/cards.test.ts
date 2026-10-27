@@ -21,6 +21,7 @@ import {
 import { LockedError, NotFoundError, ValidationError } from "@/application/errors";
 import { GetGuestPage, RunGuestJobs, SaveHousehold, SaveRsvpSettings, SubmitGuestResponse } from "@/application/guests";
 import { AddEvent } from "@/application/schedule";
+import { SetContactPerson } from "@/application/members";
 import { CreateWedding, DeleteWedding, UpdateWeddingDetails } from "@/application/weddings";
 import { SetPublished } from "@/application/websites";
 import type { PaidTier } from "@/domain/billing";
@@ -336,6 +337,22 @@ describe("marking cards as sent by hand", () => {
 });
 
 describe("sending by email", () => {
+  it("replies to the contact person, and follows a change of contact", async () => {
+    const ben = await f.users.create("ben@example.org");
+    await f.weddings.addMember(weddingId, ben.id, "admin");
+    await new SetContactPerson(f.deps).execute(anna.id, weddingId, ben.id);
+    await household("Weber", "weber@example.org");
+    await sendEmails("saveTheDate", "all");
+    await runMail();
+    expect(f.mailer.sent[0]!.replyTo).toBe("ben@example.org");
+
+    await new SetContactPerson(f.deps).execute(anna.id, weddingId, anna.id);
+    await household("Kern", "kern@example.org");
+    await sendEmails("saveTheDate", "all");
+    await runMail();
+    expect(f.mailer.sent[1]).toMatchObject({ to: ["kern@example.org"], replyTo: "anna@example.org" });
+  });
+
   it("queues one email per household with an address and sends it once, as the couple, with the card and an unsubscribe link", async () => {
     const weber = await household("Weber", "weber@example.org");
     await household("Kern");

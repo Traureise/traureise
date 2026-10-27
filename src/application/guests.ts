@@ -26,6 +26,7 @@ import { RunMailJobs } from "./cards";
 import type { Deps } from "./deps";
 import { NotFoundError, RateLimitedError, ValidationError } from "./errors";
 import { deliveriesByKind, formFor, guestsUrl, householdContent, linkUrl, loadByToken, loadGuestContext, type GuestForm } from "./guest-context";
+import { adminEmails } from "./members";
 import { loadWedding } from "./owned";
 import type { PollRecord, Wedding } from "./ports";
 
@@ -284,7 +285,7 @@ export class SubmitGuestResponse {
   constructor(private deps: Deps) {}
 
   async execute(input: { token: string; input: unknown; ip: string }): Promise<void> {
-    const { rateLimiter, guests, guestLinks, mailer, guestMail, users } = this.deps;
+    const { rateLimiter, guests, guestLinks, mailer, guestMail } = this.deps;
     const now = this.deps.clock.now();
     const linkKey = `rsvp:link:${guestLinks.hash(input.token)}`;
     const ipAllowed = await rateLimiter.hit(`rsvp:ip:${input.ip}`, MAX_PER_IP, RATE_WINDOW_MS, now);
@@ -303,9 +304,8 @@ export class SubmitGuestResponse {
 
     if (ctx.settings.notify !== "each") return;
     try {
-      // Stop-gap until the wedding's own mail goes to all admins (TRAUREISE #28, Task 5): the contact person.
-      const owner = wedding.contactUserId ? await users.findById(wedding.contactUserId) : null;
-      if (!owner) return;
+      const to = await adminEmails(this.deps, wedding.id);
+      if (to.length === 0) return;
       const name = (guestId: string) => household.people.find((p) => p.id === guestId)!.name;
       const mail = guestMail.answer({
         websiteTitle: wedding.title,
@@ -316,7 +316,7 @@ export class SubmitGuestResponse {
         requests: parsed.value.requests,
         guestsUrl: guestsUrl(this.deps, wedding.id),
       });
-      await mailer.send({ to: owner.email, ...mail });
+      await mailer.send({ to, ...mail });
     } catch (error) {
       // The answer is saved; the couple still sees it on the Gäste page.
       console.error("[traureise] answer notification failed", error);
@@ -371,16 +371,15 @@ export class RunGuestJobs {
       return "deleted";
     }
     if (!retentionWarningDue(deleteAt, now) || !(await guests.claimRetentionWarning(weddingId, deleteAt!))) return null;
-    // Stop-gap until the wedding's own mail goes to all admins (TRAUREISE #28, Task 5): the contact person.
-    const owner = wedding.contactUserId ? await this.deps.users.findById(wedding.contactUserId) : null;
-    if (!owner) return null;
+    const to = await adminEmails(this.deps, weddingId);
+    if (to.length === 0) return null;
     const mail = this.deps.guestMail.retentionWarning({ websiteTitle: wedding.title, deleteOn: deleteAt!, guestsUrl: guestsUrl(this.deps, weddingId) });
-    await this.deps.mailer.send({ to: owner.email, ...mail });
+    await this.deps.mailer.send({ to, ...mail });
     return "warned";
   }
 
   private async summary(weddingId: string): Promise<boolean> {
-    const { weddings, guests, users, mailer, guestMail } = this.deps;
+    const { weddings, guests, mailer, guestMail } = this.deps;
     const wedding = await weddings.findById(weddingId);
     if (!wedding) return false;
     const ctx = await loadGuestContext(this.deps, wedding);
@@ -392,9 +391,8 @@ export class RunGuestJobs {
     const households = await guests.listHouseholds(weddingId);
     const changed = households.filter((h) => h.respondedAt && (!previous || h.respondedAt > previous));
     if (changed.length === 0) return false;
-    // Stop-gap until the wedding's own mail goes to all admins (TRAUREISE #28, Task 5): the contact person.
-    const owner = wedding.contactUserId ? await users.findById(wedding.contactUserId) : null;
-    if (!owner) return false;
+    const to = await adminEmails(this.deps, weddingId);
+    if (to.length === 0) return false;
     const overview = guestOverview({ households, events: ctx.events, meal: ctx.meal, polls: ctx.polls });
     const mail = guestMail.dailySummary({
       websiteTitle: wedding.title,
@@ -402,7 +400,7 @@ export class RunGuestJobs {
       totals: overview.people,
       guestsUrl: guestsUrl(this.deps, weddingId),
     });
-    await mailer.send({ to: owner.email, ...mail });
+    await mailer.send({ to, ...mail });
     return true;
   }
 }
