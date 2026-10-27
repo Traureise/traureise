@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { DeleteAccount, ExportAccount, WeddingsBlockingDeletion } from "@/application/account";
 import { RequestMagicLink, VerifyMagicLink } from "@/application/auth";
 import { ValidationError } from "@/application/errors";
+import { SetContactPerson } from "@/application/members";
 import { AddEvent } from "@/application/schedule";
 import { AddBlock } from "@/application/sections";
 import { UploadImage } from "@/application/uploads";
@@ -171,6 +172,22 @@ describe("DeleteAccount with shared weddings", () => {
     expect(f.uploads.uploads.find((u) => u.key === photo)).toMatchObject({ weddingId: wedding.id, uploadedBy: null });
     expect(f.websites.websites).toHaveLength(1);
     expect(f.weddings.events).toHaveLength(1);
+  });
+
+  it("hands the contact person role to the remaining admin when an editor contact deletes their account", async () => {
+    const { wedding } = await seedWebsite();
+    const { ben } = await shareWith(wedding.id, "editor");
+    await new SetContactPerson(f.deps).execute(anna, wedding.id, ben);
+    await new DeleteAccount(f.deps).execute(ben, "ben@example.org");
+    expect((await f.weddings.findById(wedding.id))!.contactUserId).toBe(anna);
+  });
+
+  it("hands the contact person role to the remaining admin when an admin contact deletes their account", async () => {
+    const { wedding } = await seedWebsite();
+    const { ben } = await shareWith(wedding.id, "admin");
+    await new SetContactPerson(f.deps).execute(anna, wedding.id, anna);
+    await new DeleteAccount(f.deps).execute(anna, "anna@example.org");
+    expect((await f.weddings.findById(wedding.id))!.contactUserId).toBe(ben);
   });
 
   it("refuses while the user is the only admin of a wedding others belong to, and deletes nothing", async () => {

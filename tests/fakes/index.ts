@@ -96,6 +96,8 @@ export class InMemoryUsers implements UserRepository {
   cascades: ((userId: string) => void)[] = [];
   /** Set by createFakes: deletes weddings in the in-memory wedding repository. */
   deleteWeddings: (ids: string[]) => Promise<void> = async () => {};
+  /** Set by createFakes: hands a wedding's contact person to another user. */
+  setContact: (weddingId: string, userId: string) => Promise<void> = async () => {};
   async findById(id: string) {
     return this.users.find((u) => u.id === id) ?? null;
   }
@@ -111,8 +113,9 @@ export class InMemoryUsers implements UserRepository {
     const user = this.users.find((u) => u.id === id);
     if (user) user.firstName = firstName;
   }
-  async delete(id: string, weddingIds: string[] = []) {
+  async delete(id: string, weddingIds: string[] = [], handovers: { weddingId: string; contactUserId: string }[] = []) {
     await this.deleteWeddings(weddingIds);
+    for (const h of handovers) await this.setContact(h.weddingId, h.contactUserId);
     this.users = this.users.filter((u) => u.id !== id);
     for (const cascade of this.cascades) cascade(id);
   }
@@ -998,6 +1001,9 @@ export function createFakes() {
   const users = new InMemoryUsers();
   const websites = new InMemoryWebsites();
   const weddings = new InMemoryWeddings(websites, users);
+  users.setContact = async (weddingId, userId) => {
+    await weddings.update(weddingId, { contactUserId: userId });
+  };
   users.deleteWeddings = async (ids) => {
     for (const id of ids) await weddings.delete(id);
   };

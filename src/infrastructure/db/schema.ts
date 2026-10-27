@@ -102,7 +102,11 @@ export const weddingMembers = pgTable(
     role: text("role").notNull(),
     createdAt: createdAt(),
   },
-  (t) => [primaryKey({ columns: [t.weddingId, t.userId] }), index("wedding_members_user_idx").on(t.userId)],
+  (t) => [
+    primaryKey({ columns: [t.weddingId, t.userId] }),
+    index("wedding_members_user_idx").on(t.userId),
+    check("wedding_members_role_valid", sql`${t.role} IN ('admin', 'editor')`),
+  ],
 );
 
 // A pending invitation to become a member. Inviting the same address again replaces it.
@@ -120,7 +124,10 @@ export const weddingInvitations = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("wedding_invitations_wedding_email_idx").on(t.weddingId, t.email)],
+  (t) => [
+    uniqueIndex("wedding_invitations_wedding_email_idx").on(t.weddingId, t.email),
+    check("wedding_invitations_role_valid", sql`${t.role} IN ('admin', 'editor')`),
+  ],
 );
 
 // A version of the wedding's website, for an audience. A draft until published.

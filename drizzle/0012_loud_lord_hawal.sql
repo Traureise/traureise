@@ -1,0 +1,2 @@
+ALTER TABLE "wedding_invitations" ADD CONSTRAINT "wedding_invitations_role_valid" CHECK ("wedding_invitations"."role" IN ('admin', 'editor'));--> statement-breakpoint
+ALTER TABLE "wedding_members" ADD CONSTRAINT "wedding_members_role_valid" CHECK ("wedding_members"."role" IN ('admin', 'editor'));

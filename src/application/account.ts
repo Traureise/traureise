@@ -185,13 +185,19 @@ export class DeleteAccount {
     // delete never leaves a half-deleted account (at worst an orphaned file). Files of other weddings stay.
     const soleWeddings: string[] = [];
     const keys: string[] = [];
+    const handovers: { weddingId: string; contactUserId: string }[] = [];
     for (const wedding of await weddings.listForMember(userId)) {
       const members = await weddings.listMembers(wedding.id);
-      if (members.some((m) => m.userId !== userId)) continue;
+      if (members.some((m) => m.userId !== userId)) {
+        // The contact person leaves: the oldest remaining admin (there is one, see above) takes over.
+        const successor = members.find((m) => m.role === "admin" && m.userId !== userId);
+        if (wedding.contactUserId === userId && successor) handovers.push({ weddingId: wedding.id, contactUserId: successor.userId });
+        continue;
+      }
       soleWeddings.push(wedding.id);
       keys.push(...(await uploads.listKeysByWedding(wedding.id)));
     }
-    await users.delete(userId, soleWeddings);
+    await users.delete(userId, soleWeddings, handovers);
     await magicLinks.deleteByEmail(user.email);
     await rateLimiter.forget(`magic-link:email:${user.email}`);
     for (const key of keys) await storage.delete(key);

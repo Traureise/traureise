@@ -49,10 +49,11 @@ which rights people have, including the self-service export and deletion under `
 Under **Konto** (`/konto`) users can:
 
 - download all their data as a ZIP: `data.json` with the account, its memberships, every wedding they are an
-  admin of with its websites, sections, items, purchases and guest list (RSVP settings, polls, households with people, answers and requests),
-  plus every uploaded image under `images/`;
-- delete their account by typing their email address. This removes the weddings they are the only member of, with their websites, items, images
-  (also from storage), guest lists and purchases, and the account's sessions and login traces, and logs them out.
+  admin of with its websites, sections, items, purchases and guest list (RSVP settings, polls, households with
+  people, answers and requests), plus every uploaded image under `images/`;
+- delete their account by typing their email address. This removes the weddings they are the only member of, with their
+  websites, items, images (also from storage), guest lists and purchases, and the account's sessions and login
+  traces, and logs them out.
   A wedding with other members stays with them; the last admin of such a wedding has to make someone else admin
   first ([ADR 0029](adr/0029-weddings-have-members.md)).
 

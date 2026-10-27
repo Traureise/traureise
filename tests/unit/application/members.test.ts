@@ -52,6 +52,18 @@ describe("changing roles", () => {
     expect(await f.weddings.roleOf(weddingId, clara.id)).toBe("editor");
   });
 
+  it("lets an admin promote an editor", async () => {
+    const ben = await join("ben@example.org", "editor", 1);
+    await new ChangeMemberRole(f.deps).execute(anna.id, weddingId, ben.id, "admin");
+    expect(await f.weddings.roleOf(weddingId, ben.id)).toBe("admin");
+  });
+
+  it("rejects a role that is none of the known ones", async () => {
+    const ben = await join("ben@example.org", "editor", 1);
+    await expect(new ChangeMemberRole(f.deps).execute(anna.id, weddingId, ben.id, "owner")).rejects.toEqual(new ValidationError({ role: "invalid_role" }));
+    expect(await f.weddings.roleOf(weddingId, ben.id)).toBe("editor");
+  });
+
   it("refuses to demote the only admin", async () => {
     await expect(new ChangeMemberRole(f.deps).execute(anna.id, weddingId, anna.id, "editor")).rejects.toEqual(new ValidationError({ _: "last_admin" }));
     expect(await f.weddings.roleOf(weddingId, anna.id)).toBe("admin");

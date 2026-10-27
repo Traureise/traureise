@@ -24,8 +24,9 @@ export class DrizzleUserRepository implements UserRepository {
     await this.db.update(users).set({ firstName }).where(eq(users.id, id));
   }
 
-  async delete(id: string, weddingIds: string[] = []): Promise<void> {
+  async delete(id: string, weddingIds: string[] = [], handovers: { weddingId: string; contactUserId: string }[] = []): Promise<void> {
     await this.db.transaction(async (tx) => {
+      for (const h of handovers) await tx.update(weddings).set({ contactUserId: h.contactUserId }).where(eq(weddings.id, h.weddingId));
       if (weddingIds.length > 0) await tx.delete(weddings).where(inArray(weddings.id, weddingIds));
       await tx.delete(users).where(eq(users.id, id));
     });

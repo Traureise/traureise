@@ -636,7 +636,10 @@ export class RunMailJobs {
 
   /** Sender, reply address and unsubscribe headers shared by every email to guests. */
   private async envelope(ctx: GuestContext, household: Household): Promise<Pick<MailMessage, "to" | "fromName" | "replyTo" | "headers">> {
-    const contact = ctx.wedding.contactUserId ? await this.deps.users.findById(ctx.wedding.contactUserId) : null;
+    // Without a contact person (theirs was deleted) replies go to the oldest admin.
+    const contact = ctx.wedding.contactUserId
+      ? await this.deps.users.findById(ctx.wedding.contactUserId)
+      : (await this.deps.weddings.listMembers(ctx.wedding.id)).find((m) => m.role === "admin");
     const stop = this.deps.guestLinks.unsubscribeTokenFor(household.id);
     return {
       to: householdEmails(household),

@@ -353,6 +353,26 @@ describe("sending by email", () => {
     expect(f.mailer.sent[1]).toMatchObject({ to: ["kern@example.org"], replyTo: "anna@example.org" });
   });
 
+  it("replies to the oldest admin when the contact person is gone", async () => {
+    const ben = await f.users.create("ben@example.org");
+    await f.weddings.addMember(weddingId, ben.id, "editor");
+    await new SetContactPerson(f.deps).execute(anna.id, weddingId, ben.id);
+    await new DeleteAccount(f.deps).execute(ben.id, "ben@example.org");
+    expect((await f.weddings.findById(weddingId))!.contactUserId).toBe(anna.id);
+    await household("Weber", "weber@example.org");
+    await sendEmails("saveTheDate", "all");
+    await runMail();
+    expect(f.mailer.sent[0]!.replyTo).toBe("anna@example.org");
+  });
+
+  it("falls back to the oldest admin when the wedding has no contact person at all", async () => {
+    await f.weddings.update(weddingId, { contactUserId: null });
+    await household("Weber", "weber@example.org");
+    await sendEmails("saveTheDate", "all");
+    await runMail();
+    expect(f.mailer.sent[0]!.replyTo).toBe("anna@example.org");
+  });
+
   it("queues one email per household with an address and sends it once, as the couple, with the card and an unsubscribe link", async () => {
     const weber = await household("Weber", "weber@example.org");
     await household("Kern");

@@ -1,5 +1,5 @@
 import { isValidEmail, normalizeEmail } from "@/domain/email";
-import { isRole, type Role } from "@/domain/members";
+import { isRole } from "@/domain/members";
 import { startSession, type LoginResult } from "./auth";
 import type { Deps } from "./deps";
 import { InvalidTokenError, NotFoundError, RateLimitedError, ValidationError } from "./errors";
@@ -43,8 +43,9 @@ async function withdraw(deps: Deps, weddingId: string, memberId: string, contact
 export class ChangeMemberRole {
   constructor(private deps: Deps) {}
 
-  async execute(userId: string, weddingId: string, memberId: string, role: Role) {
+  async execute(userId: string, weddingId: string, memberId: string, role: string) {
     await loadWedding(this.deps, userId, weddingId, "admin");
+    if (!isRole(role)) throw new ValidationError({ role: "invalid_role" });
     const members = await this.deps.weddings.listMembers(weddingId);
     const member = members.find((m) => m.userId === memberId);
     if (!member) throw new NotFoundError();

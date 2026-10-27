@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { container } from "@/composition/container";
-import type { Role } from "@/domain/members";
 import { runAction, type ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/session";
 
@@ -28,7 +27,7 @@ export async function withdrawInvitationAction(weddingId: string, invitationId: 
   return members(weddingId, (userId) => container().withdrawInvitation.execute(userId, weddingId, invitationId));
 }
 
-export async function changeMemberRoleAction(weddingId: string, memberId: string, role: Role): Promise<ActionResult> {
+export async function changeMemberRoleAction(weddingId: string, memberId: string, role: string): Promise<ActionResult> {
   return members(weddingId, (userId) => container().changeMemberRole.execute(userId, weddingId, memberId, role));
 }
 

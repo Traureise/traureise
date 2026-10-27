@@ -223,6 +223,7 @@ describe("shared weddings", () => {
     expect(await deps.weddings.findById(own.id)).toBeNull();
     expect(await deps.weddings.findById(anna.wedding.id)).not.toBeNull();
     expect(await deps.weddings.listMembers(anna.wedding.id)).toEqual([expect.objectContaining({ userId: ben.id, role: "admin" })]);
+    expect((await deps.weddings.findById(anna.wedding.id))!.contactUserId).toBe(ben.id);
     expect((await readdir(dir)).sort()).toEqual([anna.key, key].sort());
   });
 });
