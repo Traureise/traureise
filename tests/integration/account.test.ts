@@ -117,6 +117,13 @@ describe("account export", () => {
 });
 
 describe("account deletion", () => {
+  it("deletes the user and their weddings in one transaction: a failing user delete keeps the weddings", async () => {
+    const { deps } = await realDeps();
+    const anna = await seed(deps, "anna@example.org");
+    await expect(new DrizzleUserRepository(db).delete("not-a-uuid", [anna.wedding.id])).rejects.toThrow();
+    expect(await deps.weddings.findById(anna.wedding.id)).not.toBeNull();
+  });
+
   it("removes every row and every stored file of the user, and nothing of anyone else", async () => {
     const { deps, dir } = await realDeps();
     const anna = await seed(deps, "anna@example.org");
