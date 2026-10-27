@@ -8,7 +8,7 @@ import type { ResolvedDesign } from "@/domain/theme";
 export async function GuestSite({ design, children }: { design: ResolvedDesign; children: React.ReactNode }) {
   const t = await getTranslations("site");
   return (
-    <div className="site flex min-h-dvh flex-col" style={siteStyle(design)} data-theme={design.theme.id} data-testid="guest-site">
+    <div className="site site-page flex min-h-dvh flex-col" style={siteStyle(design)} data-theme={design.theme.id} data-testid="guest-site">
       <main className="flex-1">{children}</main>
       <footer className="site-muted flex flex-wrap justify-center gap-x-4 gap-y-1 px-6 py-12 text-center text-xs" data-testid="site-footer">
         <Link href="/" className="underline-offset-4 hover:underline">
