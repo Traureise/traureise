@@ -37,7 +37,7 @@ const cardsOf = async (kind: string) => (await f.cards.listByWedding(weddingId))
 const household = (name: string, email: string | null = null) => new SaveHousehold(f.deps).execute(anna.id, weddingId, null, { name, people: [{ name: `${name} 1`, email }] });
 const grant = async (tier: PaidTier) => {
   f.deps.billing.enabled = true;
-  await f.billingRepo.applyEvent(`evt-${Math.random()}`, { kind: "grant", weddingId, tier, purchaseRef: `ord-${Math.random()}`, provider: "testpay", validUntil: new Date("2028-06-13T00:00:00Z") });
+  await f.billingRepo.applyEvent(`evt-${Math.random()}`, { kind: "grant", purchasedBy: null, weddingId, tier, purchaseRef: `ord-${Math.random()}`, provider: "testpay", validUntil: new Date("2028-06-13T00:00:00Z") });
 };
 
 describe("adding versions", () => {

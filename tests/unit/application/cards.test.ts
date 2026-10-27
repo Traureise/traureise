@@ -56,7 +56,7 @@ const exportCard = async (kind: CardKind, format: "png" | "a6" | "a5") => new Ex
 const preview = async (kind: CardKind) => new GetCardPreview(f.deps).execute(anna.id, (await create(kind)).id);
 const grant = async (tier: PaidTier) => {
   f.deps.billing.enabled = true;
-  await f.billingRepo.applyEvent(`evt-${Math.random()}`, { kind: "grant", weddingId, tier, purchaseRef: `ord-${Math.random()}`, provider: "testpay", validUntil: new Date("2028-06-13T00:00:00Z") });
+  await f.billingRepo.applyEvent(`evt-${Math.random()}`, { kind: "grant", purchasedBy: null, weddingId, tier, purchaseRef: `ord-${Math.random()}`, provider: "testpay", validUntil: new Date("2028-06-13T00:00:00Z") });
 };
 const lockAll = () => {
   f.deps.billing.enabled = true;

@@ -2,7 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { BillingChange, BillingRepository, EntitlementRecord } from "@/application/ports";
 import type { PaidTier } from "@/domain/billing";
 import type { Database } from "../db/client";
-import { billingEvents, entitlements, weddings } from "../db/schema";
+import { billingEvents, entitlements, weddingMembers } from "../db/schema";
 
 type Row = typeof entitlements.$inferSelect;
 const toRecord = (row: Row): EntitlementRecord => ({ ...row, tier: row.tier as PaidTier });
@@ -16,8 +16,8 @@ export class DrizzleBillingRepository implements BillingRepository {
       const recorded = await tx.insert(billingEvents).values({ id: eventId }).onConflictDoNothing().returning({ id: billingEvents.id });
       if (recorded.length === 0) return "duplicate";
       if (change.kind === "grant") {
-        const { weddingId, tier, purchaseRef, provider, validUntil } = change;
-        await tx.insert(entitlements).values({ weddingId, tier, purchaseRef, provider, validUntil }).onConflictDoNothing({ target: entitlements.purchaseRef });
+        const { weddingId, tier, purchaseRef, provider, validUntil, purchasedBy } = change;
+        await tx.insert(entitlements).values({ weddingId, tier, purchaseRef, provider, validUntil, purchasedBy }).onConflictDoNothing({ target: entitlements.purchaseRef });
       } else if (change.kind === "revoke") {
         await tx
           .update(entitlements)
@@ -33,12 +33,12 @@ export class DrizzleBillingRepository implements BillingRepository {
     return rows.map(toRecord);
   }
 
-  async listByOwner(ownerId: string): Promise<EntitlementRecord[]> {
+  async listForAdmin(userId: string): Promise<EntitlementRecord[]> {
     const rows = await this.db
       .select({ entitlement: entitlements })
       .from(entitlements)
-      .innerJoin(weddings, eq(weddings.id, entitlements.weddingId))
-      .where(eq(weddings.ownerId, ownerId))
+      .innerJoin(weddingMembers, eq(weddingMembers.weddingId, entitlements.weddingId))
+      .where(and(eq(weddingMembers.userId, userId), eq(weddingMembers.role, "admin")))
       .orderBy(entitlements.createdAt);
     return rows.map((r) => toRecord(r.entitlement));
   }

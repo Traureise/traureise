@@ -17,8 +17,8 @@ import {
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 
-// Every piece of user data hangs off users.id with ON DELETE CASCADE, so deleting an
-// account is a single delete.
+// A user's own rows (sessions, memberships) hang off users.id with ON DELETE CASCADE. Weddings belong to their
+// members (wedding_members), not to one user: deleting an account leaves weddings and their photos in place.
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
@@ -68,9 +68,8 @@ export const weddings = pgTable(
   "weddings",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    ownerId: uuid("owner_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    // Reply-to of the mail guests get. A member; falls back to an admin when that person leaves.
+    contactUserId: uuid("contact_user_id").references(() => users.id, { onDelete: "set null" }),
     // Carries the links that are not a website (/<slug>/verlobung, /<slug>/hochzeit.ics). Shares one namespace with
     // the website versions' slugs, checked by the application.
     slug: text("slug").notNull().unique(),
@@ -88,7 +87,40 @@ export const weddings = pgTable(
       .defaultNow()
       .$onUpdate(() => sql`now()`),
   },
-  (t) => [index("weddings_owner_idx").on(t.ownerId)],
+);
+
+// Who may work on a wedding, and as what (admin or editor). Access to a wedding is a membership.
+export const weddingMembers = pgTable(
+  "wedding_members",
+  {
+    weddingId: uuid("wedding_id")
+      .notNull()
+      .references(() => weddings.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.weddingId, t.userId] }), index("wedding_members_user_idx").on(t.userId)],
+);
+
+// A pending invitation to become a member. Inviting the same address again replaces it.
+export const weddingInvitations = pgTable(
+  "wedding_invitations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    weddingId: uuid("wedding_id")
+      .notNull()
+      .references(() => weddings.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    role: text("role").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    invitedBy: uuid("invited_by").references(() => users.id, { onDelete: "set null" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("wedding_invitations_wedding_email_idx").on(t.weddingId, t.email)],
 );
 
 // A version of the wedding's website, for an audience. A draft until published.
@@ -171,9 +203,8 @@ export const uploads = pgTable(
   "uploads",
   {
     key: text("key").primaryKey(),
-    ownerId: uuid("owner_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    // Who uploaded it. The photo belongs to the wedding and stays when that account is deleted.
+    uploadedBy: uuid("uploaded_by").references(() => users.id, { onDelete: "set null" }),
     weddingId: uuid("wedding_id").references(() => weddings.id, { onDelete: "cascade" }),
     contentType: text("content_type").notNull(),
     size: integer("size").notNull(),
@@ -196,6 +227,7 @@ export const entitlements = pgTable(
     purchaseRef: text("purchase_ref").notNull().unique(),
     validUntil: timestamp("valid_until", { withTimezone: true }).notNull(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    purchasedBy: uuid("purchased_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: createdAt(),
   },
   (t) => [index("entitlements_wedding_idx").on(t.weddingId)],

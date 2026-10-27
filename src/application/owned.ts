@@ -1,27 +1,33 @@
+import { atLeast, type Role } from "@/domain/members";
 import { imageKeysOf } from "@/domain/sections";
 import type { Deps } from "./deps";
 import { NotFoundError, ValidationError } from "./errors";
 import type { Card, Website, Wedding } from "./ports";
 
-/** Loads a wedding the user owns. Someone else's wedding looks exactly like a missing one. */
-export async function loadOwnedWedding(deps: Deps, userId: string, weddingId: string): Promise<Wedding> {
+/**
+ * Loads a wedding the user is a member of with at least role `min`, with the user's role. A wedding the user may
+ * not use (someone else's, or an admin action for an editor) looks exactly like a missing one.
+ */
+export async function loadWedding(deps: Deps, userId: string, weddingId: string, min: Role = "editor"): Promise<Wedding & { role: Role }> {
+  const role = await deps.weddings.roleOf(weddingId, userId).catch(() => null);
+  if (!role || !atLeast(role, min)) throw new NotFoundError();
   const wedding = await deps.weddings.findById(weddingId).catch(() => null);
-  if (!wedding || wedding.ownerId !== userId) throw new NotFoundError();
-  return wedding;
+  if (!wedding) throw new NotFoundError();
+  return { ...wedding, role };
 }
 
-/** A website version of a wedding the user owns. */
-export async function loadOwnedWebsite(deps: Deps, userId: string, websiteId: string): Promise<{ wedding: Wedding; website: Website }> {
+/** A website version of a wedding the user is a member of. */
+export async function loadWebsite(deps: Deps, userId: string, websiteId: string, min: Role = "editor"): Promise<{ wedding: Wedding & { role: Role }; website: Website }> {
   const website = await deps.websites.findById(websiteId).catch(() => null);
   if (!website) throw new NotFoundError();
-  return { wedding: await loadOwnedWedding(deps, userId, website.weddingId), website };
+  return { wedding: await loadWedding(deps, userId, website.weddingId, min), website };
 }
 
-/** A card version of a wedding the user owns. */
-export async function loadOwnedCardVersion(deps: Deps, userId: string, cardId: string): Promise<{ wedding: Wedding; card: Card }> {
+/** A card version of a wedding the user is a member of. */
+export async function loadCardVersion(deps: Deps, userId: string, cardId: string, min: Role = "editor"): Promise<{ wedding: Wedding & { role: Role }; card: Card }> {
   const card = await deps.cards.findById(cardId).catch(() => null);
   if (!card) throw new NotFoundError();
-  return { wedding: await loadOwnedWedding(deps, userId, card.weddingId), card };
+  return { wedding: await loadWedding(deps, userId, card.weddingId, min), card };
 }
 
 /** Image keys in form data must point at uploads made for this wedding. */

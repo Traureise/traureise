@@ -72,7 +72,7 @@ import { DrizzleMagicLinkRepository, DrizzleSessionRepository, PostgresRateLimit
 import { DrizzleUploadRepository } from "@/infrastructure/repositories/uploads";
 import { DrizzleUserRepository } from "@/infrastructure/repositories/users";
 import { DrizzleWebsiteRepository } from "@/infrastructure/repositories/websites";
-import { DrizzleWeddingRepository } from "@/infrastructure/repositories/weddings";
+import { DrizzleInvitationRepository, DrizzleWeddingRepository } from "@/infrastructure/repositories/weddings";
 import { LocalFileStorage } from "@/infrastructure/storage/local";
 import { S3FileStorage } from "@/infrastructure/storage/s3";
 import { adjustableClock, cryptoTokens, hmacGuestLinks, systemClock } from "@/infrastructure/system";
@@ -125,6 +125,7 @@ function build() {
     sessions: new DrizzleSessionRepository(db),
     rateLimiter: new PostgresRateLimiter(db),
     weddings: new DrizzleWeddingRepository(db),
+    invitations: new DrizzleInvitationRepository(db),
     websites: new DrizzleWebsiteRepository(db),
     uploads: new DrizzleUploadRepository(db),
     storage: createStorage(config),

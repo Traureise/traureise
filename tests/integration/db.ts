@@ -25,7 +25,7 @@ export const allSections = (): NewSection[] =>
 /** A user with a wedding and its first website version (a draft). */
 export async function seedWedding(db: Database, email = "anna@example.org", slug = "anna-und-ben", weddingDate: string | null = "2027-06-12", sections: NewSection[] = allSections()) {
   const user = await new DrizzleUserRepository(db).create(email);
-  const wedding = await new DrizzleWeddingRepository(db).create({ ownerId: user.id, slug, title: "Anna & Ben", weddingDate, timezone: "Europe/Berlin" });
+  const wedding = await new DrizzleWeddingRepository(db).create({ creatorId: user.id, slug, title: "Anna & Ben", weddingDate, timezone: "Europe/Berlin" });
   const website = await new DrizzleWebsiteRepository(db).create(
     {
       weddingId: wedding.id,

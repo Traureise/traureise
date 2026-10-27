@@ -5,13 +5,15 @@ import type { AnswerSource, Household, HouseholdInput, HouseholdResponse, Poll, 
 import type { ImportPlan } from "@/domain/guest-import";
 import type { CardContent, CardInput, CardKind, CardLabels, CardModel, Delivery, HouseholdCardKind, SharedVia } from "@/domain/cards";
 import type { AssignableItem, Assignment } from "@/domain/weddings";
+import type { Role } from "@/domain/members";
 
 export type User = { id: string; email: string; firstName: string | null; createdAt: Date };
 
 /** The root of everything a couple makes: names, date, place, and the address of the non-website links. */
 export type Wedding = {
   id: string;
-  ownerId: string;
+  /** Reply-to of the mail guests get: a member, null only until an admin is picked after that person left. */
+  contactUserId: string | null;
   /** /<slug>/verlobung, /<slug>/hochzeit.ics; one namespace with the website versions' slugs. */
   slug: string;
   /** The couple's names, e.g. "Anna & Ben". */
@@ -27,8 +29,15 @@ export type Wedding = {
   createdAt: Date;
   updatedAt: Date;
 };
-export type NewWedding = Pick<Wedding, "ownerId" | "slug" | "title" | "weddingDate" | "timezone">;
-export type WeddingPatch = Partial<Pick<Wedding, "slug" | "title" | "weddingDate" | "location" | "latitude" | "longitude" | "timezone">>;
+/** `creatorId` becomes the wedding's first admin and its contact person. */
+export type NewWedding = Pick<Wedding, "slug" | "title" | "weddingDate" | "timezone"> & { creatorId: string };
+export type WeddingPatch = Partial<Pick<Wedding, "slug" | "title" | "weddingDate" | "location" | "latitude" | "longitude" | "timezone" | "contactUserId">>;
+
+/** A person who may work on a wedding, and as what. */
+export type Member = { userId: string; email: string; firstName: string | null; role: Role; createdAt: Date };
+
+/** A pending invitation to become a member of a wedding; the token itself is only in the link. */
+export type Invitation = { id: string; weddingId: string; email: string; role: Role; invitedBy: string | null; expiresAt: Date; createdAt: Date };
 
 /** A version of the wedding's website, for an audience. A draft (a 404 publicly) until published. */
 export type Website = {
@@ -111,10 +120,20 @@ export interface RateLimiter {
 export type SlugOwners = { weddingIds: string[]; websites: { id: string; weddingId: string }[] };
 
 export interface WeddingRepository {
+  /** Inserts the wedding with its creator as admin and contact person, in one transaction. */
   create(wedding: NewWedding): Promise<Wedding>;
   findById(id: string): Promise<Wedding | null>;
   findBySlug(slug: string): Promise<Wedding | null>;
-  listByOwner(ownerId: string): Promise<Wedding[]>;
+  /** The weddings the user is a member of, with the user's role in each. */
+  listForMember(userId: string): Promise<(Wedding & { role: Role })[]>;
+  /** The user's role in the wedding; null for anyone who is not a member (and for ids that are not ids). */
+  roleOf(weddingId: string, userId: string): Promise<Role | null>;
+  /** Oldest first. */
+  listMembers(weddingId: string): Promise<Member[]>;
+  /** Does nothing if the user already is a member. */
+  addMember(weddingId: string, userId: string, role: Role): Promise<void>;
+  setRole(weddingId: string, userId: string, role: Role): Promise<void>;
+  removeMember(weddingId: string, userId: string): Promise<void>;
   update(id: string, patch: WeddingPatch): Promise<Wedding>;
   /** Remembers that the couple used the wedding now (wall-clock time, for "most recently used"). */
   markUsed(id: string): Promise<void>;
@@ -129,6 +148,16 @@ export interface WeddingRepository {
   updateEvent(eventId: string, data: EventData): Promise<void>;
   /** Deletes the event and, in the same transaction, every event block pointing to it, in any website version. */
   deleteEvent(eventId: string): Promise<void>;
+}
+
+export interface InvitationRepository {
+  /** Stores the invitation, replacing a pending one for the same wedding and address. */
+  replace(input: Omit<Invitation, "id" | "createdAt"> & { tokenHash: string }): Promise<Invitation>;
+  findByHash(tokenHash: string): Promise<Invitation | null>;
+  /** Not yet expired at `now`, oldest first. */
+  listPending(weddingId: string, now: Date): Promise<Invitation[]>;
+  /** True if it existed: accepting deletes the invitation, so a token is used at most once. */
+  delete(id: string): Promise<boolean>;
 }
 
 export interface WebsiteRepository {
@@ -163,14 +192,12 @@ export interface WebsiteRepository {
   setBlockOrder(sectionId: string, orderedIds: string[]): Promise<void>;
 }
 
-export type UploadRecord = { key: string; weddingId: string | null; contentType: string; size: number; createdAt: Date };
-
 /** Photos belong to the wedding: its website versions and cards share them. */
 export interface UploadRepository {
-  create(input: { key: string; ownerId: string; weddingId: string; contentType: string; size: number }): Promise<void>;
+  /** `uploadedBy`: who uploaded it; the photo belongs to the wedding either way. */
+  create(input: { key: string; uploadedBy: string; weddingId: string; contentType: string; size: number }): Promise<void>;
   belongsToWedding(key: string, weddingId: string): Promise<boolean>;
   listKeysByWedding(weddingId: string): Promise<string[]>;
-  listByOwner(ownerId: string): Promise<UploadRecord[]>;
   delete(key: string): Promise<void>;
 }
 
@@ -231,10 +258,11 @@ export interface TokenGenerator {
   hash(token: string): string;
 }
 
-export type EntitlementRecord = Entitlement & { id: string; weddingId: string; provider: string; createdAt: Date };
+/** `purchasedBy`: the member who bought it; null once that account is gone (or if unknown). */
+export type EntitlementRecord = Entitlement & { id: string; weddingId: string; provider: string; purchasedBy: string | null; createdAt: Date };
 
 export type BillingChange =
-  | { kind: "grant"; weddingId: string; tier: PaidTier; purchaseRef: string; provider: string; validUntil: Date }
+  | { kind: "grant"; weddingId: string; tier: PaidTier; purchaseRef: string; provider: string; validUntil: Date; purchasedBy: string | null }
   | { kind: "revoke"; purchaseRef: string; at: Date }
   | { kind: "none" };
 
@@ -245,7 +273,8 @@ export interface BillingRepository {
    */
   applyEvent(eventId: string, change: BillingChange): Promise<"applied" | "duplicate">;
   listByWedding(weddingId: string): Promise<EntitlementRecord[]>;
-  listByOwner(ownerId: string): Promise<EntitlementRecord[]>;
+  /** The packages of every wedding where the user is an admin. */
+  listForAdmin(userId: string): Promise<EntitlementRecord[]>;
 }
 
 export type PaymentEvent =

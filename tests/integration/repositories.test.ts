@@ -1,14 +1,21 @@
-import { eq, sql } from "drizzle-orm";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { eq } from "drizzle-orm";
+import postgres from "postgres";
 import { describe, expect, it } from "vitest";
 import type { NewSection } from "@/application/ports";
 import { parseEvent, type BlockData } from "@/domain/sections";
-import { magicLinkTokens, rateLimitHits, sectionBlocks, sessions, uploads, users, websiteSections } from "@/infrastructure/db/schema";
+import { runMigrations } from "@/infrastructure/db/migrate";
+import { magicLinkTokens, rateLimitHits, sectionBlocks, sessions, uploads, users, websiteSections, weddingMembers } from "@/infrastructure/db/schema";
 import { DrizzleMagicLinkRepository, DrizzleSessionRepository, PostgresRateLimiter } from "@/infrastructure/repositories/auth";
+import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing";
 import { DrizzleUploadRepository } from "@/infrastructure/repositories/uploads";
 import { DrizzleUserRepository } from "@/infrastructure/repositories/users";
 import { DrizzleWebsiteRepository } from "@/infrastructure/repositories/websites";
-import { DrizzleWeddingRepository } from "@/infrastructure/repositories/weddings";
+import { DrizzleInvitationRepository, DrizzleWeddingRepository } from "@/infrastructure/repositories/weddings";
 import { seedWedding, setupTestDatabase } from "./db";
+import { testEnv } from "./env";
 
 const db = setupTestDatabase();
 const userRepo = new DrizzleUserRepository(db);
@@ -80,11 +87,11 @@ describe("magic links and sessions", () => {
 });
 
 describe("DrizzleWeddingRepository", () => {
-  it("creates a wedding and finds it by id, slug and owner", async () => {
+  it("creates a wedding and finds it by id, slug and member", async () => {
     const { user, wedding } = await seedWebsite();
     expect(wedding).toMatchObject({ slug: "anna-und-ben", title: "Anna & Ben", weddingDate: "2027-06-12", location: null, lastOpenedAt: null });
     expect(await weddingRepo.findBySlug("anna-und-ben")).toMatchObject({ id: wedding.id });
-    expect((await weddingRepo.listByOwner(user.id)).map((w) => w.id)).toEqual([wedding.id]);
+    expect((await weddingRepo.listForMember(user.id)).map((w) => w.id)).toEqual([wedding.id]);
     expect(await weddingRepo.findById("not-a-uuid")).toBeNull();
     const at = new Date("2020-01-01T00:00:00Z");
     expect(await weddingRepo.update(wedding.id, { location: "Kempten", weddingDate: null })).toMatchObject({ location: "Kempten", weddingDate: null });
@@ -251,22 +258,135 @@ describe("DrizzleUploadRepository and cascades", () => {
   it("tracks uploads per wedding", async () => {
     const repo = new DrizzleUploadRepository(db);
     const { user, wedding } = await seedWebsite();
-    await repo.create({ key: "k1.webp", ownerId: user.id, weddingId: wedding.id, contentType: "image/webp", size: 3 });
+    await repo.create({ key: "k1.webp", uploadedBy: user.id, weddingId: wedding.id, contentType: "image/webp", size: 3 });
     expect(await repo.belongsToWedding("k1.webp", wedding.id)).toBe(true);
     expect(await repo.listKeysByWedding(wedding.id)).toEqual(["k1.webp"]);
     await repo.delete("k1.webp");
     expect(await repo.belongsToWedding("k1.webp", wedding.id)).toBe(false);
   });
 
-  it("removes all of a user's data when the user is deleted", async () => {
+  it("removes the user's own rows when the user is deleted; the wedding and its photos stay", async () => {
     const { user, wedding } = await seedWebsite();
-    await new DrizzleUploadRepository(db).create({ key: "k1.webp", ownerId: user.id, weddingId: wedding.id, contentType: "image/webp", size: 3 });
+    await new DrizzleUploadRepository(db).create({ key: "k1.webp", uploadedBy: user.id, weddingId: wedding.id, contentType: "image/webp", size: 3 });
     await new DrizzleSessionRepository(db).create({ userId: user.id, tokenHash: "s", expiresAt: new Date() });
     await db.delete(users).where(eq(users.id, user.id));
-    const counts = await db.execute<{ n: number }>(
-      sql`select (select count(*) from weddings) + (select count(*) from websites) + (select count(*) from website_sections) + (select count(*) from sessions) + (select count(*) from uploads) as n`,
-    );
-    expect(Number(counts[0]!.n)).toBe(0);
-    expect(await db.select().from(uploads)).toHaveLength(0);
+    expect(await db.$count(sessions)).toBe(0);
+    expect(await db.$count(weddingMembers)).toBe(0);
+    expect(await weddingRepo.findById(wedding.id)).toMatchObject({ contactUserId: null });
+    expect(await db.select({ key: uploads.key, uploadedBy: uploads.uploadedBy }).from(uploads)).toEqual([{ key: "k1.webp", uploadedBy: null }]);
+  });
+});
+
+describe("wedding members", () => {
+  it("makes the creator the first admin and the contact person", async () => {
+    const { user, wedding } = await seedWebsite();
+    expect(wedding.contactUserId).toBe(user.id);
+    expect(await weddingRepo.listMembers(wedding.id)).toEqual([{ userId: user.id, email: "anna@example.org", firstName: null, role: "admin", createdAt: expect.any(Date) }]);
+  });
+
+  it("lists a member's weddings with the role, and has no role for a stranger", async () => {
+    const { user, wedding } = await seedWebsite();
+    const ben = await userRepo.create("ben@example.org");
+    await weddingRepo.addMember(wedding.id, ben.id, "editor");
+    await weddingRepo.addMember(wedding.id, ben.id, "admin");
+    expect((await weddingRepo.listForMember(ben.id)).map((w) => [w.id, w.role])).toEqual([[wedding.id, "editor"]]);
+    expect((await weddingRepo.listForMember(user.id)).map((w) => w.role)).toEqual(["admin"]);
+    expect((await weddingRepo.listMembers(wedding.id)).map((m) => [m.email, m.role])).toEqual([
+      ["anna@example.org", "admin"],
+      ["ben@example.org", "editor"],
+    ]);
+    await weddingRepo.setRole(wedding.id, ben.id, "admin");
+    expect(await weddingRepo.roleOf(wedding.id, ben.id)).toBe("admin");
+    const eve = await userRepo.create("eve@example.org");
+    expect(await weddingRepo.roleOf(wedding.id, eve.id)).toBeNull();
+    expect(await weddingRepo.roleOf("not-a-uuid", eve.id)).toBeNull();
+    expect(await weddingRepo.update(wedding.id, { contactUserId: ben.id })).toMatchObject({ contactUserId: ben.id });
+  });
+
+  it("removes members, and memberships go with the account", async () => {
+    const { user, wedding } = await seedWebsite();
+    const ben = await userRepo.create("ben@example.org");
+    await weddingRepo.addMember(wedding.id, ben.id, "editor");
+    await weddingRepo.removeMember(wedding.id, ben.id);
+    expect(await weddingRepo.roleOf(wedding.id, ben.id)).toBeNull();
+    await db.delete(users).where(eq(users.id, user.id));
+    expect(await weddingRepo.listMembers(wedding.id)).toEqual([]);
+    expect(await weddingRepo.findById(wedding.id)).not.toBeNull();
+  });
+});
+
+describe("DrizzleInvitationRepository", () => {
+  const invitations = new DrizzleInvitationRepository(db);
+  const invite = (weddingId: string, tokenHash: string, expiresAt = new Date(Date.now() + 60_000)) =>
+    invitations.replace({ weddingId, email: "ben@example.org", role: "editor", invitedBy: null, expiresAt, tokenHash });
+
+  it("keeps one pending invitation per wedding and address", async () => {
+    const { user, wedding } = await seedWebsite();
+    await invite(wedding.id, "h1");
+    const second = await invitations.replace({ weddingId: wedding.id, email: "ben@example.org", role: "admin", invitedBy: user.id, expiresAt: new Date(Date.now() + 60_000), tokenHash: "h2" });
+    expect(second).toMatchObject({ weddingId: wedding.id, email: "ben@example.org", role: "admin", invitedBy: user.id });
+    expect(second).not.toHaveProperty("tokenHash");
+    expect(await invitations.findByHash("h1")).toBeNull();
+    expect(await invitations.findByHash("h2")).toMatchObject({ id: second.id });
+    expect((await invitations.listPending(wedding.id, new Date())).map((i) => i.id)).toEqual([second.id]);
+    expect(await invitations.listPending(wedding.id, new Date(Date.now() + 120_000))).toEqual([]);
+  });
+
+  it("deletes an invitation once, so its token is used at most once", async () => {
+    const { wedding } = await seedWebsite();
+    const invitation = await invite(wedding.id, "h1");
+    expect(await invitations.delete(invitation.id)).toBe(true);
+    expect(await invitations.delete(invitation.id)).toBe(false);
+    expect(await invitations.delete("not-a-uuid")).toBe(false);
+  });
+});
+
+describe("DrizzleBillingRepository.listForAdmin", () => {
+  it("lists the packages of weddings where the user is admin, not where they are editor", async () => {
+    const billing = new DrizzleBillingRepository(db);
+    const { user, wedding } = await seedWebsite();
+    const ben = await userRepo.create("ben@example.org");
+    await weddingRepo.addMember(wedding.id, ben.id, "editor");
+    await billing.applyEvent("evt_1", { kind: "grant", weddingId: wedding.id, tier: "rsvp", purchaseRef: "ord_1", provider: "creem", validUntil: new Date("2028-06-13T00:00:00Z"), purchasedBy: user.id });
+    expect((await billing.listForAdmin(user.id)).map((e) => [e.weddingId, e.purchasedBy])).toEqual([[wedding.id, user.id]]);
+    expect(await billing.listForAdmin(ben.id)).toEqual([]);
+  });
+});
+
+describe("migration 0011: weddings have members instead of an owner", () => {
+  it("turns every owner into the admin, contact person and buyer", async () => {
+    const { adminUrl } = testEnv();
+    const name = `traureise_migration_${Date.now()}`;
+    const url = new URL(adminUrl);
+    url.pathname = `/${name}`;
+    const admin = postgres(adminUrl, { max: 1, onnotice: () => {} });
+    const folder = mkdtempSync(path.join(tmpdir(), "drizzle-"));
+    await admin.unsafe(`create database "${name}"`);
+    const client = postgres(url.toString(), { max: 1, onnotice: () => {} });
+    try {
+      // Every migration before 0011.
+      cpSync("drizzle", folder, { recursive: true });
+      const journalPath = path.join(folder, "meta", "_journal.json");
+      const journal = JSON.parse(readFileSync(journalPath, "utf8")) as { entries: { idx: number }[] };
+      writeFileSync(journalPath, JSON.stringify({ ...journal, entries: journal.entries.filter((e) => e.idx <= 10) }));
+      await runMigrations(url.toString(), folder);
+
+      const [anna] = await client`insert into users (email) values ('anna@example.org') returning id`;
+      const [wedding] = await client`insert into weddings (owner_id, slug, title) values (${anna!.id}, 'anna-und-ben', 'Anna & Ben') returning id, created_at`;
+      await client`insert into uploads (key, owner_id, wedding_id, content_type, size) values ('k1.webp', ${anna!.id}, ${wedding!.id}, 'image/webp', 3)`;
+      await client`insert into entitlements (wedding_id, tier, provider, purchase_ref, valid_until) values (${wedding!.id}, 'rsvp', 'creem', 'ord_1', now())`;
+
+      await runMigrations(url.toString());
+
+      expect(await client`select user_id, role, created_at from wedding_members`).toEqual([{ user_id: anna!.id, role: "admin", created_at: wedding!.created_at }]);
+      expect(await client`select contact_user_id from weddings`).toEqual([{ contact_user_id: anna!.id }]);
+      expect(await client`select purchased_by from entitlements`).toEqual([{ purchased_by: anna!.id }]);
+      expect(await client`select uploaded_by from uploads`).toEqual([{ uploaded_by: anna!.id }]);
+    } finally {
+      await client.end();
+      await admin.unsafe(`drop database if exists "${name}" with (force)`);
+      await admin.end();
+      rmSync(folder, { recursive: true, force: true });
+    }
   });
 });

@@ -31,7 +31,7 @@ const home = (weddingId: string, userId = anna.id) => new GetWeddingHome(f.deps)
 describe("creating a wedding", () => {
   it("generates one first version of every card and the website, filled in from the wedding", async () => {
     const wedding = await create();
-    expect(wedding).toMatchObject({ title: "Anna & Ben", weddingDate: "2027-06-12", slug: "anna-und-ben", ownerId: anna.id });
+    expect(wedding).toMatchObject({ title: "Anna & Ben", weddingDate: "2027-06-12", slug: "anna-und-ben", contactUserId: anna.id });
     const cards = await f.cards.listByWedding(wedding.id);
     expect(cards.map((c) => c.kind).sort()).toEqual(["engagement", "invitation", "saveTheDate", "thankYou"]);
     expect(cards.every((c) => c.label === "Standard" && c.position === 0 && c.content.names === "Anna & Ben")).toBe(true);
@@ -173,6 +173,37 @@ describe("wedding details", () => {
     await new UpdateWeddingSlug(f.deps).execute(anna.id, wedding.id, "anna-und-ben");
     await expect(new UpdateWeddingSlug(f.deps).execute(anna.id, wedding.id, other.slug)).rejects.toMatchObject({ fieldErrors: { slug: "taken" } });
     await expect(new UpdateWeddingSlug(f.deps).execute(anna.id, wedding.id, "konto")).rejects.toMatchObject({ fieldErrors: { slug: "reserved" } });
+  });
+});
+
+describe("members", () => {
+  it("lets an editor work on the wedding and see it in the list", async () => {
+    const wedding = await create();
+    const ben = await f.users.create("ben@example.org");
+    await f.weddings.addMember(wedding.id, ben.id, "editor");
+    const updated = await new UpdateWeddingDetails(f.deps).execute(ben.id, wedding.id, { title: "Anna & Ben Kern", hasDate: false });
+    expect(updated.title).toBe("Anna & Ben Kern");
+    expect((await new ListWeddings(f.deps).execute(ben.id)).map((w) => [w.id, w.role])).toEqual([[wedding.id, "editor"]]);
+  });
+
+  it("keeps a stranger out", async () => {
+    const wedding = await create();
+    const eve = await f.users.create("eve@example.org");
+    await expect(new UpdateWeddingDetails(f.deps).execute(eve.id, wedding.id, { title: "x" })).rejects.toBeInstanceOf(NotFoundError);
+    expect(await new ListWeddings(f.deps).execute(eve.id)).toEqual([]);
+  });
+
+  it("lets only admins delete the wedding", async () => {
+    const wedding = await create();
+    const ben = await f.users.create("ben@example.org");
+    await f.weddings.addMember(wedding.id, ben.id, "editor");
+    await expect(new DeleteWedding(f.deps).execute(ben.id, wedding.id)).rejects.toBeInstanceOf(NotFoundError);
+    expect(await f.weddings.findById(wedding.id)).not.toBeNull();
+
+    const clara = await f.users.create("clara@example.org");
+    await f.weddings.addMember(wedding.id, clara.id, "admin");
+    await new DeleteWedding(f.deps).execute(clara.id, wedding.id);
+    expect(await f.weddings.findById(wedding.id)).toBeNull();
   });
 });
 

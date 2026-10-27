@@ -15,7 +15,7 @@ import {
 import type { Deps } from "./deps";
 import { ValidationError } from "./errors";
 import { loadGuestContext } from "./guest-context";
-import { loadOwnedWedding } from "./owned";
+import { loadWedding } from "./owned";
 
 export type ImportReview = { rows: ImportRow[]; ignoredColumns: string[]; plan: ImportPlan };
 
@@ -58,7 +58,7 @@ function parseReview(input: { rows: unknown; decisions: unknown; ignoredColumns?
 }
 
 async function plan(deps: Deps, userId: string, weddingId: string, parsed: ReturnType<typeof parseReview>): Promise<ImportPlan> {
-  const wedding = await loadOwnedWedding(deps, userId, weddingId);
+  const wedding = await loadWedding(deps, userId, weddingId);
   const { events } = await loadGuestContext(deps, wedding);
   const existing = await deps.guests.listHouseholds(weddingId);
   return planImport({ ...parsed, existing, events });
@@ -68,7 +68,7 @@ export class DownloadGuestTemplate {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, weddingId: string, headers: ImportHeaders): Promise<{ filename: string; bytes: Uint8Array }> {
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const wedding = await loadWedding(this.deps, userId, weddingId);
     const { events } = await loadGuestContext(this.deps, wedding);
     return { filename: "gaeste-vorlage.xlsx", bytes: this.deps.spreadsheets.writeXlsx(templateTable(headers, events)) };
   }
@@ -78,7 +78,7 @@ export class PreviewGuestImport {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, weddingId: string, file: { bytes: Uint8Array }, headers: ImportHeaders): Promise<ImportReview> {
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const wedding = await loadWedding(this.deps, userId, weddingId);
     if (file.bytes.byteLength === 0) throw new ValidationError({ file: "empty" });
     if (file.bytes.byteLength > IMPORT_MAX_BYTES) throw new ValidationError({ file: "too_large" });
     const sheet = this.deps.spreadsheets.read(file.bytes);

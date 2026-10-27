@@ -14,6 +14,7 @@ import type {
   GuestMailTemplates,
   GuestRepository,
   ImageProcessor,
+  InvitationRepository,
   MagicLinkMailTemplate,
   MagicLinkRepository,
   Mailer,
@@ -35,6 +36,7 @@ export type Deps = {
   sessions: SessionRepository;
   rateLimiter: RateLimiter;
   weddings: WeddingRepository;
+  invitations: InvitationRepository;
   websites: WebsiteRepository;
   uploads: UploadRepository;
   storage: FileStorage;

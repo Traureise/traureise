@@ -58,7 +58,7 @@ async function seed(deps: Deps, email: string) {
   const [website] = await deps.websites.listByWedding(wedding.id);
   const key = `${cryptoTokens.generate()}.webp`;
   await deps.storage.put(key, new Uint8Array([9, 8, 7]), "image/webp");
-  await deps.uploads.create({ key, ownerId: user.id, weddingId: wedding.id, contentType: "image/webp", size: 3 });
+  await deps.uploads.create({ key, uploadedBy: user.id, weddingId: wedding.id, contentType: "image/webp", size: 3 });
   await deps.websites.update(website!.id, { coverImageKey: key });
   const faqs = (await deps.websites.listSections(website!.id)).at(-1)!;
   await deps.websites.addBlock(website!.id, faqs.id, { type: "faq", question: "Dresscode?", answer: "Sommerlich", imageKey: null });
@@ -72,6 +72,7 @@ async function seed(deps: Deps, email: string) {
   await deps.rateLimiter.hit(`magic-link:email:${email}`, 5, 60_000, new Date());
   await deps.billingRepo.applyEvent(`evt-${email}`, {
     kind: "grant",
+    purchasedBy: null,
     weddingId: wedding.id,
     tier: "rsvp",
     purchaseRef: `ord-${email}`,
@@ -126,7 +127,7 @@ describe("account deletion", () => {
     expect(await deps.websites.findById(anna.website.id)).toBeNull();
     expect(await deps.websites.listBlocks(anna.website.id)).toEqual([]);
     expect(await deps.websites.listSections(anna.website.id)).toEqual([]);
-    expect(await deps.uploads.listByOwner(anna.user.id)).toEqual([]);
+    expect(await deps.uploads.listKeysByWedding(anna.wedding.id)).toEqual([]);
     expect(await deps.billingRepo.listByWedding(anna.wedding.id)).toEqual([]);
     expect(await deps.weddings.findById(anna.wedding.id)).toBeNull();
     // Guest data and everything that hangs off it: only Ben's rows are left.

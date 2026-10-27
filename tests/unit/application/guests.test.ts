@@ -53,6 +53,7 @@ const grantRsvp = async (over: { validUntil?: Date } = {}) => {
   f.deps.billing.enabled = true;
   await f.billingRepo.applyEvent(`evt-${Math.random()}`, {
     kind: "grant",
+    purchasedBy: null,
     weddingId,
     tier: "rsvp",
     purchaseRef: `ord-${Math.random()}`,

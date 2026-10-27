@@ -12,7 +12,7 @@ import {
 } from "@/domain/billing";
 import type { Deps } from "./deps";
 import { InvalidSignatureError, NotFoundError, ValidationError } from "./errors";
-import { loadOwnedWedding } from "./owned";
+import { loadWedding } from "./owned";
 import type { BillingChange, PaymentEvent, User } from "./ports";
 
 /** Billing only exists when it is switched on and a payment provider is configured. */
@@ -42,7 +42,8 @@ export class ListWeddingPlans {
     if (!billing.enabled) return [];
     const now = clock.now();
     const plans: WeddingPlan[] = [];
-    for (const wedding of await weddings.listByOwner(userId)) {
+    // Stop-gap until packages are admin-only (TRAUREISE #28, Task 6): every wedding the user is a member of.
+    for (const wedding of await weddings.listForMember(userId)) {
       const entitlements = await billingRepo.listByWedding(wedding.id);
       const sellable = sellableTiers(billing.offers, billing.unlockedTiers, entitlements, now);
       plans.push({
@@ -65,9 +66,9 @@ export class ListPurchases {
   async execute(userId: string): Promise<Purchase[]> {
     const { weddings, billingRepo, billing, clock } = this.deps;
     if (!billing.enabled) return [];
-    const titles = new Map((await weddings.listByOwner(userId)).map((w) => [w.id, w.title]));
+    const titles = new Map((await weddings.listForMember(userId)).map((w) => [w.id, w.title]));
     const now = clock.now();
-    return (await billingRepo.listByOwner(userId)).map((e) => ({
+    return (await billingRepo.listForAdmin(userId)).map((e) => ({
       weddingId: e.weddingId,
       weddingTitle: titles.get(e.weddingId) ?? "",
       tier: e.tier,
@@ -84,7 +85,7 @@ export class StartCheckout {
   async execute(user: Pick<User, "id" | "email">, weddingId: string, tier: PaidTier): Promise<{ url: string }> {
     const provider = payments(this.deps);
     const { billing, billingRepo, clock, tokens, appUrl } = this.deps;
-    await loadOwnedWedding(this.deps, user.id, weddingId);
+    await loadWedding(this.deps, user.id, weddingId, "admin");
     const entitlements = await billingRepo.listByWedding(weddingId);
     const offer = billing.offers.find((o) => o.tier === tier);
     const now = clock.now();
@@ -133,6 +134,8 @@ export class HandlePaymentWebhook {
       purchaseRef: event.purchaseRef,
       provider: providerId,
       validUntil: entitlementValidUntil(wedding.weddingDate, now),
+      // Who bought it comes with the checkout metadata in TRAUREISE #28, Task 6; unknown until then.
+      purchasedBy: null,
     };
   }
 }

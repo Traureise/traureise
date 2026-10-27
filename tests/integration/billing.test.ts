@@ -12,6 +12,7 @@ async function seed() {
 
 const grant = (weddingId: string, purchaseRef = "ord_1") => ({
   kind: "grant" as const,
+  purchasedBy: null,
   weddingId,
   tier: "rsvp" as const,
   purchaseRef,
@@ -20,13 +21,13 @@ const grant = (weddingId: string, purchaseRef = "ord_1") => ({
 });
 
 describe("DrizzleBillingRepository", () => {
-  it("grants, lists by wedding and owner, and handles each event once", async () => {
+  it("grants, lists by wedding and for admins, and handles each event once", async () => {
     const { user, website } = await seed();
     expect(await billing.applyEvent("evt_1", grant(website.id))).toBe("applied");
     expect(await billing.applyEvent("evt_1", grant(website.id))).toBe("duplicate");
     const [entitlement] = await billing.listByWedding(website.id);
     expect(entitlement).toMatchObject({ tier: "rsvp", purchaseRef: "ord_1", provider: "creem", revokedAt: null, weddingId: website.id });
-    expect(await billing.listByOwner(user.id)).toHaveLength(1);
+    expect((await billing.listForAdmin(user.id)).map((e) => e.weddingId)).toEqual([website.id]);
   });
 
   it("revokes by purchase reference and never grants the same purchase again", async () => {

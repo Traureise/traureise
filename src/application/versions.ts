@@ -4,7 +4,7 @@ import { imageKeysOf } from "@/domain/sections";
 import type { Deps } from "./deps";
 import { LockedError, NotFoundError, ValidationError } from "./errors";
 import { loadGuestContext, type GuestContext } from "./guest-context";
-import { loadOwnedWedding, releaseImages } from "./owned";
+import { loadWedding, releaseImages } from "./owned";
 import type { Card, NewSection, Website } from "./ports";
 import { standardSections } from "./sections";
 import { uniqueSlug } from "./slugs";
@@ -29,7 +29,7 @@ function parseLabel(input: unknown): string {
 
 async function load(deps: Deps, userId: string, weddingId: string, item: string) {
   if (!isVersionItem(item)) throw new NotFoundError();
-  const wedding = await loadOwnedWedding(deps, userId, weddingId);
+  const wedding = await loadWedding(deps, userId, weddingId);
   return { wedding, item, ctx: await loadGuestContext(deps, wedding) };
 }
 

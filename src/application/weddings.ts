@@ -1,5 +1,6 @@
 import { activeTier, type Tier } from "@/domain/billing";
 import { cardCounts, CARD_KINDS, followWeddingDetails, type CardModel, type HouseholdCardKind } from "@/domain/cards";
+import type { Role } from "@/domain/members";
 import { slugify } from "@/domain/slug";
 import { localDay } from "@/domain/days";
 import { DEFAULT_TIMEZONE } from "@/domain/website";
@@ -21,7 +22,7 @@ import { cardPreview, engagementUrl, newCardVersion, siteUrl } from "./cards";
 import type { Deps } from "./deps";
 import { ValidationError } from "./errors";
 import { deliveriesByKind, loadGuestContext } from "./guest-context";
-import { deleteImage, loadOwnedWedding } from "./owned";
+import { deleteImage, loadWedding } from "./owned";
 import type { Wedding } from "./ports";
 import { standardSections } from "./sections";
 import { assertSlugAvailable, uniqueSlug } from "./slugs";
@@ -33,13 +34,13 @@ export class CreateWedding {
    * The Hochzeit form: names and, if planned, the date. Generates one first version of every card and the
    * website, filled in from the wedding. The website is a draft: nothing is public until the couple decides.
    */
-  async execute(ownerId: string, input: unknown): Promise<Wedding> {
+  async execute(userId: string, input: unknown): Promise<Wedding> {
     const parsed = parseNewWedding(input);
     if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
     const { title, weddingDate } = parsed.value;
     const { weddings, websites, cards, themes, cardTexts } = this.deps;
     const slug = await uniqueSlug(this.deps, slugify(title), { wedding: null });
-    const wedding = await weddings.create({ ownerId, title, weddingDate, slug, timezone: DEFAULT_TIMEZONE });
+    const wedding = await weddings.create({ creatorId: userId, title, weddingDate, slug, timezone: DEFAULT_TIMEZONE });
     const website = await websites.create(
       {
         weddingId: wedding.id,
@@ -69,9 +70,9 @@ const byRecentUse = (a: Wedding, b: Wedding) => (b.lastOpenedAt?.getTime() ?? 0)
 export class ListWeddings {
   constructor(private deps: Deps) {}
 
-  /** In the order they were created (the list of weddings). */
-  async execute(ownerId: string): Promise<Wedding[]> {
-    return (await this.deps.weddings.listByOwner(ownerId)).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  /** The weddings the user is a member of, with the user's role, in the order they were created. */
+  async execute(userId: string): Promise<(Wedding & { role: Role })[]> {
+    return (await this.deps.weddings.listForMember(userId)).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }
 }
 
@@ -79,8 +80,8 @@ export class GetRecentWedding {
   constructor(private deps: Deps) {}
 
   /** The wedding /dashboard opens: the one used last. Null for an account without weddings. */
-  async execute(ownerId: string): Promise<Wedding | null> {
-    return [...(await this.deps.weddings.listByOwner(ownerId))].sort(byRecentUse)[0] ?? null;
+  async execute(userId: string): Promise<Wedding | null> {
+    return [...(await this.deps.weddings.listForMember(userId))].sort(byRecentUse)[0] ?? null;
   }
 }
 
@@ -125,7 +126,7 @@ export class GetWeddingHome {
 
   /** The home screen of a wedding: the timeline of its items, the countdown and the guests. */
   async execute(userId: string, weddingId: string): Promise<WeddingHome> {
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const wedding = await loadWedding(this.deps, userId, weddingId);
     const ctx = await loadGuestContext(this.deps, wedding);
     const [households, records, opens] = await Promise.all([
       this.deps.guests.listHouseholds(weddingId),
@@ -190,10 +191,10 @@ export class GetWeddingHome {
 export class GetWeddingFrame {
   constructor(private deps: Deps) {}
 
-  /** What every tab of a wedding shows above its content: the wedding and, for the switcher, the account's others. */
-  async execute(userId: string, weddingId: string): Promise<{ wedding: Wedding; others: { id: string; title: string }[] }> {
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
-    const all = await this.deps.weddings.listByOwner(userId);
+  /** What every tab of a wedding shows above its content: the wedding with the user's role and, for the switcher, the account's others. */
+  async execute(userId: string, weddingId: string): Promise<{ wedding: Wedding & { role: Role }; others: { id: string; title: string }[] }> {
+    const wedding = await loadWedding(this.deps, userId, weddingId);
+    const all = await this.deps.weddings.listForMember(userId);
     return { wedding, others: all.filter((w) => w.id !== weddingId).sort(byRecentUse).map(({ id, title }) => ({ id, title })) };
   }
 }
@@ -203,7 +204,7 @@ export class MarkWeddingUsed {
 
   /** The couple opened the wedding's home; /dashboard opens the one used last. */
   async execute(userId: string, weddingId: string): Promise<void> {
-    await loadOwnedWedding(this.deps, userId, weddingId);
+    await loadWedding(this.deps, userId, weddingId);
     await this.deps.weddings.markUsed(weddingId);
   }
 }
@@ -213,7 +214,7 @@ export class UpdateWeddingDetails {
 
   /** Names, date, place and time zone, which every card and website version share; cards follow unless their text was changed. */
   async execute(userId: string, weddingId: string, input: unknown): Promise<Wedding> {
-    const before = await loadOwnedWedding(this.deps, userId, weddingId);
+    const before = await loadWedding(this.deps, userId, weddingId);
     const parsed = parseWeddingDetails(input);
     if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
     const after = await this.deps.weddings.update(weddingId, parsed.value);
@@ -232,7 +233,7 @@ export class UpdateWeddingSlug {
 
   /** The address of the links that are not a website. Changing it never changes a website version's. */
   async execute(userId: string, weddingId: string, slug: string): Promise<Wedding> {
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const wedding = await loadWedding(this.deps, userId, weddingId);
     const normalized = slug.trim();
     if (normalized === wedding.slug) return wedding;
     await assertSlugAvailable(this.deps, normalized, { wedding: weddingId });
@@ -243,9 +244,9 @@ export class UpdateWeddingSlug {
 export class DeleteWedding {
   constructor(private deps: Deps) {}
 
-  /** Deletes everything in the wedding: versions, cards, guest list, packages and photos. */
+  /** Deletes everything in the wedding: versions, cards, guest list, packages and photos. Admins only. */
   async execute(userId: string, weddingId: string): Promise<void> {
-    await loadOwnedWedding(this.deps, userId, weddingId);
+    await loadWedding(this.deps, userId, weddingId, "admin");
     const keys = await this.deps.uploads.listKeysByWedding(weddingId);
     await this.deps.weddings.delete(weddingId);
     for (const key of keys) await deleteImage(this.deps, key);

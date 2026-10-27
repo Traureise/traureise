@@ -15,13 +15,18 @@ export class ExportAccount {
     if (!user) throw new NotFoundError();
     const now = clock.now();
 
+    // Stop-gap until the export follows the roles (TRAUREISE #28, Task 7): every wedding the user is a member of,
+    // with its photos, whoever uploaded them.
+    const memberOf = await weddings.listForMember(userId);
     const files: ArchiveEntry[] = [];
     const fileList: { path: string; weddingId: string | null; contentType: string }[] = [];
-    for (const upload of await uploads.listByOwner(userId)) {
-      const file = await storage.get(upload.key);
-      if (!file) continue;
-      files.push({ path: imagePath(upload.key), bytes: file.bytes });
-      fileList.push({ path: imagePath(upload.key), weddingId: upload.weddingId, contentType: upload.contentType });
+    for (const wedding of memberOf) {
+      for (const key of await uploads.listKeysByWedding(wedding.id)) {
+        const file = await storage.get(key);
+        if (!file) continue;
+        files.push({ path: imagePath(key), bytes: file.bytes });
+        fileList.push({ path: imagePath(key), weddingId: wedding.id, contentType: file.contentType });
+      }
     }
 
     const image = (key: string | null) => (key ? imagePath(key) : null);
@@ -30,7 +35,7 @@ export class ExportAccount {
       return sections.map((s) => ({ ...s, blocks: blocks.filter((b) => b.sectionId === s.id).map(({ id, position, data }) => ({ id, position, data })) }));
     };
     const exported = [];
-    for (const wedding of await weddings.listByOwner(userId)) {
+    for (const wedding of memberOf) {
       const [households, weddingCards, sites, deliveries, opens, assignments] = await Promise.all([
         guests.listHouseholds(wedding.id),
         cards.listByWedding(wedding.id),
@@ -147,13 +152,21 @@ export class DeleteAccount {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, confirmEmail: string): Promise<void> {
-    const { users, uploads, storage, magicLinks, rateLimiter } = this.deps;
+    const { users, weddings, uploads, storage, magicLinks, rateLimiter } = this.deps;
     const user = await users.findById(userId);
     if (!user) throw new NotFoundError();
     if (normalizeEmail(confirmEmail) !== user.email) throw new ValidationError({ email: "email_mismatch" });
 
-    const keys = (await uploads.listByOwner(userId)).map((u) => u.key);
-    // Rows first (one delete, the cascades do the rest), so a failing file delete never leaves a half-deleted account.
+    // Weddings no one else is a member of go with the account, as everything in them. Stop-gap until shared
+    // weddings block the deletion (TRAUREISE #28, Task 7): weddings with other members simply stay.
+    const keys: string[] = [];
+    for (const wedding of await weddings.listForMember(userId)) {
+      const members = await weddings.listMembers(wedding.id);
+      if (members.some((m) => m.userId !== userId)) continue;
+      keys.push(...(await uploads.listKeysByWedding(wedding.id)));
+      await weddings.delete(wedding.id);
+    }
+    // Rows first, so a failing file delete never leaves a half-deleted account.
     await users.delete(userId);
     for (const key of keys) await storage.delete(key);
     await magicLinks.deleteByEmail(user.email);

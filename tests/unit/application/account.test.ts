@@ -80,6 +80,7 @@ describe("ExportAccount", () => {
     const { wedding } = await seedWebsite();
     await f.billingRepo.applyEvent("evt_1", {
       kind: "grant",
+      purchasedBy: null,
       weddingId: wedding.id,
       tier: "rsvp",
       purchaseRef: "ord_1",

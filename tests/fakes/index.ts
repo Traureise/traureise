@@ -26,6 +26,9 @@ import type {
   GuestRepository,
   HouseholdData,
   ImageProcessor,
+  Invitation,
+  InvitationRepository,
+  Member,
   GuestImportBatch,
   NewPoll,
   PollRecord,
@@ -64,6 +67,7 @@ import { DEFAULT_RSVP_SETTINGS, type AnswerSource, type Household, type Househol
 import { parseThemeManifest, type ThemeManifest } from "@/domain/theme";
 import type { CardInput, CardKind, Delivery, HouseholdCardKind, SharedVia } from "@/domain/cards";
 import type { AssignableItem, Assignment } from "@/domain/weddings";
+import type { Role } from "@/domain/members";
 
 export class FakeClock implements Clock {
   constructor(public current = new Date("2026-10-18T10:00:00Z")) {}
@@ -164,15 +168,20 @@ function omit<T extends object, K extends keyof T>(value: T, key: K): Omit<T, K>
 
 export class InMemoryWeddings implements WeddingRepository {
   weddings: Wedding[] = [];
+  members: { weddingId: string; userId: string; role: Role; createdAt: Date }[] = [];
   events: (WeddingEvent & { weddingId: string })[] = [];
   /** Stands in for ON DELETE CASCADE from weddings. */
   cascades: ((weddingId: string) => void)[] = [];
-  constructor(private websites: InMemoryWebsites) {}
+  constructor(
+    private websites: InMemoryWebsites,
+    private users: InMemoryUsers,
+  ) {}
 
-  async create(input: NewWedding) {
+  async create({ creatorId, ...input }: NewWedding) {
     const now = new Date();
-    const wedding: Wedding = { id: randomUUID(), location: null, latitude: null, longitude: null, lastOpenedAt: null, createdAt: now, updatedAt: now, ...input };
+    const wedding: Wedding = { id: randomUUID(), location: null, latitude: null, longitude: null, lastOpenedAt: null, createdAt: now, updatedAt: now, ...input, contactUserId: creatorId };
     this.weddings.push(wedding);
+    this.members.push({ weddingId: wedding.id, userId: creatorId, role: "admin", createdAt: now });
     return copy(wedding);
   }
   async findById(id: string) {
@@ -181,8 +190,30 @@ export class InMemoryWeddings implements WeddingRepository {
   async findBySlug(slug: string) {
     return copy(this.weddings.find((w) => w.slug === slug) ?? null);
   }
-  async listByOwner(ownerId: string) {
-    return copy(this.weddings.filter((w) => w.ownerId === ownerId));
+  async listForMember(userId: string) {
+    return this.members.filter((m) => m.userId === userId).map((m) => ({ ...copy(this.weddings.find((w) => w.id === m.weddingId)!), role: m.role }));
+  }
+  async roleOf(weddingId: string, userId: string) {
+    return this.members.find((m) => m.weddingId === weddingId && m.userId === userId)?.role ?? null;
+  }
+  async listMembers(weddingId: string): Promise<Member[]> {
+    return this.members
+      .filter((m) => m.weddingId === weddingId)
+      .map((m) => {
+        const user = this.users.users.find((u) => u.id === m.userId)!;
+        return { userId: m.userId, email: user.email, firstName: user.firstName, role: m.role, createdAt: m.createdAt };
+      });
+  }
+  async addMember(weddingId: string, userId: string, role: Role) {
+    if (await this.roleOf(weddingId, userId)) return;
+    this.members.push({ weddingId, userId, role, createdAt: new Date() });
+  }
+  async setRole(weddingId: string, userId: string, role: Role) {
+    const member = this.members.find((m) => m.weddingId === weddingId && m.userId === userId);
+    if (member) member.role = role;
+  }
+  async removeMember(weddingId: string, userId: string) {
+    this.members = this.members.filter((m) => !(m.weddingId === weddingId && m.userId === userId));
   }
   async update(id: string, patch: WeddingPatch) {
     const wedding = this.weddings.find((w) => w.id === id)!;
@@ -197,6 +228,7 @@ export class InMemoryWeddings implements WeddingRepository {
   }
   async delete(id: string) {
     this.weddings = this.weddings.filter((w) => w.id !== id);
+    this.members = this.members.filter((m) => m.weddingId !== id);
     this.events = this.events.filter((e) => e.weddingId !== id);
     for (const site of this.websites.websites.filter((w) => w.weddingId === id)) await this.websites.delete(site.id);
     for (const cascade of this.cascades) cascade(id);
@@ -227,6 +259,28 @@ export class InMemoryWeddings implements WeddingRepository {
   async deleteEvent(eventId: string) {
     this.events = this.events.filter((e) => e.id !== eventId);
     this.websites.blocks = this.websites.blocks.filter((b) => !(b.data.type === "event" && b.data.eventId === eventId));
+  }
+}
+
+export class InMemoryInvitations implements InvitationRepository {
+  invitations: (Invitation & { tokenHash: string })[] = [];
+  async replace(input: Omit<Invitation, "id" | "createdAt"> & { tokenHash: string }) {
+    this.invitations = this.invitations.filter((i) => !(i.weddingId === input.weddingId && i.email === input.email));
+    const invitation = { ...input, id: randomUUID(), createdAt: new Date() };
+    this.invitations.push(invitation);
+    return omit(copy(invitation), "tokenHash");
+  }
+  async findByHash(tokenHash: string) {
+    const invitation = this.invitations.find((i) => i.tokenHash === tokenHash);
+    return invitation ? omit(copy(invitation), "tokenHash") : null;
+  }
+  async listPending(weddingId: string, now: Date) {
+    return this.invitations.filter((i) => i.weddingId === weddingId && i.expiresAt > now).map((i) => omit(copy(i), "tokenHash"));
+  }
+  async delete(id: string) {
+    const before = this.invitations.length;
+    this.invitations = this.invitations.filter((i) => i.id !== id);
+    return this.invitations.length < before;
   }
 }
 
@@ -327,14 +381,9 @@ export class InMemoryWebsites implements WebsiteRepository {
 }
 
 export class InMemoryUploads implements UploadRepository {
-  uploads: { key: string; ownerId: string; weddingId: string; contentType: string; size: number; createdAt: Date }[] = [];
-  async create(input: Omit<InMemoryUploads["uploads"][number], "createdAt">) {
+  uploads: { key: string; uploadedBy: string | null; weddingId: string; contentType: string; size: number; createdAt: Date }[] = [];
+  async create(input: Omit<InMemoryUploads["uploads"][number], "createdAt" | "uploadedBy"> & { uploadedBy: string }) {
     this.uploads.push({ ...input, createdAt: new Date() });
-  }
-  async listByOwner(ownerId: string) {
-    return this.uploads
-      .filter((u) => u.ownerId === ownerId)
-      .map((u) => ({ key: u.key, weddingId: u.weddingId, contentType: u.contentType, size: u.size, createdAt: u.createdAt }));
   }
   async belongsToWedding(key: string, weddingId: string) {
     return this.uploads.some((u) => u.key === key && u.weddingId === weddingId);
@@ -382,8 +431,8 @@ export class InMemoryBilling implements BillingRepository {
     if (this.events.has(eventId)) return "duplicate" as const;
     this.events.add(eventId);
     if (change.kind === "grant" && !this.entitlements.some((e) => e.purchaseRef === change.purchaseRef)) {
-      const { weddingId, tier, purchaseRef, provider, validUntil } = change;
-      this.entitlements.push({ id: randomUUID(), revokedAt: null, createdAt: new Date(), weddingId, tier, purchaseRef, provider, validUntil });
+      const { weddingId, tier, purchaseRef, provider, validUntil, purchasedBy } = change;
+      this.entitlements.push({ id: randomUUID(), revokedAt: null, createdAt: new Date(), weddingId, tier, purchaseRef, provider, validUntil, purchasedBy });
     }
     if (change.kind === "revoke") {
       for (const e of this.entitlements) if (e.purchaseRef === change.purchaseRef && !e.revokedAt) e.revokedAt = change.at;
@@ -393,8 +442,8 @@ export class InMemoryBilling implements BillingRepository {
   async listByWedding(weddingId: string) {
     return copy(this.entitlements.filter((e) => e.weddingId === weddingId));
   }
-  async listByOwner(ownerId: string) {
-    const ids = new Set(this.weddings.weddings.filter((w) => w.ownerId === ownerId).map((w) => w.id));
+  async listForAdmin(userId: string) {
+    const ids = new Set(this.weddings.members.filter((m) => m.userId === userId && m.role === "admin").map((m) => m.weddingId));
     return copy(this.entitlements.filter((e) => ids.has(e.weddingId)));
   }
 }
@@ -933,25 +982,29 @@ export class FakeThemes implements ThemeCatalog {
 }
 
 export function createFakes() {
+  const users = new InMemoryUsers();
   const websites = new InMemoryWebsites();
-  const weddings = new InMemoryWeddings(websites);
+  const weddings = new InMemoryWeddings(websites, users);
   const billingRepo = new InMemoryBilling(weddings);
   const guests = new InMemoryGuests();
   const cards = new InMemoryCards(guests);
   const uploads = new InMemoryUploads();
+  const invitations = new InMemoryInvitations();
   guests.versionExists = (id) => cards.cards.some((c) => c.id === id) || websites.websites.some((w) => w.id === id);
   weddings.cascades.push(
     (id) => guests.dropWedding(id),
     (id) => cards.dropWedding(id),
     (id) => (uploads.uploads = uploads.uploads.filter((u) => u.weddingId !== id)),
     (id) => (billingRepo.entitlements = billingRepo.entitlements.filter((e) => e.weddingId !== id)),
+    (id) => (invitations.invitations = invitations.invitations.filter((i) => i.weddingId !== id)),
   );
   const fakes = {
-    users: new InMemoryUsers(),
+    users,
     magicLinks: new InMemoryMagicLinks(),
     sessions: new InMemorySessions(),
     rateLimiter: new InMemoryRateLimiter(),
     weddings,
+    invitations,
     websites,
     uploads,
     storage: new InMemoryStorage(),
@@ -987,9 +1040,13 @@ export function createFakes() {
     appUrl: "http://localhost:3000",
   };
   fakes.users.cascades.push((userId) => {
-    for (const w of weddings.weddings.filter((x) => x.ownerId === userId)) void weddings.delete(w.id);
+    // As in the database: memberships go, weddings and their photos stay; references to the user become null.
+    weddings.members = weddings.members.filter((m) => m.userId !== userId);
+    for (const w of weddings.weddings) if (w.contactUserId === userId) w.contactUserId = null;
+    for (const u of uploads.uploads) if (u.uploadedBy === userId) u.uploadedBy = null;
+    for (const e of billingRepo.entitlements) if (e.purchasedBy === userId) e.purchasedBy = null;
+    invitations.invitations = invitations.invitations.map((i) => (i.invitedBy === userId ? { ...i, invitedBy: null } : i));
     fakes.sessions.sessions = fakes.sessions.sessions.filter((s) => s.userId !== userId);
-    uploads.uploads = uploads.uploads.filter((u) => u.ownerId !== userId);
   });
   const deps: Deps = fakes;
   return { ...fakes, deps };

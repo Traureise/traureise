@@ -25,7 +25,7 @@ import { firstVersion, needsDate, VERSION_FEATURES } from "@/domain/weddings";
 import type { Deps } from "./deps";
 import { LockedError, NotFoundError, ValidationError } from "./errors";
 import { formFor, householdContent, householdDesign, linkUrl, loadByToken, loadGuestContext, type GuestContext, type GuestForm } from "./guest-context";
-import { assertOwnImage, loadOwnedCardVersion, loadOwnedWedding } from "./owned";
+import { assertOwnImage, loadCardVersion, loadWedding } from "./owned";
 import type { Card, MailMessage, NewCard, PaperFormat, QueuedMail, Website, Wedding } from "./ports";
 
 const PNG_EXPORT_WIDTH = 1748; // A5 width at 300 dpi
@@ -85,8 +85,8 @@ async function photoBytes(deps: Deps, card: Card): Promise<Uint8Array | null> {
   return card.photoKey ? ((await deps.storage.get(card.photoKey))?.bytes ?? null) : null;
 }
 
-async function loadOwnedCard(deps: Deps, userId: string, cardId: string) {
-  const { wedding, card } = await loadOwnedCardVersion(deps, userId, cardId);
+async function loadCard(deps: Deps, userId: string, cardId: string) {
+  const { wedding, card } = await loadCardVersion(deps, userId, cardId);
   return { wedding, card, ctx: await loadGuestContext(deps, wedding) };
 }
 
@@ -156,7 +156,7 @@ export class GetCardEditor {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, cardId: string): Promise<CardEditor> {
-    const { wedding, ctx, card } = await loadOwnedCard(this.deps, userId, cardId);
+    const { wedding, ctx, card } = await loadCard(this.deps, userId, cardId);
     const { kind } = card;
     const themes = this.deps.themes
       .list()
@@ -194,7 +194,7 @@ export class SaveCard {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, cardId: string, input: unknown): Promise<void> {
-    const { ctx, card, wedding } = await loadOwnedCard(this.deps, userId, cardId);
+    const { ctx, card, wedding } = await loadCard(this.deps, userId, cardId);
     const { kind } = card;
     const parsed = parseCardInput(input);
     if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
@@ -218,7 +218,7 @@ export class ExportCard {
 
   /** PNG for messengers, PDF in A6 or A5 for printing at home. Needs the card's tier. */
   async execute(userId: string, cardId: string, format: ExportFormat): Promise<{ filename: string; contentType: string; bytes: Uint8Array }> {
-    const { ctx, card, wedding } = await loadOwnedCard(this.deps, userId, cardId);
+    const { ctx, card, wedding } = await loadCard(this.deps, userId, cardId);
     const { kind } = card;
     if (!ctx.cardActive(kind)) throw new LockedError();
     assertDate(wedding, kind);
@@ -301,7 +301,7 @@ export class GetCardPreview {
 
   /** A card version as guests see it, for a household that gets it or a sample one. Free; it records nothing. */
   async execute(userId: string, cardId: string): Promise<Extract<HouseholdPageView, { state: "page" }>> {
-    const { wedding, ctx, card } = await loadOwnedCard(this.deps, userId, cardId);
+    const { wedding, ctx, card } = await loadCard(this.deps, userId, cardId);
     const { kind } = card;
     const households = await this.deps.guests.listHouseholds(wedding.id);
     const first = isHouseholdCardKind(kind) ? households.find((h) => ctx.cardFor(h.id, kind)?.id === card.id) : undefined;
@@ -393,7 +393,7 @@ export class MarkEngagementShared {
 
   /** The couple copied the engagement link or opened WhatsApp with it: the timeline counts it as shared. */
   async execute(userId: string, cardId: string): Promise<void> {
-    const { card, ctx } = await loadOwnedCard(this.deps, userId, cardId);
+    const { card, ctx } = await loadCard(this.deps, userId, cardId);
     if (card.kind !== "engagement") throw new NotFoundError();
     if (!ctx.can(CARD_FEATURES.engagement)) throw new LockedError();
     await this.deps.cards.markLinkShared(card.id, ctx.now);
@@ -404,7 +404,7 @@ export class MarkEngagementShared {
 
 async function loadHouseholdCard(deps: Deps, userId: string, weddingId: string, kind: CardKind, householdId: string) {
   if (!isHouseholdCardKind(kind)) throw new NotFoundError();
-  const wedding = await loadOwnedWedding(deps, userId, weddingId);
+  const wedding = await loadWedding(deps, userId, weddingId);
   const ctx = await loadGuestContext(deps, wedding);
   const household = await deps.guests.findHousehold(weddingId, householdId);
   const card = household && ctx.cardFor(household.id, kind);
@@ -438,7 +438,7 @@ export class MarkCardsSent {
    */
   async execute(userId: string, weddingId: string, kind: CardKind, target: SendTarget, sent: boolean): Promise<{ marked: number }> {
     if (!isHouseholdCardKind(kind)) throw new NotFoundError();
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const wedding = await loadWedding(this.deps, userId, weddingId);
     const ctx = await loadGuestContext(this.deps, wedding);
     const households = await this.deps.guests.listHouseholds(weddingId);
     const ids = target === "all" ? households.map((h) => h.id) : households.filter((h) => h.id === target.householdId).map((h) => h.id);
@@ -482,7 +482,7 @@ export class SendCardEmails {
    */
   async execute(userId: string, weddingId: string, kind: CardKind, target: SendTarget): Promise<{ queued: number }> {
     if (!isHouseholdCardKind(kind)) throw new NotFoundError();
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const wedding = await loadWedding(this.deps, userId, weddingId);
     const ctx = await loadGuestContext(this.deps, wedding);
     if (!ctx.cardActive(kind) || !ctx.can("emailSending")) throw new LockedError();
     assertDate(wedding, kind);
@@ -509,7 +509,7 @@ export class SendReminders {
    * tier), otherwise the text and link for the couple to open in WhatsApp (RSVP tier). The text is the household's invitation version's.
    */
   async execute(userId: string, weddingId: string, target: SendTarget): Promise<{ queued: number; whatsapp: { householdId: string; name: string; message: string; link: string }[] }> {
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const wedding = await loadWedding(this.deps, userId, weddingId);
     const ctx = await loadGuestContext(this.deps, wedding);
     const byEmail = ctx.can("emailReminders");
     if (!ctx.sending && !byEmail) throw new LockedError();
@@ -636,12 +636,12 @@ export class RunMailJobs {
 
   /** Sender, reply address and unsubscribe headers shared by every email to guests. */
   private async envelope(ctx: GuestContext, household: Household): Promise<Pick<MailMessage, "to" | "fromName" | "replyTo" | "headers">> {
-    const owner = await this.deps.users.findById(ctx.wedding.ownerId);
+    const contact = ctx.wedding.contactUserId ? await this.deps.users.findById(ctx.wedding.contactUserId) : null;
     const stop = this.deps.guestLinks.unsubscribeTokenFor(household.id);
     return {
       to: householdEmails(household),
       fromName: `${ctx.wedding.title} über Traureise`,
-      replyTo: owner?.email,
+      replyTo: contact?.email,
       headers: { "List-Unsubscribe": `<${this.deps.appUrl}/api/abmelden/${stop}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
     };
   }

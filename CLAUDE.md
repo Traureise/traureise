@@ -31,15 +31,16 @@ Layers point inward only; ESLint enforces the import bans:
 - `src/domain/`: pure rules and zod schemas (no app/infra/next/react/drizzle imports). The paid-feature
   gate is `canUse(feature, context, now)` in `domain/billing.ts` (`FEATURE_TIERS`, `RELEASED_TIERS`).
 - `src/application/`: use-case classes (`new X(deps).execute(...)`) depending only on ports in
-  `ports.ts`, bundled as `Deps` (`deps.ts`). Ownership checks go through `loadOwnedWebsite`
-  (someone else's website is a `NotFoundError`). Errors in `errors.ts`.
+  `ports.ts`, bundled as `Deps` (`deps.ts`). Access checks go through `loadWedding`/`loadWebsite`/`loadCardVersion`
+  in `owned.ts` with a minimum role (`admin` > `editor`; no membership is a `NotFoundError`). Errors in `errors.ts`.
 - `src/infrastructure/`: Drizzle repositories, SMTP, storage (local/S3), Creem, themes.
 - `src/composition/container.ts`: the only place wiring adapters to ports; `config.ts` is the zod env schema.
 - `src/app/` + `src/components/`: thin routes and server actions (`src/app/actions/*`) that call
   `container().<useCase>.execute(...)` wrapped in `runAction` (`src/lib/action-result.ts`).
 
-Data: everything hangs off `users.id` / `websites.id` with `ON DELETE CASCADE`; account export
-(`application/account.ts`, `data.json` + images) and deletion rely on that.
+Data: everything in a wedding hangs off `weddings.id` with `ON DELETE CASCADE`; users reach weddings through
+`wedding_members` (role per wedding). Deleting a user removes memberships, not weddings: account deletion
+(`application/account.ts`) deletes the weddings the user was the only member of.
 Tests: unit tests use hand-written fakes in `tests/fakes/index.ts`; integration tests in `tests/integration/`.
 E2E fixture (`e2e/fixtures.ts`) fails any test whose browser hits a non-app host; magic links are read
 from Mailpit (`e2e/helpers/`). Billing E2E uses the Creem stub in `e2e/creem-stub/`.
