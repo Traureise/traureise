@@ -202,7 +202,8 @@ export class InMemoryWeddings implements WeddingRepository {
       .map((m) => {
         const user = this.users.users.find((u) => u.id === m.userId)!;
         return { userId: m.userId, email: user.email, firstName: user.firstName, role: m.role, createdAt: m.createdAt };
-      });
+      })
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }
   async addMember(weddingId: string, userId: string, role: Role) {
     if (await this.roleOf(weddingId, userId)) return;
