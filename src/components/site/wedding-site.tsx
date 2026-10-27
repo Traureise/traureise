@@ -20,7 +20,7 @@ export async function WeddingSite({ view, now, mode }: Props) {
   const days = website.weddingDate ? daysUntil(website.weddingDate, now, website.timezone) : null;
 
   return (
-    <div className="site min-h-full" style={siteStyle(design)} data-theme={design.theme.id} data-palette={design.palette.id} data-fonts={design.fonts.id} data-testid={mode === "preview" ? "site-preview" : "site"}>
+    <div className={mode === "public" ? "site site-page min-h-full" : "site min-h-full"} style={siteStyle(design)} data-theme={design.theme.id} data-palette={design.palette.id} data-fonts={design.fonts.id} data-testid={mode === "preview" ? "site-preview" : "site"}>
       <nav className="site-nav sticky top-0 z-10" aria-label={t("navLabel")}>
         <ul className="mx-auto flex max-w-4xl gap-5 overflow-x-auto px-6 py-3 text-sm whitespace-nowrap">
           <li>

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 export async function AppHeader({ email }: { email: string }) {
   const t = await getTranslations("auth");
   return (
-    <header className="border-b border-border/70 bg-background/80 backdrop-blur">
+    <header className="border-b border-border/70 bg-background/60 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-2 px-4 sm:px-6">
         <Logo href="/dashboard" />
         {/* On phones the account and logout buttons show only their icons, so the row fits. */}
