@@ -11,7 +11,7 @@ import {
 } from "@/domain/sections";
 import type { Deps } from "./deps";
 import { NotFoundError, ValidationError } from "./errors";
-import { assertOwnImage, loadOwnedWebsite, releaseImages } from "./owned";
+import { assertOwnImage, loadWebsite, releaseImages } from "./owned";
 import type { Block, NewSection, Section, SectionPatch, SiteTexts, Wedding } from "./ports";
 
 /** A section of the standard template, with its translated default title and default blocks. */
@@ -22,15 +22,15 @@ export function templateSection(texts: SiteTexts, template: SectionTemplate): Ne
 /** The standard template: what a new wedding's first website and "Aus Vorlage erstellen" start with. */
 export const standardSections = (texts: SiteTexts): NewSection[] => SECTION_TEMPLATES.map((t) => templateSection(texts, t));
 
-async function loadOwnedSection(deps: Deps, userId: string, websiteId: string, sectionId: string) {
-  const owned = await loadOwnedWebsite(deps, userId, websiteId);
+async function loadSection(deps: Deps, userId: string, websiteId: string, sectionId: string) {
+  const owned = await loadWebsite(deps, userId, websiteId);
   const section = await deps.websites.findSection(websiteId, sectionId).catch(() => null);
   if (!section) throw new NotFoundError();
   return { ...owned, section };
 }
 
-async function loadOwnedBlock(deps: Deps, userId: string, websiteId: string, blockId: string) {
-  const owned = await loadOwnedWebsite(deps, userId, websiteId);
+async function loadBlock(deps: Deps, userId: string, websiteId: string, blockId: string) {
+  const owned = await loadWebsite(deps, userId, websiteId);
   const block = await deps.websites.findBlock(websiteId, blockId).catch(() => null);
   if (!block) throw new NotFoundError();
   return { ...owned, block };
@@ -53,7 +53,7 @@ export class AddSection {
 
   /** "+ Abschnitt": an empty section, or one section of the standard template. Appended at the end. */
   async execute(userId: string, websiteId: string, input: { template: SectionTemplate | null }): Promise<Section> {
-    await loadOwnedWebsite(this.deps, userId, websiteId);
+    await loadWebsite(this.deps, userId, websiteId);
     const { template } = input;
     if (template !== null && !isSectionTemplate(template)) throw new ValidationError({ template: "invalid_option" });
     const section: NewSection = template
@@ -67,7 +67,7 @@ export class UpdateSection {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, websiteId: string, sectionId: string, input: { title?: string; visible?: boolean }): Promise<void> {
-    await loadOwnedSection(this.deps, userId, websiteId, sectionId);
+    await loadSection(this.deps, userId, websiteId, sectionId);
     const patch: SectionPatch = {};
     if (input.visible !== undefined && typeof input.visible !== "boolean") throw new ValidationError({ visible: "invalid_option" });
     if (input.title !== undefined) {
@@ -85,7 +85,7 @@ export class DeleteSection {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, websiteId: string, sectionId: string): Promise<void> {
-    const { wedding } = await loadOwnedSection(this.deps, userId, websiteId, sectionId);
+    const { wedding } = await loadSection(this.deps, userId, websiteId, sectionId);
     const photos = (await this.deps.websites.listBlocks(websiteId)).filter((b) => b.sectionId === sectionId).flatMap((b) => imageKeysOf(b.data));
     await this.deps.websites.deleteSection(sectionId);
     await releaseImages(this.deps, wedding.id, photos);
@@ -97,7 +97,7 @@ export class MoveSection {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, websiteId: string, sectionId: string, direction: Direction): Promise<void> {
-    await loadOwnedSection(this.deps, userId, websiteId, sectionId);
+    await loadSection(this.deps, userId, websiteId, sectionId);
     const ids = (await this.deps.websites.listSections(websiteId)).map((s) => s.id);
     await this.deps.websites.setSectionOrder(websiteId, moveItem(ids, sectionId, direction));
   }
@@ -108,7 +108,7 @@ export class AddBlock {
 
   /** Appends a block of any type to the end of a section. */
   async execute(userId: string, websiteId: string, sectionId: string, input: unknown): Promise<Block> {
-    const { wedding } = await loadOwnedSection(this.deps, userId, websiteId, sectionId);
+    const { wedding } = await loadSection(this.deps, userId, websiteId, sectionId);
     const data = await validBlock(this.deps, wedding, input);
     return this.deps.websites.addBlock(websiteId, sectionId, data);
   }
@@ -119,7 +119,7 @@ export class UpdateBlock {
 
   /** Edits a block's fields; its type stays. */
   async execute(userId: string, websiteId: string, blockId: string, input: unknown): Promise<void> {
-    const { wedding, block } = await loadOwnedBlock(this.deps, userId, websiteId, blockId);
+    const { wedding, block } = await loadBlock(this.deps, userId, websiteId, blockId);
     const data = await validBlock(this.deps, wedding, input);
     if (data.type !== block.data.type) throw new ValidationError({ type: "invalid_option" });
     await this.deps.websites.updateBlock(blockId, data);
@@ -132,7 +132,7 @@ export class DeleteBlock {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, websiteId: string, blockId: string): Promise<void> {
-    const { wedding, block } = await loadOwnedBlock(this.deps, userId, websiteId, blockId);
+    const { wedding, block } = await loadBlock(this.deps, userId, websiteId, blockId);
     await this.deps.websites.deleteBlock(blockId);
     await releaseImages(this.deps, wedding.id, imageKeysOf(block.data));
   }
@@ -143,7 +143,7 @@ export class MoveBlock {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, websiteId: string, blockId: string, direction: Direction): Promise<void> {
-    const { block } = await loadOwnedBlock(this.deps, userId, websiteId, blockId);
+    const { block } = await loadBlock(this.deps, userId, websiteId, blockId);
     const ids = (await this.deps.websites.listBlocks(websiteId)).filter((b) => b.sectionId === block.sectionId).map((b) => b.id);
     await this.deps.websites.setBlockOrder(block.sectionId, moveItem(ids, blockId, direction));
   }

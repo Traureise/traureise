@@ -4,6 +4,7 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { CalendarDays, MapPin, Plus } from "lucide-react";
 import { AppHeader } from "@/components/app/app-header";
 import { PageShell } from "@/components/app/app-footer";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteWeddingButton } from "@/components/weddings/delete-wedding-button";
 import { container } from "@/composition/container";
@@ -41,11 +42,19 @@ export default async function WeddingsPage() {
           {weddings.map((w) => (
             <li key={w.id} className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5" data-testid="wedding">
               <div className="space-y-2">
-                <h2 className="font-heading text-3xl font-medium tracking-tight">
-                  <Link href={`/hochzeiten/${w.id}`} className="hover:underline">
-                    {w.title}
-                  </Link>
-                </h2>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <h2 className="font-heading text-3xl font-medium tracking-tight">
+                    <Link href={`/hochzeiten/${w.id}`} className="hover:underline">
+                      {w.title}
+                    </Link>
+                  </h2>
+                  {/* A wedding shared with the account as editor. */}
+                  {w.role === "editor" && (
+                    <Badge variant="secondary" data-testid="role-badge">
+                      {t("members.roles.editor")}
+                    </Badge>
+                  )}
+                </div>
                 <p className="flex items-center gap-2 text-sm">
                   <CalendarDays className="size-4 text-muted-foreground" aria-hidden />
                   {w.weddingDate ? format.dateTime(dateFromIso(w.weddingDate), { dateStyle: "long", timeZone: "UTC" }) : t("dateOpen")}
@@ -61,7 +70,7 @@ export default async function WeddingsPage() {
                 <Button asChild>
                   <Link href={`/hochzeiten/${w.id}`}>{t("open")}</Link>
                 </Button>
-                <DeleteWeddingButton weddingId={w.id} title={w.title} />
+                {w.role === "admin" && <DeleteWeddingButton weddingId={w.id} title={w.title} />}
               </div>
             </li>
           ))}

@@ -59,7 +59,8 @@ export default async function WeddingHomePage({ params, searchParams }: Props) {
           <Link href={`/hochzeiten/${wedding.id}/hochzeit`} className="text-sm font-medium text-primary underline-offset-4 hover:underline">
             {tDetails("open")}
           </Link>
-          {home.tier && (
+          {/* Packages are the admins' business. */}
+          {home.tier && wedding.role === "admin" && (
             <span className="text-sm text-muted-foreground" data-testid="wedding-plan">
               · {t("plan", { tier: tTiers(`${home.tier}.name`) })}
               {home.tier !== "complete" && (

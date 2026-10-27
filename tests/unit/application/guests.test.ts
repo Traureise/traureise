@@ -19,6 +19,7 @@ import {
 import { GetHouseholdPage } from "@/application/cards";
 import { AddEvent } from "@/application/schedule";
 import { CreateWedding, DeleteWedding } from "@/application/weddings";
+import type { Role } from "@/domain/members";
 import type { CsvLabels } from "@/domain/guests";
 import { FakeArchive, createFakes } from "../../fakes";
 
@@ -53,6 +54,7 @@ const grantRsvp = async (over: { validUntil?: Date } = {}) => {
   f.deps.billing.enabled = true;
   await f.billingRepo.applyEvent(`evt-${Math.random()}`, {
     kind: "grant",
+    purchasedBy: null,
     weddingId,
     tier: "rsvp",
     purchaseRef: `ord-${Math.random()}`,
@@ -60,6 +62,16 @@ const grantRsvp = async (over: { validUntil?: Date } = {}) => {
     validUntil: over.validUntil ?? new Date("2028-06-13T00:00:00Z"),
   });
 };
+
+/** Adds a second admin and an editor, so mail to "the admins" is distinguishable from mail to everyone. */
+async function addTeam() {
+  const join = async (email: string, role: Role) => {
+    const user = await f.users.create(email);
+    await f.weddings.addMember(weddingId, user.id, role);
+  };
+  await join("ben@example.org", "admin");
+  await join("tina@example.org", "editor");
+}
 
 async function weber() {
   return saveHousehold({ name: "Familie Weber", people: [{ name: "Clara" }, { name: "Max" }] });
@@ -223,7 +235,7 @@ describe("the guest form", () => {
     const input = { people: { [household.people[0]!.id]: { attending: true, eventIds: [party] }, [household.people[1]!.id]: { attending: false } } };
     await submit(tokenOf(household.id), input);
     expect(f.mailer.sent).toHaveLength(1);
-    expect(f.mailer.sent[0]).toMatchObject({ to: "anna@example.org", subject: "Antwort: Familie Weber" });
+    expect(f.mailer.sent[0]).toMatchObject({ to: ["anna@example.org"], subject: "Antwort: Familie Weber" });
     expect(JSON.parse(f.mailer.sent[0]!.text)).toMatchObject({ coming: ["Clara"], notComing: ["Max"], guestsUrl: `http://localhost:3000/hochzeiten/${weddingId}/gaeste` });
 
     f.mailer.send = async () => {
@@ -340,6 +352,39 @@ describe("guest data and account rights", () => {
   });
 });
 
+describe("the wedding's own mail goes to all admins", () => {
+  const jobs = () => new RunGuestJobs(f.deps).execute({});
+  const admins = ["anna@example.org", "ben@example.org"];
+  const sortedTo = () => f.mailer.sent.map((m) => [...(m.to as string[])].sort());
+
+  it("sends an RSVP answer notification to both admins and not the editor", async () => {
+    await addTeam();
+    await new SaveRsvpSettings(f.deps).execute(anna.id, weddingId, { notify: "each" });
+    const household = await weber();
+    await submit(tokenOf(household.id), { people: Object.fromEntries(household.people.map((p) => [p.id, { attending: false }])) });
+    expect(sortedTo()).toEqual([admins]);
+  });
+
+  it("sends the daily summary to both admins", async () => {
+    await addTeam();
+    await new SaveRsvpSettings(f.deps).execute(anna.id, weddingId, { notify: "daily" });
+    const household = await weber();
+    f.clock.current = new Date("2026-10-19T05:00:00Z");
+    await submit(tokenOf(household.id), { people: Object.fromEntries(household.people.map((p) => [p.id, { attending: false }])) });
+    f.clock.current = new Date("2026-10-19T06:30:00Z");
+    expect((await jobs()).summaries).toEqual([weddingId]);
+    expect(sortedTo()).toEqual([admins]);
+  });
+
+  it("sends the retention warning to both admins", async () => {
+    await addTeam();
+    await weber();
+    f.clock.current = new Date("2028-05-15T10:00:00Z");
+    expect((await jobs()).warned).toEqual([weddingId]);
+    expect(sortedTo()).toEqual([admins]);
+  });
+});
+
 describe("RunGuestJobs", () => {
   const jobs = (scope?: string) => new RunGuestJobs(f.deps).execute({ weddingId: scope });
 
@@ -350,7 +395,7 @@ describe("RunGuestJobs", () => {
     f.clock.current = new Date("2028-05-15T10:00:00Z");
     expect((await jobs()).warned).toEqual([weddingId]);
     expect((await jobs()).warned).toEqual([]);
-    expect(f.mailer.sent.map((m) => [m.to, m.subject])).toEqual([["anna@example.org", "Löschung: Anna & Ben"]]);
+    expect(f.mailer.sent.map((m) => [m.to, m.subject])).toEqual([[["anna@example.org"], "Löschung: Anna & Ben"]]);
     expect((await page()).deletionSoon).toBe(true);
 
     f.clock.current = new Date("2028-06-13T00:00:01Z");

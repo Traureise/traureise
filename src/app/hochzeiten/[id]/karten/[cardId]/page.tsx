@@ -15,6 +15,7 @@ import { WeddingNav } from "@/components/weddings/wedding-nav";
 import { container } from "@/composition/container";
 import { dateFromIso } from "@/lib/format";
 import { requireProfile } from "@/lib/session";
+import { loadWeddingFrame } from "@/lib/weddings";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,7 @@ export default async function CardEditorPage({ params }: Props) {
   const tHome = await getTranslations("weddings.home");
   const format = await getFormatter();
   const { wedding, card } = data;
+  const { role } = (await loadWeddingFrame(id)).wedding;
   const base = `/hochzeiten/${id}/karten/${card.id}`;
   const kindName = tKinds(card.kind);
   const header = (
@@ -86,9 +88,12 @@ export default async function CardEditorPage({ params }: Props) {
         <p className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm" data-testid="card-editor-locked">
           <Lock className="size-4 text-primary" aria-hidden />
           {t("locked")}
-          <Link href="/preise" className="font-medium text-primary underline-offset-4 hover:underline">
-            {t("lockedLink")}
-          </Link>
+          {/* Buying a package is for admins. */}
+          {role === "admin" && (
+            <Link href="/preise" className="font-medium text-primary underline-offset-4 hover:underline">
+              {t("lockedLink")}
+            </Link>
+          )}
         </p>
       )}
       {data.waitsForDate && (

@@ -78,6 +78,20 @@
       "when": 1792679021056,
       "tag": "0010_email_per_person",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793095676638,
+      "tag": "0011_wedding_members",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793100572857,
+      "tag": "0012_loud_lord_hawal",
+      "breakpoints": true
     }
   ]
 }

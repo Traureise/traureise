@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { logoutAction } from "@/app/actions/auth";
 import { AppFooter } from "@/components/app/app-footer";
 import { Logo } from "@/components/brand/logo";
+import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/session";
 import { LoginForm } from "./login-form";
 
@@ -11,8 +13,12 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  if (await getCurrentUser()) redirect("/dashboard");
   const { error } = await searchParams;
+  const messages: Record<string, string> = { link: "linkInvalid", einladung: "invitationInvalid", "einladung-konto": "invitationOtherAccount" };
+  const message = error && Object.hasOwn(messages, error) ? messages[error] : undefined;
+  // An invitation for another address arrives logged in: show why it failed and offer to log out instead.
+  const loggedIn = Boolean(await getCurrentUser());
+  if (loggedIn && error !== "einladung-konto") redirect("/dashboard");
   const t = await getTranslations("auth");
   return (
     <div className="flex min-h-dvh flex-col">
@@ -22,12 +28,18 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <h1 className="font-heading text-4xl font-medium tracking-tight">{t("loginTitle")}</h1>
         <p className="text-muted-foreground">{t("loginLead")}</p>
       </div>
-      {error === "link" && (
+      {message && (
         <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-          {t("linkInvalid")}
+          {t(message)}
         </p>
       )}
-      <LoginForm />
+      {loggedIn ? (
+        <form action={logoutAction}>
+          <Button type="submit">{t("logout")}</Button>
+        </form>
+      ) : (
+        <LoginForm />
+      )}
     </main>
       <AppFooter />
     </div>

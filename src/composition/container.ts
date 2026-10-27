@@ -2,7 +2,7 @@ import "server-only";
 import path from "node:path";
 import { S3Client } from "@aws-sdk/client-s3";
 import { sql } from "drizzle-orm";
-import { DeleteAccount, ExportAccount } from "@/application/account";
+import { DeleteAccount, ExportAccount, WeddingsBlockingDeletion } from "@/application/account";
 import {
   GetCurrentUser,
   Logout,
@@ -62,17 +62,28 @@ import { AddEvent, DeleteEvent, ListEvents, UpdateEvent } from "@/application/sc
 import { AddBlock, AddSection, DeleteBlock, DeleteSection, MoveBlock, MoveSection, UpdateBlock, UpdateSection } from "@/application/sections";
 import { GetUpload, UploadImage } from "@/application/uploads";
 import { AddVersion, AssignVersion, DeleteVersion, RenameVersion } from "@/application/versions";
+import {
+  AcceptInvitation,
+  ChangeMemberRole,
+  InviteMember,
+  LeaveWedding,
+  ListMembers,
+  RemoveMember,
+  SetContactPerson,
+  WithdrawInvitation,
+} from "@/application/members";
 import { CreateWedding, DeleteWedding, GetRecentWedding, GetWeddingFrame, GetWeddingHome, ListWeddings, MarkWeddingUsed, UpdateWeddingDetails, UpdateWeddingSlug } from "@/application/weddings";
 import { GetWebsiteForOwner, SelectTheme, SetCoverImage, SetPublished, UpdateDesign, UpdateHome, UpdateSlug } from "@/application/websites";
 import { createDatabase } from "@/infrastructure/db/client";
 import { SharpImageProcessor } from "@/infrastructure/images/sharp";
+import { createInvitationTemplate } from "@/infrastructure/mail/invitation-template";
 import { createMagicLinkTemplate } from "@/infrastructure/mail/magic-link-template";
 import { SmtpMailer } from "@/infrastructure/mail/smtp";
 import { DrizzleMagicLinkRepository, DrizzleSessionRepository, PostgresRateLimiter } from "@/infrastructure/repositories/auth";
 import { DrizzleUploadRepository } from "@/infrastructure/repositories/uploads";
 import { DrizzleUserRepository } from "@/infrastructure/repositories/users";
 import { DrizzleWebsiteRepository } from "@/infrastructure/repositories/websites";
-import { DrizzleWeddingRepository } from "@/infrastructure/repositories/weddings";
+import { DrizzleInvitationRepository, DrizzleWeddingRepository } from "@/infrastructure/repositories/weddings";
 import { LocalFileStorage } from "@/infrastructure/storage/local";
 import { S3FileStorage } from "@/infrastructure/storage/s3";
 import { adjustableClock, cryptoTokens, hmacGuestLinks, systemClock } from "@/infrastructure/system";
@@ -125,6 +136,7 @@ function build() {
     sessions: new DrizzleSessionRepository(db),
     rateLimiter: new PostgresRateLimiter(db),
     weddings: new DrizzleWeddingRepository(db),
+    invitations: new DrizzleInvitationRepository(db),
     websites: new DrizzleWebsiteRepository(db),
     uploads: new DrizzleUploadRepository(db),
     storage: createStorage(config),
@@ -138,6 +150,7 @@ function build() {
       from: config.MAIL_FROM,
     }),
     mailTemplate: createMagicLinkTemplate(),
+    invitationMail: createInvitationTemplate(),
     themes,
     clock: config.TEST_HOOKS ? adjustableClock : systemClock,
     tokens: cryptoTokens,
@@ -197,6 +210,14 @@ function build() {
     updateWeddingDetails: new UpdateWeddingDetails(deps),
     updateWeddingSlug: new UpdateWeddingSlug(deps),
     deleteWedding: new DeleteWedding(deps),
+    listMembers: new ListMembers(deps),
+    changeMemberRole: new ChangeMemberRole(deps),
+    removeMember: new RemoveMember(deps),
+    leaveWedding: new LeaveWedding(deps),
+    setContactPerson: new SetContactPerson(deps),
+    inviteMember: new InviteMember(deps),
+    withdrawInvitation: new WithdrawInvitation(deps),
+    acceptInvitation: new AcceptInvitation(deps),
     addVersion: new AddVersion(deps),
     renameVersion: new RenameVersion(deps),
     deleteVersion: new DeleteVersion(deps),
@@ -227,6 +248,7 @@ function build() {
     getWeddingIcs: new GetWeddingIcs(deps),
     exportAccount: new ExportAccount(deps),
     deleteAccount: new DeleteAccount(deps),
+    weddingsBlockingDeletion: new WeddingsBlockingDeletion(deps),
     getPricing: new GetPricing(deps),
     listWeddingPlans: new ListWeddingPlans(deps),
     listPurchases: new ListPurchases(deps),

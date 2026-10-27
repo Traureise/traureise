@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { cardCounts, deliveryStatus, emailRecipients, sentAt, type DeliveryStatus, type HouseholdCardKind } from "@/domain/cards";
 import { householdEmails, type HouseholdStatus } from "@/domain/guests";
 import { loadGuestPage } from "@/lib/guests";
+import { loadWeddingFrame } from "@/lib/weddings";
 import { cn } from "@/lib/utils";
 
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ status?: string; karte?: string; versand?: string }> };
@@ -244,6 +245,7 @@ export default async function GuestsPage({ params, searchParams }: Props) {
   const whatsappMessage = page.settings.whatsappMessage ?? t("list.whatsappDefault", { title: page.wedding.title });
   const versionLabel = (entry: GuestListEntry, kind: HouseholdCardKind) => page.versionChoices.find((c) => c.item === kind)?.versions.find((v) => v.id === entry.versions[kind])?.label ?? null;
   const locked = page.billingEnabled && !page.sending;
+  const { role } = (await loadWeddingFrame(id)).wedding;
   const openHouseholds = page.households.filter((h) => h.status === "open");
   const remindable = page.replyOpen && (page.sending || page.emailReminders);
   const counts = card ? cardCounts(page.households.map((h) => h.deliveries[card.kind])) : null;
@@ -257,9 +259,12 @@ export default async function GuestsPage({ params, searchParams }: Props) {
         <p className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm" data-testid="rsvp-locked">
           <Lock className="size-4 text-primary" aria-hidden />
           {t("locked")}
-          <Link href="/preise" className="font-medium text-primary underline-offset-4 hover:underline">
-            {t("lockedLink")}
-          </Link>
+          {/* Buying a package is for admins. */}
+          {role === "admin" && (
+            <Link href="/preise" className="font-medium text-primary underline-offset-4 hover:underline">
+              {t("lockedLink")}
+            </Link>
+          )}
         </p>
       )}
       {page.deletionSoon && page.deleteAt && (

@@ -27,6 +27,7 @@ export const RESERVED_SLUGS = [
   "antwort",
   "abmelden",
   "hochzeiten",
+  "einladung",
   "actions",
   "_next",
 ] as const;

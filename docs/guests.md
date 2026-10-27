@@ -90,19 +90,19 @@ yet" page. Without billing (self-hosted) everything is available
 
 Guest data (households, people, answers, requests, email addresses, personal lines, and the cards' sent and
 opened status) is deleted automatically at the latest of 12 months after
-the wedding and the end of the RSVP package. About 30 days before, the couple gets an email and a notice on
+the wedding and the end of the RSVP package. About 30 days before, all admins of the wedding get an email and a notice on
 the Gäste page suggesting the CSV export. A refund stops the links at once but keeps the data until that
 date. Without a wedding date and without a package nothing is deleted automatically
 ([ADR 0017](adr/0017-automatic-deletion-of-guest-data.md)). The job runs inside the app every
 `GUEST_JOBS_INTERVAL_MINUTES` ([ADR 0018](adr/0018-background-jobs-inside-the-app.md)).
 
-Deleting a household, the website or the account removes its guest data at once; the account export
-(`data.json`) contains all of it.
+Deleting a household, the website or the wedding (or an account that is the wedding's only member) removes its
+guest data at once; the account export (`data.json`) contains all of it.
 
 ## For operators
 
 - Set `APP_SECRET` to a long random value before couples send links, and never change it afterwards: the
   links are derived from it ([ADR 0015](adr/0015-households-with-hashed-personal-links.md)).
-- RSVP emails go to the couple through your SMTP provider and contain guests' names, answers and messages.
+- RSVP emails go to all admins of the wedding through your SMTP provider and contain guests' names, answers and messages.
 - Your privacy policy should say what is stored about guests and when it is deleted
   ([What to write](legal-and-billing.md#what-to-write)).

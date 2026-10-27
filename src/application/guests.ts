@@ -26,7 +26,8 @@ import { RunMailJobs } from "./cards";
 import type { Deps } from "./deps";
 import { NotFoundError, RateLimitedError, ValidationError } from "./errors";
 import { deliveriesByKind, formFor, guestsUrl, householdContent, linkUrl, loadByToken, loadGuestContext, type GuestForm } from "./guest-context";
-import { loadOwnedWedding } from "./owned";
+import { adminEmails } from "./members";
+import { loadWedding } from "./owned";
 import type { PollRecord, Wedding } from "./ports";
 
 export type { GuestForm } from "./guest-context";
@@ -79,7 +80,7 @@ export class GetGuestPage {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, weddingId: string): Promise<GuestPage> {
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const wedding = await loadWedding(this.deps, userId, weddingId);
     const ctx = await loadGuestContext(this.deps, wedding);
     const [households, records, opens] = await Promise.all([this.deps.guests.listHouseholds(weddingId), this.deps.cards.listDeliveries(weddingId), this.deps.cards.listOpens(weddingId)]);
     const { defaults } = this.deps.cardTexts;
@@ -121,7 +122,7 @@ export class SaveHousehold {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, weddingId: string, householdId: string | null, input: unknown): Promise<Household> {
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const wedding = await loadWedding(this.deps, userId, weddingId);
     const parsed = parseHouseholdInput(input);
     if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
     const { schedule } = await loadGuestContext(this.deps, wedding);
@@ -144,7 +145,7 @@ export class DeleteHousehold {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, weddingId: string, householdId: string): Promise<void> {
-    await loadOwnedWedding(this.deps, userId, weddingId);
+    await loadWedding(this.deps, userId, weddingId);
     if (!(await this.deps.guests.findHousehold(weddingId, householdId))) throw new NotFoundError();
     await this.deps.guests.deleteHousehold(weddingId, householdId);
   }
@@ -159,7 +160,7 @@ export class SaveRsvpSettings {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, weddingId: string, input: unknown): Promise<void> {
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const wedding = await loadWedding(this.deps, userId, weddingId);
     const parsed = parseRsvpSettings(input);
     if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
     const { schedule } = await loadGuestContext(this.deps, wedding);
@@ -178,7 +179,7 @@ export class SavePoll {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, weddingId: string, pollId: string | null, input: unknown): Promise<Poll> {
-    await loadOwnedWedding(this.deps, userId, weddingId);
+    await loadWedding(this.deps, userId, weddingId);
     const parsed = parsePoll(input);
     if (!parsed.ok) throw new ValidationError(parsed.fieldErrors);
     const poll = { ...parsed.value, options: withIds(this.deps, parsed.value.options) };
@@ -192,7 +193,7 @@ export class DeletePoll {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, weddingId: string, pollId: string): Promise<void> {
-    await loadOwnedWedding(this.deps, userId, weddingId);
+    await loadWedding(this.deps, userId, weddingId);
     await this.deps.guests.deletePoll(weddingId, pollId);
   }
 }
@@ -201,7 +202,7 @@ export class DecideGuestRequest {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, weddingId: string, requestId: string, decision: "added" | "declined"): Promise<void> {
-    await loadOwnedWedding(this.deps, userId, weddingId);
+    await loadWedding(this.deps, userId, weddingId);
     if (!(await this.deps.guests.decideRequest(weddingId, requestId, decision, this.deps.clock.now()))) throw new NotFoundError();
   }
 }
@@ -210,7 +211,7 @@ export class ExportGuestsCsv {
   constructor(private deps: Deps) {}
 
   async execute(userId: string, weddingId: string, labels: CsvLabels): Promise<{ filename: string; csv: string }> {
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const wedding = await loadWedding(this.deps, userId, weddingId);
     const ctx = await loadGuestContext(this.deps, wedding);
     const households = await this.deps.guests.listHouseholds(weddingId);
     return {
@@ -227,7 +228,7 @@ export class GetGuestFormPreview {
 
   /** The form as guests see it, for the first household or a sample one. Free, and it saves nothing. */
   async execute(userId: string, weddingId: string, sample: { household: string; people: string[] }): Promise<GuestForm> {
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const wedding = await loadWedding(this.deps, userId, weddingId);
     const ctx = await loadGuestContext(this.deps, wedding);
     const [first] = await this.deps.guests.listHouseholds(weddingId);
     const household: Household = first ?? {
@@ -256,7 +257,7 @@ export class GetCoupleAnswerForm {
    * card went out, after the reply-by date and without a package, because nothing is sent.
    */
   async execute(userId: string, weddingId: string, householdId: string): Promise<GuestForm> {
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const wedding = await loadWedding(this.deps, userId, weddingId);
     const household = await this.deps.guests.findHousehold(weddingId, householdId);
     if (!household) throw new NotFoundError();
     return formFor(this.deps, await loadGuestContext(this.deps, wedding), household, "couple");
@@ -268,7 +269,7 @@ export class SaveCoupleAnswer {
 
   /** The couple's entry counts like the household's own answer, marked as theirs; nobody is notified. */
   async execute(userId: string, weddingId: string, householdId: string, input: unknown): Promise<void> {
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const wedding = await loadWedding(this.deps, userId, weddingId);
     const household = await this.deps.guests.findHousehold(weddingId, householdId);
     if (!household) throw new NotFoundError();
     const ctx = await loadGuestContext(this.deps, wedding);
@@ -284,7 +285,7 @@ export class SubmitGuestResponse {
   constructor(private deps: Deps) {}
 
   async execute(input: { token: string; input: unknown; ip: string }): Promise<void> {
-    const { rateLimiter, guests, guestLinks, mailer, guestMail, users } = this.deps;
+    const { rateLimiter, guests, guestLinks, mailer, guestMail } = this.deps;
     const now = this.deps.clock.now();
     const linkKey = `rsvp:link:${guestLinks.hash(input.token)}`;
     const ipAllowed = await rateLimiter.hit(`rsvp:ip:${input.ip}`, MAX_PER_IP, RATE_WINDOW_MS, now);
@@ -303,8 +304,8 @@ export class SubmitGuestResponse {
 
     if (ctx.settings.notify !== "each") return;
     try {
-      const owner = await users.findById(wedding.ownerId);
-      if (!owner) return;
+      const to = await adminEmails(this.deps, wedding.id);
+      if (to.length === 0) return;
       const name = (guestId: string) => household.people.find((p) => p.id === guestId)!.name;
       const mail = guestMail.answer({
         websiteTitle: wedding.title,
@@ -315,7 +316,7 @@ export class SubmitGuestResponse {
         requests: parsed.value.requests,
         guestsUrl: guestsUrl(this.deps, wedding.id),
       });
-      await mailer.send({ to: owner.email, ...mail });
+      await mailer.send({ to, ...mail });
     } catch (error) {
       // The answer is saved; the couple still sees it on the Gäste page.
       console.error("[traureise] answer notification failed", error);
@@ -370,15 +371,15 @@ export class RunGuestJobs {
       return "deleted";
     }
     if (!retentionWarningDue(deleteAt, now) || !(await guests.claimRetentionWarning(weddingId, deleteAt!))) return null;
-    const owner = await this.deps.users.findById(wedding.ownerId);
-    if (!owner) return null;
+    const to = await adminEmails(this.deps, weddingId);
+    if (to.length === 0) return null;
     const mail = this.deps.guestMail.retentionWarning({ websiteTitle: wedding.title, deleteOn: deleteAt!, guestsUrl: guestsUrl(this.deps, weddingId) });
-    await this.deps.mailer.send({ to: owner.email, ...mail });
+    await this.deps.mailer.send({ to, ...mail });
     return "warned";
   }
 
   private async summary(weddingId: string): Promise<boolean> {
-    const { weddings, guests, users, mailer, guestMail } = this.deps;
+    const { weddings, guests, mailer, guestMail } = this.deps;
     const wedding = await weddings.findById(weddingId);
     if (!wedding) return false;
     const ctx = await loadGuestContext(this.deps, wedding);
@@ -390,8 +391,8 @@ export class RunGuestJobs {
     const households = await guests.listHouseholds(weddingId);
     const changed = households.filter((h) => h.respondedAt && (!previous || h.respondedAt > previous));
     if (changed.length === 0) return false;
-    const owner = await users.findById(wedding.ownerId);
-    if (!owner) return false;
+    const to = await adminEmails(this.deps, weddingId);
+    if (to.length === 0) return false;
     const overview = guestOverview({ households, events: ctx.events, meal: ctx.meal, polls: ctx.polls });
     const mail = guestMail.dailySummary({
       websiteTitle: wedding.title,
@@ -399,7 +400,7 @@ export class RunGuestJobs {
       totals: overview.people,
       guestsUrl: guestsUrl(this.deps, weddingId),
     });
-    await mailer.send({ to: owner.email, ...mail });
+    await mailer.send({ to, ...mail });
     return true;
   }
 }

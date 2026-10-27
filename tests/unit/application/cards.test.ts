@@ -21,6 +21,7 @@ import {
 import { LockedError, NotFoundError, ValidationError } from "@/application/errors";
 import { GetGuestPage, RunGuestJobs, SaveHousehold, SaveRsvpSettings, SubmitGuestResponse } from "@/application/guests";
 import { AddEvent } from "@/application/schedule";
+import { SetContactPerson } from "@/application/members";
 import { CreateWedding, DeleteWedding, UpdateWeddingDetails } from "@/application/weddings";
 import { SetPublished } from "@/application/websites";
 import type { PaidTier } from "@/domain/billing";
@@ -56,7 +57,7 @@ const exportCard = async (kind: CardKind, format: "png" | "a6" | "a5") => new Ex
 const preview = async (kind: CardKind) => new GetCardPreview(f.deps).execute(anna.id, (await create(kind)).id);
 const grant = async (tier: PaidTier) => {
   f.deps.billing.enabled = true;
-  await f.billingRepo.applyEvent(`evt-${Math.random()}`, { kind: "grant", weddingId, tier, purchaseRef: `ord-${Math.random()}`, provider: "testpay", validUntil: new Date("2028-06-13T00:00:00Z") });
+  await f.billingRepo.applyEvent(`evt-${Math.random()}`, { kind: "grant", purchasedBy: null, weddingId, tier, purchaseRef: `ord-${Math.random()}`, provider: "testpay", validUntil: new Date("2028-06-13T00:00:00Z") });
 };
 const lockAll = () => {
   f.deps.billing.enabled = true;
@@ -336,6 +337,42 @@ describe("marking cards as sent by hand", () => {
 });
 
 describe("sending by email", () => {
+  it("replies to the contact person, and follows a change of contact", async () => {
+    const ben = await f.users.create("ben@example.org");
+    await f.weddings.addMember(weddingId, ben.id, "admin");
+    await new SetContactPerson(f.deps).execute(anna.id, weddingId, ben.id);
+    await household("Weber", "weber@example.org");
+    await sendEmails("saveTheDate", "all");
+    await runMail();
+    expect(f.mailer.sent[0]!.replyTo).toBe("ben@example.org");
+
+    await new SetContactPerson(f.deps).execute(anna.id, weddingId, anna.id);
+    await household("Kern", "kern@example.org");
+    await sendEmails("saveTheDate", "all");
+    await runMail();
+    expect(f.mailer.sent[1]).toMatchObject({ to: ["kern@example.org"], replyTo: "anna@example.org" });
+  });
+
+  it("replies to the oldest admin when the contact person is gone", async () => {
+    const ben = await f.users.create("ben@example.org");
+    await f.weddings.addMember(weddingId, ben.id, "editor");
+    await new SetContactPerson(f.deps).execute(anna.id, weddingId, ben.id);
+    await new DeleteAccount(f.deps).execute(ben.id, "ben@example.org");
+    expect((await f.weddings.findById(weddingId))!.contactUserId).toBe(anna.id);
+    await household("Weber", "weber@example.org");
+    await sendEmails("saveTheDate", "all");
+    await runMail();
+    expect(f.mailer.sent[0]!.replyTo).toBe("anna@example.org");
+  });
+
+  it("falls back to the oldest admin when the wedding has no contact person at all", async () => {
+    await f.weddings.update(weddingId, { contactUserId: null });
+    await household("Weber", "weber@example.org");
+    await sendEmails("saveTheDate", "all");
+    await runMail();
+    expect(f.mailer.sent[0]!.replyTo).toBe("anna@example.org");
+  });
+
   it("queues one email per household with an address and sends it once, as the couple, with the card and an unsubscribe link", async () => {
     const weber = await household("Weber", "weber@example.org");
     await household("Kern");

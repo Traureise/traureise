@@ -1,7 +1,7 @@
 # Email (SMTP)
 
 Traureise sends three kinds of email over plain SMTP, so any mail provider works: the login link,
-notifications to couples about their guests' answers, and cards and reminders to guests on the couple's
+notifications to a wedding's admins about their guests' answers, and cards and reminders to guests on the couple's
 behalf.
 
 ## The bundled Mailpit
@@ -37,7 +37,8 @@ Cards and reminders go to guests who have an email address in the guest list
 ([Save the Dates, invitations and cards](cards.md)):
 
 - **Sender:** the address of `MAIL_FROM` with the couple's names as display name, for example
-  `"Anna & Ben über Traureise" <no-reply@example.de>`. `Reply-To` is the couple's account address, so
+  `"Anna & Ben über Traureise" <no-reply@example.de>`. `Reply-To` is the wedding's contact
+  person (a member, chosen on the Hochzeit tab; if they leave or delete their account, the oldest admin), so
   answers go to them, not to you.
 - **Content:** the couple's text, the card as an attached image (no remote images, so nothing tracks
   opening), one button to the household's page, and a footer saying who sent it and why.

@@ -27,7 +27,7 @@ const repo = new DrizzleGuestRepository(db);
 const users = new DrizzleUserRepository(db);
 const websites = new DrizzleWebsiteRepository(db);
 const weddings = new DrizzleWeddingRepository(db);
-const newWedding = (slug: string, title: string, weddingDate: string | null) => weddings.create({ ownerId, slug: `${slug}-${Date.now()}`, title, weddingDate, timezone: "Europe/Berlin" });
+const newWedding = (slug: string, title: string, weddingDate: string | null) => weddings.create({ creatorId: ownerId, slug: `${slug}-${Date.now()}`, title, weddingDate, timezone: "Europe/Berlin" });
 
 let weddingId: string; // the wedding
 let ownerId: string;
@@ -134,7 +134,7 @@ describe("DrizzleGuestRepository", () => {
     });
 
     it("rolls everything back for a household of another wedding", async () => {
-      const other = (await weddings.create({ ownerId, slug: `other-${Date.now()}`, title: "Andere", weddingDate: null, timezone: "Europe/Berlin" })).id;
+      const other = (await weddings.create({ creatorId: ownerId, slug: `other-${Date.now()}`, title: "Andere", weddingDate: null, timezone: "Europe/Berlin" })).id;
       const foreign = await repo.createHousehold(other, { name: "Fremd", invitedEventIds: null, personalLine: "", people: [{ id: null, name: "Fremder", isChild: false, email: null }] }, (id) => `hash-${id}`);
       await newHousehold("Weber", ["Clara"]);
       const batch = { create: [{ name: "Neu", invitedEventIds: null, personalLine: "", people: [person("Neu")] }], overwrite: [] };
@@ -291,7 +291,7 @@ describe("retention", () => {
     clock.current = new Date("2028-05-20T10:00:00Z");
     const runs = await Promise.all([new RunGuestJobs(d).execute(), new RunGuestJobs(d).execute()]);
     expect(runs.flatMap((r) => r.warned)).toEqual([weddingId]);
-    expect(mailer.sent.map((m) => [m.to, m.subject])).toEqual([["anna@example.org", "Eure Gästeliste wird am 13. Juni 2028 gelöscht"]]);
+    expect(mailer.sent.map((m) => [m.to, m.subject])).toEqual([[["anna@example.org"], "Eure Gästeliste wird am 13. Juni 2028 gelöscht"]]);
   });
 });
 

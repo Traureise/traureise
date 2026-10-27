@@ -34,21 +34,26 @@ export class RequestMagicLink {
 
 export type LoginResult = { user: User; sessionToken: string; expiresAt: Date; needsProfile: boolean };
 
+/** Logs `user` in: stores a new session (only its hash) and returns its token. */
+export async function startSession(deps: Deps, user: User, now: Date): Promise<LoginResult> {
+  const sessionToken = deps.tokens.generate();
+  const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
+  await deps.sessions.create({ userId: user.id, tokenHash: deps.tokens.hash(sessionToken), expiresAt });
+  return { user, sessionToken, expiresAt, needsProfile: !user.firstName };
+}
+
 export class VerifyMagicLink {
   constructor(private deps: Deps) {}
 
   async execute(input: { token: string }): Promise<LoginResult> {
-    const { magicLinks, users, sessions, tokens, clock } = this.deps;
+    const { magicLinks, users, tokens, clock } = this.deps;
     const now = clock.now();
     const link = await magicLinks.findByHash(tokens.hash(input.token));
     if (!link || link.usedAt || link.expiresAt <= now) throw new InvalidTokenError();
     if (!(await magicLinks.markUsed(link.id, now))) throw new InvalidTokenError();
 
     const user = (await users.findByEmail(link.email)) ?? (await users.create(link.email));
-    const sessionToken = tokens.generate();
-    const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
-    await sessions.create({ userId: user.id, tokenHash: tokens.hash(sessionToken), expiresAt });
-    return { user, sessionToken, expiresAt, needsProfile: !user.firstName };
+    return startSession(this.deps, user, now);
   }
 }
 

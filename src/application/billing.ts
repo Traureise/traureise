@@ -10,9 +10,10 @@ import {
   type PricingRow,
   type Tier,
 } from "@/domain/billing";
+import { z } from "zod";
 import type { Deps } from "./deps";
 import { InvalidSignatureError, NotFoundError, ValidationError } from "./errors";
-import { loadOwnedWedding } from "./owned";
+import { loadWedding } from "./owned";
 import type { BillingChange, PaymentEvent, User } from "./ports";
 
 /** Billing only exists when it is switched on and a payment provider is configured. */
@@ -33,7 +34,7 @@ export class GetPricing {
 /** `prices`: what each sellable tier costs this wedding, after the credit for what it already paid. */
 export type WeddingPlan = { weddingId: string; title: string; tier: Tier; sellable: PaidTier[]; prices: Partial<Record<PaidTier, CheckoutPrice>> };
 
-/** Packages belong to the wedding: everything in it (every version, card and the guest list) shares them. */
+/** Packages belong to the wedding (and are managed by its admins): everything in it (every version, card and the guest list) shares them. */
 export class ListWeddingPlans {
   constructor(private deps: Deps) {}
 
@@ -42,7 +43,8 @@ export class ListWeddingPlans {
     if (!billing.enabled) return [];
     const now = clock.now();
     const plans: WeddingPlan[] = [];
-    for (const wedding of await weddings.listByOwner(userId)) {
+    // Packages are the admins' business: an editor sees none of this.
+    for (const wedding of (await weddings.listForMember(userId)).filter((w) => w.role === "admin")) {
       const entitlements = await billingRepo.listByWedding(wedding.id);
       const sellable = sellableTiers(billing.offers, billing.unlockedTiers, entitlements, now);
       plans.push({
@@ -57,23 +59,31 @@ export class ListWeddingPlans {
   }
 }
 
-export type Purchase = { weddingId: string; weddingTitle: string; tier: PaidTier; purchasedAt: Date; validUntil: Date; active: boolean };
+export type Purchase = { weddingId: string; weddingTitle: string; tier: PaidTier; purchasedAt: Date; validUntil: Date; active: boolean; purchasedBy: { id: string; name: string } | null };
 
 export class ListPurchases {
   constructor(private deps: Deps) {}
 
   async execute(userId: string): Promise<Purchase[]> {
-    const { weddings, billingRepo, billing, clock } = this.deps;
+    const { weddings, billingRepo, billing, clock, users } = this.deps;
     if (!billing.enabled) return [];
-    const titles = new Map((await weddings.listByOwner(userId)).map((w) => [w.id, w.title]));
+    const titles = new Map((await weddings.listForMember(userId)).map((w) => [w.id, w.title]));
     const now = clock.now();
-    return (await billingRepo.listByOwner(userId)).map((e) => ({
+    const entitlements = await billingRepo.listForAdmin(userId);
+    // The buyer is shown by first name, or by email while there is none; null once the account is gone.
+    const buyers = new Map<string, { id: string; name: string } | null>();
+    for (const id of new Set(entitlements.flatMap((e) => (e.purchasedBy ? [e.purchasedBy] : [])))) {
+      const buyer = await users.findById(id);
+      buyers.set(id, buyer ? { id: buyer.id, name: buyer.firstName || buyer.email } : null);
+    }
+    return entitlements.map((e) => ({
       weddingId: e.weddingId,
       weddingTitle: titles.get(e.weddingId) ?? "",
       tier: e.tier,
       purchasedAt: e.createdAt,
       validUntil: e.validUntil,
       active: isActive(e, now),
+      purchasedBy: e.purchasedBy ? (buyers.get(e.purchasedBy) ?? null) : null,
     }));
   }
 }
@@ -84,7 +94,7 @@ export class StartCheckout {
   async execute(user: Pick<User, "id" | "email">, weddingId: string, tier: PaidTier): Promise<{ url: string }> {
     const provider = payments(this.deps);
     const { billing, billingRepo, clock, tokens, appUrl } = this.deps;
-    await loadOwnedWedding(this.deps, user.id, weddingId);
+    await loadWedding(this.deps, user.id, weddingId, "admin");
     const entitlements = await billingRepo.listByWedding(weddingId);
     const offer = billing.offers.find((o) => o.tier === tier);
     const now = clock.now();
@@ -98,6 +108,7 @@ export class StartCheckout {
       productId: offer.productId,
       weddingId,
       tier,
+      userId: user.id,
       customerEmail: user.email,
       successUrl: `${appUrl}/hochzeiten/${weddingId}?kauf=danke`,
       requestId: tokens.generate(),
@@ -133,6 +144,13 @@ export class HandlePaymentWebhook {
       purchaseRef: event.purchaseRef,
       provider: providerId,
       validUntil: entitlementValidUntil(wedding.weddingDate, now),
+      purchasedBy: await this.knownBuyer(event.userId),
     };
+  }
+
+  /** The buyer from the checkout metadata, only while the account exists: a stale or malformed id must not make the grant fail. */
+  private async knownBuyer(userId: string | null): Promise<string | null> {
+    if (!userId || !z.uuid().safeParse(userId).success) return null;
+    return (await this.deps.users.findById(userId).catch(() => null))?.id ?? null;
   }
 }

@@ -1,7 +1,7 @@
 import { imageKeysOf, parseEvent } from "@/domain/sections";
 import type { Deps } from "./deps";
 import { NotFoundError, ValidationError } from "./errors";
-import { assertOwnImage, loadOwnedWedding, releaseImages } from "./owned";
+import { assertOwnImage, loadWedding, releaseImages } from "./owned";
 import type { Wedding, WeddingEvent } from "./ports";
 
 /**
@@ -16,8 +16,8 @@ async function validEvent(deps: Deps, weddingId: string, input: unknown) {
   return parsed.value;
 }
 
-async function loadOwnedEvent(deps: Deps, userId: string, weddingId: string, eventId: string) {
-  const wedding = await loadOwnedWedding(deps, userId, weddingId);
+async function loadEvent(deps: Deps, userId: string, weddingId: string, eventId: string) {
+  const wedding = await loadWedding(deps, userId, weddingId);
   const event = await deps.weddings.findEvent(wedding.id, eventId).catch(() => null);
   if (!event) throw new NotFoundError();
   return { wedding, event };
@@ -28,7 +28,7 @@ export class ListEvents {
 
   /** Chronological. */
   async execute(userId: string, weddingId: string): Promise<{ wedding: Wedding; events: WeddingEvent[] }> {
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const wedding = await loadWedding(this.deps, userId, weddingId);
     return { wedding, events: await this.deps.weddings.listEvents(wedding.id) };
   }
 }
@@ -38,7 +38,7 @@ export class AddEvent {
 
   /** The wedding's first event also fills the invitations that have none yet (there was nothing to choose before). */
   async execute(userId: string, weddingId: string, input: unknown): Promise<WeddingEvent> {
-    const wedding = await loadOwnedWedding(this.deps, userId, weddingId);
+    const wedding = await loadWedding(this.deps, userId, weddingId);
     const data = await validEvent(this.deps, wedding.id, input);
     const event = await this.deps.weddings.addEvent(wedding.id, data);
     if ((await this.deps.weddings.listEvents(wedding.id)).length > 1) return event;
@@ -56,7 +56,7 @@ export class UpdateEvent {
 
   /** Changes the event everywhere: every website version, the invitations and the response form. */
   async execute(userId: string, weddingId: string, eventId: string, input: unknown): Promise<void> {
-    const { wedding, event } = await loadOwnedEvent(this.deps, userId, weddingId, eventId);
+    const { wedding, event } = await loadEvent(this.deps, userId, weddingId, eventId);
     const data = await validEvent(this.deps, wedding.id, input);
     await this.deps.weddings.updateEvent(eventId, data);
     const newKeys = imageKeysOf(data);
@@ -69,7 +69,7 @@ export class DeleteEvent {
 
   /** Also deletes the blocks that show just this event, in every website version. */
   async execute(userId: string, weddingId: string, eventId: string): Promise<void> {
-    const { wedding, event } = await loadOwnedEvent(this.deps, userId, weddingId, eventId);
+    const { wedding, event } = await loadEvent(this.deps, userId, weddingId, eventId);
     await this.deps.weddings.deleteEvent(eventId);
     await releaseImages(this.deps, wedding.id, imageKeysOf(event.data));
   }

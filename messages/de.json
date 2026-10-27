@@ -12,6 +12,16 @@
       "expiry": "Der Link ist {minutes} Minuten gültig und funktioniert nur einmal.",
       "ignore": "Du hast keinen Link angefordert? Dann kannst du diese E-Mail ignorieren."
     },
+    "invitation": {
+      "subject": "{inviter} lädt dich zu „{title}“ auf Traureise ein",
+      "greeting": "Hallo!",
+      "intro": "{inviter} lädt dich ein, bei Traureise an „{title}“ mitzuarbeiten.",
+      "roleEditor": "Du kannst Websites, Karten, Gäste und den Ablauf bearbeiten.",
+      "roleAdmin": "Du kannst alles bearbeiten und außerdem Personen verwalten, Pakete kaufen und die Hochzeit löschen.",
+      "button": "Einladung annehmen",
+      "expiry": "Der Link ist bis zum {date} gültig und funktioniert nur einmal. Mit ihm meldest du dich auch gleich an.",
+      "ignore": "Du kennst die Person nicht oder möchtest nicht mitmachen? Dann kannst du diese E-Mail ignorieren."
+    },
     "answer": {
       "subject": "{household} hat geantwortet",
       "intro": "{household} hat für „{title}“ geantwortet.",
@@ -86,6 +96,8 @@
     "sentBody": "Wir haben einen Anmeldelink an {email} geschickt. Er ist 15 Minuten gültig.",
     "sentAgain": "Andere E-Mail-Adresse verwenden",
     "linkInvalid": "Dieser Anmeldelink ist abgelaufen oder wurde schon benutzt. Fordere einfach einen neuen an.",
+    "invitationInvalid": "Diese Einladung ist abgelaufen, wurde zurückgezogen oder schon angenommen. Bitte die Person, die dich eingeladen hat, um eine neue.",
+    "invitationOtherAccount": "Diese Einladung ging an eine andere E-Mail-Adresse als die, mit der du angemeldet bist. Melde dich ab und öffne den Link aus der Einladung noch einmal.",
     "welcomeTitle": "Schön, dass du da bist",
     "welcomeLead": "Wie dürfen wir dich nennen?",
     "firstNameLabel": "Vorname",
@@ -142,7 +154,11 @@
     "not_manual": "Nur von Hand markierte Karten lassen sich zurücksetzen.",
     "already_sent": "Diese Karte hat der Haushalt schon.",
     "invalid_yes_no": "Bitte schreibe „ja“ oder „nein“.",
-    "household_full": "Ein Haushalt kann höchstens 30 Personen haben."
+    "household_full": "Ein Haushalt kann höchstens 30 Personen haben.",
+    "last_admin": "Eine Hochzeit braucht mindestens einen Admin. Mach zuerst jemand anderen zum Admin.",
+    "already_member": "Diese Person arbeitet schon an der Hochzeit mit.",
+    "invalid_role": "Bitte wähle eine Rolle.",
+    "not_a_member": "Diese Person arbeitet nicht an der Hochzeit mit."
   },
   "editor": {
     "back": "Zur Hochzeit",
@@ -428,6 +444,7 @@
     "planOptionCredit": "{title} · {price, number, ::currency/EUR precision-integer} ({credit, number, ::currency/EUR precision-integer} angerechnet)",
     "loginToBuy": "Anmelden, um zu kaufen",
     "createWebsiteFirst": "Legt zuerst eure Hochzeit an.",
+    "onlyAdmins": "Pakete kaufen die Admins eurer Hochzeit.",
     "owned": "Eure Hochzeiten haben dieses Paket schon.",
     "checkoutFailed": "Die Bezahlseite konnte nicht geöffnet werden. Bitte versuch es noch einmal.",
     "tiers": {
@@ -491,16 +508,19 @@
       "validUntil": "gültig bis {date}",
       "inactive": "nicht mehr aktiv",
       "purchasedAt": "gekauft am {date}",
+      "purchasedBy": "gekauft von {name}",
       "pricing": "Zu den Preisen",
       "lead": "Pakete gelten für eine Hochzeit."
     },
     "delete": {
       "title": "Konto löschen",
-      "body": "Damit löschst du dein Konto und alle Hochzeiten mit allem, was dazugehört: Websites, Karten, Gästeliste und Bilder. Die Websites sind danach nicht mehr erreichbar. Das lässt sich nicht rückgängig machen.",
+      "body": "Damit löschst du dein Konto. Hochzeiten, an denen nur du mitarbeitest, werden mit allem gelöscht, was dazugehört: Websites, Karten, Gästeliste und Bilder; ihre Websites sind danach nicht mehr erreichbar. Hochzeiten, die du mit anderen teilst, bleiben für sie bestehen. Das lässt sich nicht rückgängig machen.",
       "confirmLabel": "Gib zur Bestätigung deine E-Mail-Adresse ein",
       "button": "Konto endgültig löschen",
       "deleting": "Wird gelöscht …",
-      "lead": "Endgültig, für alle deine Hochzeiten."
+      "lead": "Endgültig. Geteilte Hochzeiten bleiben für die anderen.",
+      "blocked": "Bei diesen Hochzeiten bist du der einzige Admin, aber nicht die einzige Person. Mach dort zuerst jemand anderen zum Admin oder lösche die Hochzeit:",
+      "blockedNow": "Bei einer deiner Hochzeiten bist du inzwischen der einzige Admin. Lade die Seite neu, um zu sehen, welche."
     },
     "profileLead": "Damit meldest du dich an."
   },
@@ -1238,6 +1258,50 @@
       "website": "Hochzeitswebsite",
       "invitation": "Einladung",
       "thankYou": "Dankeskarte"
+    },
+    "members": {
+      "title": "Personen",
+      "leadAdmin": "Wer an dieser Hochzeit mitarbeitet. Editoren bearbeiten alles; Admins laden außerdem Personen ein, kaufen Pakete und können die Hochzeit löschen.",
+      "leadEditor": "Wer an dieser Hochzeit mitarbeitet. Personen einladen und Rollen ändern können die Admins.",
+      "roles": {
+        "admin": "Admin",
+        "editor": "Editor"
+      },
+      "you": "(du)",
+      "contact": "Kontaktperson",
+      "contactLabel": "Kontaktperson für Gäste",
+      "contactHint": "Antworten eurer Gäste auf Karten und Erinnerungen gehen an diese Person.",
+      "contactChanged": "Kontaktperson geändert",
+      "roleOf": "Rolle von {name}",
+      "roleChanged": "Rolle geändert",
+      "remove": "Entfernen",
+      "removeLabel": "{name} entfernen",
+      "removeTitle": "{name} entfernen?",
+      "removeBody": "{name} kann „{title}“ danach nicht mehr öffnen, bis ihr wieder einladet.",
+      "removed": "{name} entfernt",
+      "cancel": "Abbrechen",
+      "invitations": {
+        "title": "Offene Einladungen",
+        "details": "{role} · gültig bis {date}",
+        "withdraw": "Zurückziehen",
+        "withdrawLabel": "Einladung an {email} zurückziehen",
+        "withdrawn": "Einladung zurückgezogen"
+      },
+      "invite": {
+        "title": "Person einladen",
+        "email": "E-Mail-Adresse",
+        "role": "Rolle",
+        "hint": "Die Person bekommt einen Link per E-Mail, der 14 Tage gültig ist. Ein Konto braucht sie dafür noch nicht.",
+        "submit": "Einladen",
+        "sending": "Wird gesendet …",
+        "sent": "Einladung an {email} verschickt"
+      },
+      "leave": {
+        "button": "Hochzeit verlassen",
+        "title": "Hochzeit verlassen?",
+        "body": "Du kannst „{title}“ danach nicht mehr öffnen, bis dich jemand wieder einlädt.",
+        "confirm": "Verlassen"
+      }
     }
   }
 }
