@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DrizzleBillingRepository } from "@/infrastructure/repositories/billing";
+import { DrizzleUserRepository } from "@/infrastructure/repositories/users";
+import { DrizzleWeddingRepository } from "@/infrastructure/repositories/weddings";
 import { seedWedding, setupTestDatabase } from "./db";
 
 const db = setupTestDatabase();
@@ -10,9 +12,9 @@ async function seed() {
   return { user, website: wedding };
 }
 
-const grant = (weddingId: string, purchaseRef = "ord_1") => ({
+const grant = (weddingId: string, purchaseRef = "ord_1", purchasedBy: string | null = null) => ({
   kind: "grant" as const,
-  purchasedBy: null,
+  purchasedBy,
   weddingId,
   tier: "rsvp" as const,
   purchaseRef,
@@ -52,5 +54,20 @@ describe("DrizzleBillingRepository", () => {
     await expect(billing.applyEvent("evt_bad", grant("00000000-0000-0000-0000-000000000000"))).rejects.toThrow();
     const { website } = await seed();
     expect(await billing.applyEvent("evt_bad", grant(website.id))).toBe("applied");
+  });
+
+  it("stores who bought a package; admins list it, editors do not, and it outlives the buyer's account", async () => {
+    const { user, website } = await seed();
+    const users = new DrizzleUserRepository(db);
+    const weddings = new DrizzleWeddingRepository(db);
+    const ben = await users.create("ben@example.org");
+    const carla = await users.create("carla@example.org");
+    await weddings.addMember(website.id, ben.id, "admin");
+    await weddings.addMember(website.id, carla.id, "editor");
+    await billing.applyEvent("evt_1", grant(website.id, "ord_1", user.id));
+    expect((await billing.listForAdmin(ben.id)).map((e) => e.purchasedBy)).toEqual([user.id]);
+    expect(await billing.listForAdmin(carla.id)).toEqual([]);
+    await users.delete(user.id);
+    expect((await billing.listForAdmin(ben.id)).map((e) => e.purchasedBy)).toEqual([null]);
   });
 });

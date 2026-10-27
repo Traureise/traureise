@@ -283,7 +283,7 @@ export interface BillingRepository {
 }
 
 export type PaymentEvent =
-  | { type: "paid"; eventId: string; purchaseRef: string; productId: string; weddingId: string | null }
+  | { type: "paid"; eventId: string; purchaseRef: string; productId: string; weddingId: string | null; /** The admin who started the checkout; null when the provider did not echo it. */ userId: string | null }
   | { type: "revoked"; eventId: string; purchaseRef: string | null }
   | { type: "ignored"; eventId: string };
 
@@ -292,6 +292,8 @@ export type CheckoutRequest = {
   productId: string;
   weddingId: string;
   tier: PaidTier;
+  /** The admin buying; echoed back on the paid event so the purchase records who bought it. */
+  userId: string;
   customerEmail: string;
   successUrl: string;
   requestId: string;

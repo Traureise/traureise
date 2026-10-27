@@ -23,6 +23,7 @@ const paid = (over: Partial<Extract<PaymentEvent, { type: "paid" }>> = {}): Paym
   purchaseRef: "ord_1",
   productId: "prod_rsvp",
   weddingId,
+  userId: null,
   ...over,
 });
 
@@ -64,6 +65,15 @@ describe("StartCheckout", () => {
     await expect(new StartCheckout(f.deps).execute(ben, weddingId, "rsvp")).rejects.toBeInstanceOf(NotFoundError);
   });
 
+  it("refuses an editor and passes the buyer's id to the provider for an admin", async () => {
+    const carla = await f.users.create("carla@example.org");
+    await f.weddings.addMember(weddingId, carla.id, "editor");
+    await expect(new StartCheckout(f.deps).execute(carla, weddingId, "rsvp")).rejects.toBeInstanceOf(NotFoundError);
+    expect((f.payments as FakePayments).checkouts).toEqual([]);
+    await new StartCheckout(f.deps).execute(anna, weddingId, "rsvp");
+    expect((f.payments as FakePayments).checkouts[0]).toEqual(expect.objectContaining({ userId: anna.id }));
+  });
+
   it("does nothing when billing is off", async () => {
     f.deps.billing.enabled = false;
     await expect(new StartCheckout(f.deps).execute(anna, weddingId, "rsvp")).rejects.toBeInstanceOf(NotFoundError);
@@ -87,6 +97,12 @@ describe("HandlePaymentWebhook", () => {
     expect(await f.billingRepo.listByWedding(weddingId)).toEqual([
       expect.objectContaining({ tier: "rsvp", purchaseRef: "ord_1", provider: "testpay", validUntil: new Date("2028-06-13T00:00:00Z"), revokedAt: null }),
     ]);
+  });
+
+  it("stores who bought it when the event carries the buyer, and null otherwise", async () => {
+    await webhook(paid({ userId: anna.id }));
+    await webhook(paid({ eventId: "evt_2", purchaseRef: "ord_2", userId: null }));
+    expect((await f.billingRepo.listByWedding(weddingId)).map((e) => e.purchasedBy)).toEqual([anna.id, null]);
   });
 
   it("takes the tier from the product, not from anything the buyer controls", async () => {
@@ -149,5 +165,30 @@ describe("pricing and plans", () => {
     ]);
     f.deps.billing.enabled = false;
     expect(await new ListPurchases(f.deps).execute(anna.id)).toEqual([]);
+  });
+
+  it("shows an admin the packages another admin bought, with who bought them", async () => {
+    const ben = await f.users.create("ben@example.org");
+    await f.weddings.addMember(weddingId, ben.id, "admin");
+    await webhook(paid({ userId: anna.id }));
+    await f.users.updateFirstName(anna.id, "Anna");
+    const purchases = await new ListPurchases(f.deps).execute(ben.id);
+    expect(purchases).toEqual([expect.objectContaining({ weddingId, tier: "rsvp", purchasedBy: { id: anna.id, name: "Anna" } })]);
+    await f.users.updateFirstName(anna.id, "");
+    expect((await new ListPurchases(f.deps).execute(ben.id))[0]?.purchasedBy).toEqual({ id: anna.id, name: "anna@example.org" });
+  });
+
+  it("has no buyer for purchases without one or whose buyer is gone", async () => {
+    await webhook(paid());
+    await webhook(paid({ eventId: "evt_2", purchaseRef: "ord_2", userId: "00000000-0000-0000-0000-000000000000" }));
+    expect((await new ListPurchases(f.deps).execute(anna.id)).map((p) => p.purchasedBy)).toEqual([null, null]);
+  });
+
+  it("keeps wedding plans and purchases from editors", async () => {
+    const carla = await f.users.create("carla@example.org");
+    await f.weddings.addMember(weddingId, carla.id, "editor");
+    await webhook(paid({ userId: anna.id }));
+    expect(await new ListWeddingPlans(f.deps).execute(carla.id)).toEqual([]);
+    expect(await new ListPurchases(f.deps).execute(carla.id)).toEqual([]);
   });
 });

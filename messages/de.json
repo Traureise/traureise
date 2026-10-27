@@ -503,6 +503,7 @@
       "validUntil": "gültig bis {date}",
       "inactive": "nicht mehr aktiv",
       "purchasedAt": "gekauft am {date}",
+      "purchasedBy": "gekauft von {name}",
       "pricing": "Zu den Preisen",
       "lead": "Pakete gelten für eine Hochzeit."
     },

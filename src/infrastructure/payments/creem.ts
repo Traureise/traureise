@@ -34,7 +34,7 @@ export class CreemPaymentProvider implements PaymentProvider {
         request_id: request.requestId,
         success_url: request.successUrl,
         customer: { email: request.customerEmail },
-        metadata: { weddingId: request.weddingId, tier: request.tier },
+        metadata: { weddingId: request.weddingId, userId: request.userId, tier: request.tier },
         // An upgrade: Creem's per-checkout price override for one-time products, in cents.
         ...(request.priceCents === undefined ? {} : { custom_price: request.priceCents }),
       }),
@@ -59,9 +59,10 @@ export class CreemPaymentProvider implements PaymentProvider {
     switch (eventType) {
       case "checkout.completed": {
         const productId = object.product?.id;
-        const weddingId = object.metadata?.weddingId;
+        const { weddingId, userId } = object.metadata ?? {};
         if (!orderId || !productId) return { type: "ignored", eventId };
-        return { type: "paid", eventId, purchaseRef: orderId, productId, weddingId: typeof weddingId === "string" ? weddingId : null };
+        const strOrNull = (v: unknown) => (typeof v === "string" ? v : null);
+        return { type: "paid", eventId, purchaseRef: orderId, productId, weddingId: strOrNull(weddingId), userId: strOrNull(userId) };
       }
       case "refund.created":
       case "dispute.created":

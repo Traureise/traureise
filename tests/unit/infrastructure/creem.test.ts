@@ -22,7 +22,7 @@ const checkoutCompleted = {
     product: { id: "prod_rsvp", name: "RSVP", price: 4900, currency: "EUR", billing_type: "onetime" },
     customer: { id: "cust_1", object: "customer", email: "anna@example.org", name: "Anna" },
     status: "completed",
-    metadata: { weddingId: "6a1f0c62-2b0e-4b8e-9b4d-2b6a8c1f0e11", tier: "rsvp" },
+    metadata: { weddingId: "6a1f0c62-2b0e-4b8e-9b4d-2b6a8c1f0e11", userId: "3f2b9d1e-0000-4000-8000-000000000001", tier: "rsvp" },
     mode: "test",
   },
 };
@@ -60,6 +60,7 @@ describe("CreemPaymentProvider.createCheckout", () => {
     const result = await creem.createCheckout({
       productId: "prod_rsvp",
       weddingId: "w1",
+      userId: "u1",
       tier: "rsvp",
       customerEmail: "anna@example.org",
       successUrl: "https://traureise.example/dashboard?kauf=danke",
@@ -74,7 +75,7 @@ describe("CreemPaymentProvider.createCheckout", () => {
       request_id: "req_1",
       success_url: "https://traureise.example/dashboard?kauf=danke",
       customer: { email: "anna@example.org" },
-      metadata: { weddingId: "w1", tier: "rsvp" },
+      metadata: { weddingId: "w1", userId: "u1", tier: "rsvp" },
     });
   });
 
@@ -84,14 +85,14 @@ describe("CreemPaymentProvider.createCheckout", () => {
       body = JSON.parse(String(init!.body));
       return Response.json({ id: "ch_2", checkout_url: "https://checkout.creem.io/ch_2", status: "pending" });
     });
-    await creem.createCheckout({ productId: "prod_all", weddingId: "w1", tier: "complete", customerEmail: "a@b.de", successUrl: "https://x", requestId: "r", priceCents: 10000 });
+    await creem.createCheckout({ productId: "prod_all", weddingId: "w1", userId: "u1", tier: "complete", customerEmail: "a@b.de", successUrl: "https://x", requestId: "r", priceCents: 10000 });
     expect(body.custom_price).toBe(10000);
   });
 
   it("fails on API errors", async () => {
     const creem = provider(async () => new Response("nope", { status: 401 }));
     await expect(
-      creem.createCheckout({ productId: "p", weddingId: "w", tier: "rsvp", customerEmail: "a@b.de", successUrl: "https://x", requestId: "r" }),
+      creem.createCheckout({ productId: "p", weddingId: "w", userId: "u", tier: "rsvp", customerEmail: "a@b.de", successUrl: "https://x", requestId: "r" }),
     ).rejects.toThrow(/401/);
   });
 });
@@ -113,6 +114,7 @@ describe("CreemPaymentProvider.parseWebhook", () => {
       purchaseRef: "ord_4aDwWXjMLpes4Kj4XqNnUA",
       productId: "prod_rsvp",
       weddingId: "6a1f0c62-2b0e-4b8e-9b4d-2b6a8c1f0e11",
+      userId: "3f2b9d1e-0000-4000-8000-000000000001",
     });
   });
 

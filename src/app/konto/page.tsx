@@ -49,6 +49,7 @@ export default async function AccountPage() {
                     <li key={`${p.weddingId}-${p.tier}-${p.purchasedAt.toISOString()}`} className="space-y-0.5 py-2 first:pt-0" data-testid="purchase">
                       <p className="font-medium">{t("purchases.item", { tier: tPricing(`${p.tier}.name`), website: p.weddingTitle })}</p>
                       <p className="text-muted-foreground">{t("purchases.purchasedAt", { date: date(p.purchasedAt) })}</p>
+                      {p.purchasedBy && <p className="text-muted-foreground">{t("purchases.purchasedBy", { name: p.purchasedBy.name })}</p>}
                       <p className="text-muted-foreground">{p.active ? t("purchases.validUntil", { date: lastDay(p.validUntil) }) : t("purchases.inactive")}</p>
                     </li>
                   ))}
